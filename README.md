@@ -21,3 +21,15 @@ The `build` directory ships with the compiled JavaScript server (`build/index.js
 The server communicates over stdio and is typically used by clients such as Claude Desktop or other MCP-compatible tools.
 
 Refer to the files in `build_docs/` for API references, debugging instructions and the architecture overview.
+
+## Testing API Endpoints
+
+A small helper script `build_docs/api_test_tool.js` allows testing any SecurityScorecard REST endpoint. Provide the endpoint path and optionally your domain and API token. The `{domain}` placeholder inside the endpoint will be replaced with your domain.
+
+```bash
+# Example
+node build_docs/api_test_tool.js /companies/{domain}/issues?limit=5 \
+  --domain company.com --token YOUR_TOKEN
+```
+
+The script prints the HTTP status and a short preview of the response so you can validate what the API returns before integrating a new MCP tool.
