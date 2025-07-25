@@ -1,0 +1,3 @@
+node_modules/** -diff
+build/** -diff
+build_docs/** -diff
