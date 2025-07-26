@@ -4,7 +4,19 @@ This repository contains a compiled Model Context Protocol (MCP) server that int
 
 The `build` directory ships with the compiled JavaScript server (`build/index.js`). Documentation, debugging helpers and architecture references are in `build_docs/`.
 
-## Running the server
+## Quick setup
+
+Run the provided setup script to verify your Node.js installation, collect the
+required configuration values and launch the server:
+
+```bash
+./setup.sh
+```
+
+On Windows use `setup.ps1` instead. The script writes the entered values to a
+`.env` file so subsequent runs can reuse them.
+
+## Running the server manually
 
 1. Install Node.js (v18 or newer).
 2. Set your API token in the environment:
