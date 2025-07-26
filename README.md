@@ -4,6 +4,12 @@ This repository contains a compiled Model Context Protocol (MCP) server that int
 
 The `build` directory ships with the compiled JavaScript server (`build/index.js`). Documentation, debugging helpers and architecture references are in `build_docs/`.
 
+## Branch workflow
+
+The `main` branch contains the stable, production-ready code. Active development
+happens on the `dev` branch where new features and fixes are tested before being
+merged back into `main`.
+
 ## Quick setup
 
 Run the provided setup script to verify your Node.js installation, collect the
