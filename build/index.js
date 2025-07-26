@@ -2,6 +2,7 @@
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { CallToolRequestSchema, ErrorCode, ListToolsRequestSchema, McpError, } from "@modelcontextprotocol/sdk/types.js";
+import { getFindingsByCategory } from "./get_findings_by_category.js";
 // Security Scorecard API base URL
 const API_BASE_URL = "https://api.securityscorecard.io";
 class SecurityScorecardServer {
@@ -148,6 +149,20 @@ class SecurityScorecardServer {
                         },
                     },
                     {
+                        name: "get_findings_by_category",
+                        description: "Group security findings by SecurityScorecard factor to highlight weak areas",
+                        inputSchema: {
+                            type: "object",
+                            properties: {
+                                domain: {
+                                    type: "string",
+                                    description: `Company domain (defaults to ${this.config.defaultDomain})`,
+                                    default: this.config.defaultDomain,
+                                },
+                            },
+                        },
+                    },
+                    {
                         name: "get_historical_trend",
                         description: "Analyze security score trends over time to track improvement/deterioration patterns",
                         inputSchema: {
@@ -283,6 +298,8 @@ class SecurityScorecardServer {
                     return await this.getFactorBreakdown(domain);
                 case "get_findings_by_asset":
                     return await this.getFindingsByAsset(domain, request.params.arguments?.asset_type);
+                case "get_findings_by_category":
+                    return await this.getFindingsByCategory(domain);
                 case "get_historical_trend":
                     return await this.getHistoricalTrend(domain, request.params.arguments?.months, request.params.arguments?.factor);
                 case "get_remediation_plan":
@@ -457,6 +474,20 @@ class SecurityScorecardServer {
                         `- **Total Issues:** ${asset.issue_count}\n` +
                         `- **Critical:** ${asset.critical_count}, **High:** ${asset.high_count}\n` +
                         `- **Top Issues:** ${asset.issues.slice(0, 3).map((i) => i.issue_type).join(', ')}\n\n`).join('')}\n\n*Complete Asset Analysis:*\n\`\`\`json\n${JSON.stringify(assetSummary, null, 2)}\n\`\`\``,
+                },
+            ],
+        };
+    }
+    async getFindingsByCategory(domain) {
+        const factorSummary = await getFindingsByCategory(this.makeRequest.bind(this), domain);
+        return {
+            content: [
+                {
+                    type: "text",
+                    text: `# Security Findings by Category for ${domain}\n\n## Factor Risk Summary:\n\n${factorSummary.slice(0, 20).map((f) => `### ${f.factor}\n` +
+                        `- **Total Issues:** ${f.issue_count}\n` +
+                        `- **Critical:** ${f.critical_count}, **High:** ${f.high_count}\n` +
+                        `- **Top Issues:** ${f.issues.slice(0, 3).map((i) => i.issue_type).join(', ')}\n\n`).join('')}\n\n*Complete Category Analysis:*\n\`\`\`json\n${JSON.stringify(factorSummary, null, 2)}\n\`\`\``,
                 },
             ],
         };

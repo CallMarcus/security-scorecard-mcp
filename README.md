@@ -69,3 +69,20 @@ Claude Desktop looks for its configuration file at `%APPDATA%/Claude/claude_desk
 
 You can also find this example at `build_docs/claude_desktop_config.sample.json`.
 
+## MCP tools
+
+The MCP server exposes several tools that map to SecurityScorecard API queries.
+Invoke them using the MCP `call_tool` request type.
+
+- **get_findings_by_category** - Fetch current findings and group them by
+  SecurityScorecard factor to pinpoint weak areas.
+
+Example request:
+
+```json
+{
+  "name": "get_findings_by_category",
+  "arguments": {"domain": "example.com"}
+}
+```
+
