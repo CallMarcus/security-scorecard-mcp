@@ -12,7 +12,14 @@ This document provides guidance for working on the MCP repository.
 2. Run `setup.ps1` (Windows) or `setup.sh` (Linux/macOS).
    - The script asks for your company domain and API token.
    - These values are stored in `.env` for subsequent runs.
+   - Pass `--dev`/`-Dev` to install the latest development build instead of the
+     stable release.
 3. Start the server with `node build/index.js`.
+
+## Release channels
+`setup.*` and `scripts/update.*` download prebuilt files from GitHub releases.
+They default to the latest stable release. Supply `--dev` (or `-Dev` on Windows)
+to fetch the most recent development build instead.
 
 ## Developing and building
 1. Clone the repository and install dependencies:
