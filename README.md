@@ -22,6 +22,18 @@ required configuration values and launch the server:
 On Windows use `setup.ps1` instead. The script writes the entered values to a
 `.env` file so subsequent runs can reuse them.
 
+## Updating MCP
+
+Run the update script to download the latest tagged release and refresh the
+compiled files:
+
+```bash
+scripts/update.sh
+```
+
+On Windows use `scripts\update.ps1`. Add the `--dev` flag to pull the most
+recent development build.
+
 ## Running the server manually
 
 1. Install Node.js (v18 or newer).
