@@ -1,0 +1,17 @@
+{
+  "name": "security-scorecard-mcp",
+  "version": "0.1.0",
+  "description": "Compiled MCP server for the SecurityScorecard API",
+  "main": "build/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node build/index.js",
+    "test": "echo \"No tests specified\" && exit 0"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^0.6.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
