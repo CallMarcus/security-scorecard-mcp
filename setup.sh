@@ -14,6 +14,15 @@ if [ "$NODE_MAJOR" -lt 18 ]; then
   exit 1
 fi
 
+# Determine release channel (stable is default)
+CHANNEL=""
+if [[ "${1:-}" == "--dev" ]]; then
+  CHANNEL="--dev"
+fi
+
+# Pull latest release files before starting
+./scripts/update.sh $CHANNEL
+
 # Prompt for configuration
 read -p "Enter company domain: " COMPANY_DOMAIN
 read -s -p "Enter SecurityScorecard API token: " SECURITY_SCORECARD_API_TOKEN

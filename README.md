@@ -22,6 +22,32 @@ required configuration values and launch the server:
 On Windows use `setup.ps1` instead. The script writes the entered values to a
 `.env` file so subsequent runs can reuse them.
 
+## Release Channels
+
+`setup.sh` and `setup.ps1` download the latest build before starting the server.
+By default they fetch the stable release. Pass `--dev` to switch to the
+development channel.
+
+```bash
+# stable release
+./setup.sh
+
+# development build
+./setup.sh --dev
+```
+
+On Windows 11 run:
+
+```powershell
+# stable release
+.\setup.ps1
+
+# development build
+.\setup.ps1 --dev
+```
+
+You can change channels later by running the update script with the same flag.
+
 ## Updating MCP
 
 Run the update script to download the latest tagged release and refresh the
@@ -31,8 +57,13 @@ compiled files:
 scripts/update.sh
 ```
 
-On Windows use `scripts\update.ps1`. Add the `--dev` flag to pull the most
-recent development build.
+On Windows 11 run:
+
+```powershell
+.\scripts\update.ps1
+```
+
+Add `--dev`/`-Dev` to either command to pull the most recent development build.
 
 ## Running the server manually
 
