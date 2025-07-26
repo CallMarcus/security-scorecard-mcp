@@ -1,0 +1,14 @@
+{
+  "servers": {
+    "security-scorecard-enterprise": {
+      "command": "node",
+      "args": ["C:\\Temp\\scorecard\\build\\index.js"],
+      "env": {
+        "SECURITY_SCORECARD_API_TOKEN": "YOUR_TOKEN_HERE",
+        "COMPANY_DOMAIN": "example.com"
+      },
+      "shell": false
+    }
+  },
+  "defaultServer": "security-scorecard-enterprise"
+}

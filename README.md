@@ -45,3 +45,27 @@ node build_docs/api_test_tool.js /companies/{domain}/issues?limit=5 \
 ```
 
 The script prints the HTTP status and a short preview of the response so you can validate what the API returns before integrating a new MCP tool.
+
+## Sample Claude Desktop configuration
+
+Claude Desktop looks for its configuration file at `%APPDATA%/Claude/claude_desktop_config.json` on Windows. Below is a minimal example that references this MCP server. Replace the placeholder values with your own token and default domain.
+
+```json
+{
+  "servers": {
+    "security-scorecard-enterprise": {
+      "command": "node",
+      "args": ["C:\\Temp\\scorecard\\build\\index.js"],
+      "env": {
+        "SECURITY_SCORECARD_API_TOKEN": "YOUR_TOKEN_HERE",
+        "COMPANY_DOMAIN": "example.com"
+      },
+      "shell": false
+    }
+  },
+  "defaultServer": "security-scorecard-enterprise"
+}
+```
+
+You can also find this example at `build_docs/claude_desktop_config.sample.json`.
+
