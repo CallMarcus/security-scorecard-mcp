@@ -1,4 +1,7 @@
 # Requires PowerShell 5+
+Param(
+    [switch]$Dev
+)
 $ErrorActionPreference = 'Stop'
 
 # Verify Node.js 18+ is installed
@@ -12,6 +15,13 @@ $major = [int]$version.Split('.')[0]
 if ($major -lt 18) {
     Write-Error "Node.js 18+ is required. Found $(node --version)."
     exit 1
+}
+
+# Determine release channel and update files
+if ($Dev) {
+    .\scripts\update.ps1 -Dev
+} else {
+    .\scripts\update.ps1
 }
 
 $COMPANY_DOMAIN = Read-Host 'Enter company domain'
