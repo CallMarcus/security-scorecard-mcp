@@ -1,5 +1,3 @@
-**ChatGPT said:**
-
 **SecurityScorecard REST API Reference (20250725)**
 
 This reference summarises the major endpoints exposed by the **SecurityScorecard** REST API. It is based on the public documentation provided at securityscorecard.readme.io. The API uses JSON over **HTTPS**, is versioned using semantic versioning and requires an API token for authentication.

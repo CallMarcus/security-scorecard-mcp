@@ -4,6 +4,12 @@ This repository contains a compiled Model Context Protocol (MCP) server that int
 
 The `build` directory ships with the compiled JavaScript server (`build/index.js`). Documentation, debugging helpers and architecture references are in `build_docs/`.
 
+## Branch workflow
+
+The `main` branch contains the stable, production-ready code. Active development
+happens on the `dev` branch where new features and fixes are tested before being
+merged back into `main`.
+
 ## Quick setup
 
 Run the provided setup script to verify your Node.js installation, collect the
@@ -15,6 +21,49 @@ required configuration values and launch the server:
 
 On Windows use `setup.ps1` instead. The script writes the entered values to a
 `.env` file so subsequent runs can reuse them.
+
+## Release Channels
+
+`setup.sh` and `setup.ps1` download the latest build before starting the server.
+By default they fetch the stable release. Pass `--dev` to switch to the
+development channel.
+
+```bash
+# stable release
+./setup.sh
+
+# development build
+./setup.sh --dev
+```
+
+On Windows 11 run:
+
+```powershell
+# stable release
+.\setup.ps1
+
+# development build
+.\setup.ps1 --dev
+```
+
+You can change channels later by running the update script with the same flag.
+
+## Updating MCP
+
+Run the update script to download the latest tagged release and refresh the
+compiled files:
+
+```bash
+scripts/update.sh
+```
+
+On Windows 11 run:
+
+```powershell
+.\scripts\update.ps1
+```
+
+Add `--dev`/`-Dev` to either command to pull the most recent development build.
 
 ## Running the server manually
 
@@ -68,4 +117,21 @@ Claude Desktop looks for its configuration file at `%APPDATA%/Claude/claude_desk
 ```
 
 You can also find this example at `build_docs/claude_desktop_config.sample.json`.
+
+## MCP tools
+
+The MCP server exposes several tools that map to SecurityScorecard API queries.
+Invoke them using the MCP `call_tool` request type.
+
+- **get_findings_by_category** - Fetch current findings and group them by
+  SecurityScorecard factor to pinpoint weak areas.
+
+Example request:
+
+```json
+{
+  "name": "get_findings_by_category",
+  "arguments": {"domain": "example.com"}
+}
+```
 
