@@ -11,7 +11,18 @@ $api = if ($Dev) {
     "https://api.github.com/repos/$owner/$repo/releases/latest"
 }
 
-$release = Invoke-RestMethod -Uri $api
+$token = $env:GITHUB_TOKEN
+$headers = @{}
+if ($token) { $headers['Authorization'] = "Bearer $token" }
+
+$release = $null
+try {
+    $release = Invoke-RestMethod -Uri $api -Headers $headers
+} catch {
+    Write-Error "Failed to retrieve release info from $api."
+    Write-Error "Check your network connection or verify that the repository has published releases."
+    exit 1
+}
 $tag = $release.tag_name
 $zipUrl = $release.zipball_url
 
