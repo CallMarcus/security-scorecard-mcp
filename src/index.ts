@@ -2,6 +2,7 @@
 
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { getFindingsByCategory } from "./get_findings_by_category.js";
 import {
   CallToolRequestSchema,
   ErrorCode,
@@ -245,6 +246,17 @@ class ScoreImpactSecurityScorecardServer {
           }
         },
         {
+          name: "get_findings_by_category",
+          description: "📊 List findings grouped by factor for a company domain.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              domain: { type: "string", description: "Company domain to analyze.", default: this.config.defaultDomain }
+            },
+            required: ["domain"]
+          }
+        },
+        {
           name: "call_api_endpoint",
           description: "🔧 Low-level helper to query any SecurityScorecard API endpoint.",
           inputSchema: {
@@ -289,6 +301,11 @@ class ScoreImpactSecurityScorecardServer {
           return await this.getFindingsByAsset(
             domain,
             request.params.arguments?.asset_type as string
+          );
+
+        case "get_findings_by_category":
+          return await this.getFindingsByCategoryTool(
+            domain
           );
 
         case "call_api_endpoint":
@@ -559,6 +576,17 @@ class ScoreImpactSecurityScorecardServer {
         text += `\n\n\`\`\`json\n${JSON.stringify(results, null, 2)}\n\`\`\``;
     } catch (error: any) {
         text += `Error retrieving asset findings: ${error.message}`;
+    }
+    return { content: [{ type: "text", text }] };
+  }
+
+  private async getFindingsByCategoryTool(domain: string): Promise<any> {
+    let text = `# 📊 FINDINGS BY CATEGORY: ${domain}\n\n`;
+    try {
+      const summary = await getFindingsByCategory(this.makeRequest.bind(this), domain);
+      text += `\n\n\`\`\`json\n${JSON.stringify(summary, null, 2)}\n\`\`\``;
+    } catch (error: any) {
+      text += `Error retrieving category findings: ${error.message}`;
     }
     return { content: [{ type: "text", text }] };
   }

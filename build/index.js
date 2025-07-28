@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { getFindingsByCategory } from "./get_findings_by_category.js";
 import { CallToolRequestSchema, ErrorCode, ListToolsRequestSchema, McpError, } from "@modelcontextprotocol/sdk/types.js";
 // Base URL for the Security Scorecard API
 const API_BASE_URL = "https://api.securityscorecard.io";
@@ -167,6 +168,17 @@ class ScoreImpactSecurityScorecardServer {
                         }
                     },
                     {
+                        name: "get_findings_by_category",
+                        description: "📊 List findings grouped by factor for a company domain.",
+                        inputSchema: {
+                            type: "object",
+                            properties: {
+                                domain: { type: "string", description: "Company domain to analyze.", default: this.config.defaultDomain }
+                            },
+                            required: ["domain"]
+                        }
+                    },
+                    {
                         name: "call_api_endpoint",
                         description: "🔧 Low-level helper to query any SecurityScorecard API endpoint.",
                         inputSchema: {
@@ -195,6 +207,8 @@ class ScoreImpactSecurityScorecardServer {
                     return await this.findHighImpactFindingsAcrossAssets(request.params.arguments?.issue_types || this.config.defaultIssueTypes);
                 case "get_findings_by_asset":
                     return await this.getFindingsByAsset(domain, request.params.arguments?.asset_type);
+                case "get_findings_by_category":
+                    return await this.getFindingsByCategoryTool(domain);
                 case "call_api_endpoint":
                     return await this.callApiEndpoint(request.params.arguments?.endpoint, request.params.arguments?.method ?? "GET", request.params.arguments?.body);
                 default:
@@ -409,6 +423,17 @@ class ScoreImpactSecurityScorecardServer {
         }
         catch (error) {
             text += `Error retrieving asset findings: ${error.message}`;
+        }
+        return { content: [{ type: "text", text }] };
+    }
+    async getFindingsByCategoryTool(domain) {
+        let text = `# 📊 FINDINGS BY CATEGORY: ${domain}\n\n`;
+        try {
+            const summary = await getFindingsByCategory(this.makeRequest.bind(this), domain);
+            text += `\n\n\`\`\`json\n${JSON.stringify(summary, null, 2)}\n\`\`\``;
+        }
+        catch (error) {
+            text += `Error retrieving category findings: ${error.message}`;
         }
         return { content: [{ type: "text", text }] };
     }
