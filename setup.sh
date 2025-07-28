@@ -27,14 +27,17 @@ fi
 read -p "Enter company domain: " COMPANY_DOMAIN
 read -s -p "Enter SecurityScorecard API token: " SECURITY_SCORECARD_API_TOKEN
 echo
+read -p "Default issue types (comma-separated): " DEFAULT_ISSUE_TYPES
 
 export COMPANY_DOMAIN
 export SECURITY_SCORECARD_API_TOKEN
+export DEFAULT_ISSUE_TYPES
 
 # Persist to .env for future runs
 cat > .env <<EOV
 COMPANY_DOMAIN="$COMPANY_DOMAIN"
 SECURITY_SCORECARD_API_TOKEN="$SECURITY_SCORECARD_API_TOKEN"
+DEFAULT_ISSUE_TYPES="$DEFAULT_ISSUE_TYPES"
 EOV
 
 # Launch the MCP server

@@ -17,7 +17,10 @@ class ScoreImpactSecurityScorecardServer {
         });
         this.config = {
             apiToken: process.env.SECURITY_SCORECARD_API_TOKEN || "",
-            defaultDomain: process.env.COMPANY_DOMAIN || "neste.com",
+            defaultDomain: process.env.COMPANY_DOMAIN || "",
+            defaultIssueTypes: process.env.DEFAULT_ISSUE_TYPES
+                ? process.env.DEFAULT_ISSUE_TYPES.split(',').map(s => s.trim()).filter(Boolean)
+                : [],
             debugMode: process.env.DEBUG_MODE === "true",
         };
         this.setupToolHandlers();
@@ -146,7 +149,7 @@ class ScoreImpactSecurityScorecardServer {
                                     type: "array",
                                     items: { type: "string" },
                                     description: "Comma-separated list of issue types to scan for.",
-                                    default: ["spf_record_missing", "dmarc_contains_none", "patching_cadence_v3_critical"]
+                                    default: this.config.defaultIssueTypes
                                 }
                             }
                         }
@@ -177,7 +180,7 @@ class ScoreImpactSecurityScorecardServer {
                 case "get_issues_by_roi":
                     return await this.getIssuesByROI(domain, request.params.arguments?.top_n);
                 case "find_high_impact_findings_across_assets":
-                    return await this.findHighImpactFindingsAcrossAssets(request.params.arguments?.issue_types);
+                    return await this.findHighImpactFindingsAcrossAssets(request.params.arguments?.issue_types || this.config.defaultIssueTypes);
                 case "call_api_endpoint":
                     return await this.callApiEndpoint(request.params.arguments?.endpoint, request.params.arguments?.method ?? "GET", request.params.arguments?.body);
                 default:
@@ -331,6 +334,9 @@ class ScoreImpactSecurityScorecardServer {
         return { content: [{ type: "text", text }] };
     }
     async findHighImpactFindingsAcrossAssets(issueTypes) {
+        if (!issueTypes || issueTypes.length === 0) {
+            return { content: [{ type: "text", text: "No issue types specified." }] };
+        }
         let text = `# 🔍 TACTICAL FINDINGS ACROSS ALL ASSETS\n\nScanning for: ${issueTypes.join(', ')}\n\n`;
         try {
             const assetsResponse = await this.makeRequest('/esi/assets?type=domain');

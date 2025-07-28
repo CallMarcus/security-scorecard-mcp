@@ -13,14 +13,19 @@ merged back into `main`.
 ## Quick setup
 
 Run the provided setup script to verify your Node.js installation, collect the
-required configuration values and launch the server:
+required configuration values and launch the server. The script now also allows
+setting a comma-separated list of default issue types used by some tools:
 
 ```bash
 ./setup.sh
 ```
 
 On Windows use `setup.ps1` instead. The script writes the entered values to a
-`.env` file so subsequent runs can reuse them.
+`.env` file so subsequent runs can reuse them. You'll be prompted for:
+
+1. The company domain used in most queries
+2. Your SecurityScorecard API token
+3. (Optional) default issue types to scan across assets
 
 ## Release Channels
 
@@ -77,6 +82,8 @@ Add `--dev`/`-Dev` to either command to pull the most recent development build.
    export SECURITY_SCORECARD_API_TOKEN="<your-token>"
    # optional default domain for queries
    export COMPANY_DOMAIN="example.com"
+   # optional default issue types used by some tools
+   export DEFAULT_ISSUE_TYPES="spf_record_missing,dmarc_contains_none,patching_cadence_v3_critical"
    ```
 3. Start the MCP server:
    ```bash
@@ -111,7 +118,8 @@ Claude Desktop looks for its configuration file at `%APPDATA%/Claude/claude_desk
       "args": ["C:\\Temp\\scorecard\\build\\index.js"],
       "env": {
         "SECURITY_SCORECARD_API_TOKEN": "YOUR_TOKEN_HERE",
-        "COMPANY_DOMAIN": "example.com"
+        "COMPANY_DOMAIN": "example.com",
+        "DEFAULT_ISSUE_TYPES": "spf_record_missing,dmarc_contains_none,patching_cadence_v3_critical"
       },
       "shell": false
     }

@@ -63,6 +63,7 @@ class ScoreImpactSecurityScorecardServer {
   private config: {
     apiToken: string;
     defaultDomain: string;
+    defaultIssueTypes: string[];
     debugMode: boolean;
   };
   private factorCache: Factor[] | null = null;
@@ -82,7 +83,10 @@ class ScoreImpactSecurityScorecardServer {
 
     this.config = {
       apiToken: process.env.SECURITY_SCORECARD_API_TOKEN || "",
-      defaultDomain: process.env.COMPANY_DOMAIN || "neste.com",
+      defaultDomain: process.env.COMPANY_DOMAIN || "",
+      defaultIssueTypes: process.env.DEFAULT_ISSUE_TYPES
+        ? process.env.DEFAULT_ISSUE_TYPES.split(',').map(s => s.trim()).filter(Boolean)
+        : [],
       debugMode: process.env.DEBUG_MODE === "true",
     };
 
@@ -223,7 +227,7 @@ class ScoreImpactSecurityScorecardServer {
                   type: "array",
                   items: { type: "string" },
                   description: "Comma-separated list of issue types to scan for.",
-                  default: ["spf_record_missing", "dmarc_contains_none", "patching_cadence_v3_critical"]
+                  default: this.config.defaultIssueTypes
                 }
               }
             }
@@ -266,7 +270,7 @@ class ScoreImpactSecurityScorecardServer {
         
         case "find_high_impact_findings_across_assets":
           return await this.findHighImpactFindingsAcrossAssets(
-            request.params.arguments?.issue_types as string[]
+            (request.params.arguments?.issue_types as string[]) || this.config.defaultIssueTypes
           );
 
         case "call_api_endpoint":
@@ -462,6 +466,10 @@ class ScoreImpactSecurityScorecardServer {
   }
 
   private async findHighImpactFindingsAcrossAssets(issueTypes: string[]): Promise<any> {
+    if (!issueTypes || issueTypes.length === 0) {
+      return { content: [{ type: "text", text: "No issue types specified." }] };
+    }
+
     let text = `# 🔍 TACTICAL FINDINGS ACROSS ALL ASSETS\n\nScanning for: ${issueTypes.join(', ')}\n\n`;
     
     try {
