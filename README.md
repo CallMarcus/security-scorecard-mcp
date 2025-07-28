@@ -175,6 +175,15 @@ The server exposes the following tools. Invoke them with the MCP `call_tool` req
 }
 ```
 
+- **get_findings_by_asset** - List issues grouped by each asset using the ESI API.
+
+```json
+{
+  "name": "get_findings_by_asset",
+  "arguments": {"domain": "example.com", "asset_type": "domain"}
+}
+```
+
 - **call_api_endpoint** - Generic helper to query any SecurityScorecard REST endpoint. Use this for custom API paths not yet covered by the built-in tools.
 
 ```json

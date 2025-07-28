@@ -216,27 +216,39 @@ class ScoreImpactSecurityScorecardServer {
               },
                required: ["domain"],
             },
-          },
-          {
-            name: "find_high_impact_findings_across_assets",
-            description: "🔍 TACTICAL: Scan all company assets to find the most common, high-impact findings.",
-            inputSchema: {
-              type: "object",
-              properties: {
-                issue_types: {
-                  type: "array",
-                  items: { type: "string" },
-                  description: "Comma-separated list of issue types to scan for.",
-                  default: this.config.defaultIssueTypes
-                }
+        },
+        {
+          name: "find_high_impact_findings_across_assets",
+          description: "🔍 TACTICAL: Scan all company assets to find the most common, high-impact findings.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              issue_types: {
+                type: "array",
+                items: { type: "string" },
+                description: "Comma-separated list of issue types to scan for.",
+                default: this.config.defaultIssueTypes
               }
             }
-          },
-          {
-            name: "call_api_endpoint",
-            description: "🔧 Low-level helper to query any SecurityScorecard API endpoint.",
-            inputSchema: {
-              type: "object",
+          }
+        },
+        {
+          name: "get_findings_by_asset",
+          description: "🔍 List issues for each asset matching the given domain using ESI endpoints.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              domain: { type: "string", description: "Domain to filter assets.", default: this.config.defaultDomain },
+              asset_type: { type: "string", enum: ["domain", "ip_address"], default: "domain", description: "Asset type to query" }
+            },
+            required: ["domain"]
+          }
+        },
+        {
+          name: "call_api_endpoint",
+          description: "🔧 Low-level helper to query any SecurityScorecard API endpoint.",
+          inputSchema: {
+            type: "object",
               properties: {
                 endpoint: { type: "string", description: "REST API path, e.g. /companies/example.com" },
                 method: { type: "string", default: "GET", description: "HTTP method" },
@@ -271,6 +283,12 @@ class ScoreImpactSecurityScorecardServer {
         case "find_high_impact_findings_across_assets":
           return await this.findHighImpactFindingsAcrossAssets(
             (request.params.arguments?.issue_types as string[]) || this.config.defaultIssueTypes
+          );
+
+        case "get_findings_by_asset":
+          return await this.getFindingsByAsset(
+            domain,
+            request.params.arguments?.asset_type as string
           );
 
         case "call_api_endpoint":
@@ -518,6 +536,30 @@ class ScoreImpactSecurityScorecardServer {
         text += `**An error occurred during the scan:** ${error.message}`;
     }
 
+    return { content: [{ type: "text", text }] };
+  }
+
+  private async getFindingsByAsset(domain: string, assetType: string = "domain"): Promise<any> {
+    let text = `# 🔍 FINDINGS BY ASSET: ${domain}\n\n`;
+    try {
+        const assetsResponse = await this.makeRequest(`/esi/assets?type=${assetType}`);
+        const assets: Asset[] = (assetsResponse.entries || []).filter((a: Asset) => a.name.includes(domain));
+
+        if (assets.length === 0) {
+            return { content: [{ type: "text", text: `No ${assetType} assets found for ${domain}.` }] };
+        }
+
+        const results: Record<string, Issue[]> = {};
+        for (const asset of assets) {
+            const issues = await this.makeRequest(`/esi/assets/${asset.id}/issues`);
+            results[asset.name] = issues.entries || [];
+        }
+
+        text += `Found ${assets.length} ${assetType} assets.`;
+        text += `\n\n\`\`\`json\n${JSON.stringify(results, null, 2)}\n\`\`\``;
+    } catch (error: any) {
+        text += `Error retrieving asset findings: ${error.message}`;
+    }
     return { content: [{ type: "text", text }] };
   }
 
