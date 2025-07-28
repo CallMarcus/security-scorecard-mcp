@@ -184,6 +184,24 @@ The server exposes the following tools. Invoke them with the MCP `call_tool` req
 }
 ```
 
+- **get_findings_by_category** - List issues grouped by SecurityScorecard factor.
+
+```json
+{
+  "name": "get_findings_by_category",
+  "arguments": {"domain": "example.com"}
+}
+```
+
+- **generate_remediation_report** - Retrieve all findings and output remediation advice prioritized by factor.
+
+```json
+{
+  "name": "generate_remediation_report",
+  "arguments": {"domain": "example.com"}
+}
+```
+
 - **call_api_endpoint** - Generic helper to query any SecurityScorecard REST endpoint. Use this for custom API paths not yet covered by the built-in tools.
 
 ```json
