@@ -150,6 +150,19 @@ class ScoreImpactSecurityScorecardServer {
                                 }
                             }
                         }
+                    },
+                    {
+                        name: "call_api_endpoint",
+                        description: "🔧 Low-level helper to query any SecurityScorecard API endpoint.",
+                        inputSchema: {
+                            type: "object",
+                            properties: {
+                                endpoint: { type: "string", description: "REST API path, e.g. /companies/example.com" },
+                                method: { type: "string", default: "GET", description: "HTTP method" },
+                                body: { type: "object", description: "Optional JSON body for POST/PUT" }
+                            },
+                            required: ["endpoint"]
+                        }
                     }
                 ],
             };
@@ -165,6 +178,8 @@ class ScoreImpactSecurityScorecardServer {
                     return await this.getIssuesByROI(domain, request.params.arguments?.top_n);
                 case "find_high_impact_findings_across_assets":
                     return await this.findHighImpactFindingsAcrossAssets(request.params.arguments?.issue_types);
+                case "call_api_endpoint":
+                    return await this.callApiEndpoint(request.params.arguments?.endpoint, request.params.arguments?.method ?? "GET", request.params.arguments?.body);
                 default:
                     throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${request.params.name}`);
             }
@@ -354,6 +369,12 @@ class ScoreImpactSecurityScorecardServer {
         catch (error) {
             text += `**An error occurred during the scan:** ${error.message}`;
         }
+        return { content: [{ type: "text", text }] };
+    }
+    async callApiEndpoint(endpoint, method = "GET", body) {
+        const json = await this.makeRequest(endpoint, method, body);
+        const summary = `Response from \`${endpoint}\``;
+        const text = `${summary}\n\n\`\`\`json\n${JSON.stringify(json, null, 2)}\n\`\`\``;
         return { content: [{ type: "text", text }] };
     }
     // --- HELPER METHODS ---

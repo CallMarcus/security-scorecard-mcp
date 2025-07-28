@@ -139,3 +139,17 @@ Example request:
 }
 ```
 
+- **call_api_endpoint** - Send a raw request to any SecurityScorecard REST endpoint.
+
+Example request:
+
+```json
+{
+  "name": "call_api_endpoint",
+  "arguments": {
+    "endpoint": "/companies/example.com",
+    "method": "GET"
+  }
+}
+```
+
