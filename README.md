@@ -184,6 +184,13 @@ The server exposes the following tools. Invoke them with the MCP `call_tool` req
 }
 ```
 
+On Windows 11 run:
+
+```powershell
+echo '{"type":"call_tool","id":1,"params":{"name":"get_findings_by_asset","arguments":{"domain":"example.com","asset_type":"domain"}}}' |
+  node .\build\index.js
+```
+
 - **get_findings_by_category** - List issues grouped by SecurityScorecard factor.
 
 ```json
@@ -193,6 +200,13 @@ The server exposes the following tools. Invoke them with the MCP `call_tool` req
 }
 ```
 
+On Windows 11 run:
+
+```powershell
+echo '{"type":"call_tool","id":1,"params":{"name":"get_findings_by_category","arguments":{"domain":"example.com"}}}' |
+  node .\build\index.js
+```
+
 - **generate_remediation_report** - Retrieve all findings and output remediation advice prioritized by factor.
 
 ```json
@@ -200,6 +214,13 @@ The server exposes the following tools. Invoke them with the MCP `call_tool` req
   "name": "generate_remediation_report",
   "arguments": {"domain": "example.com"}
 }
+```
+
+On Windows 11 run:
+
+```powershell
+echo '{"type":"call_tool","id":1,"params":{"name":"generate_remediation_report","arguments":{"domain":"example.com"}}}' |
+  node .\build\index.js
 ```
 
 - **call_api_endpoint** - Generic helper to query any SecurityScorecard REST endpoint. Use this for custom API paths not yet covered by the built-in tools.
