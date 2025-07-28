@@ -9,7 +9,17 @@ if [[ "${1:-}" == "--dev" ]]; then
   API="https://api.github.com/repos/$OWNER/$REPO/releases/tags/dev"
 fi
 
-info=$(curl -fsSL "$API")
+TOKEN=${GITHUB_TOKEN:-}
+CURL_ARGS=("-fsSL")
+if [[ -n "$TOKEN" ]]; then
+  CURL_ARGS+=("-H" "Authorization: Bearer $TOKEN")
+fi
+
+if ! info=$(curl "${CURL_ARGS[@]}" "$API"); then
+  echo "Failed to retrieve release info from $API" >&2
+  echo "Check your network connection or verify that the repository has published releases." >&2
+  exit 1
+fi
 TAG=$(echo "$info" | jq -r .tag_name)
 ZIP=$(echo "$info" | jq -r .zipball_url)
 

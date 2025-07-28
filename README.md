@@ -48,6 +48,10 @@ On Windows 11 run:
 
 You can change channels later by running the update script with the same flag.
 
+If this repository is private, set a `GITHUB_TOKEN` environment variable with a
+personal access token before running the setup or update scripts. The token
+needs `repo` scope so the scripts can fetch release assets.
+
 ## Updating MCP
 
 Run the update script to download the latest tagged release and refresh the
