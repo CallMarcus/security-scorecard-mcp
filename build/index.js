@@ -155,6 +155,18 @@ class ScoreImpactSecurityScorecardServer {
                         }
                     },
                     {
+                        name: "get_findings_by_asset",
+                        description: "🔍 List issues for each asset matching the given domain using ESI endpoints.",
+                        inputSchema: {
+                            type: "object",
+                            properties: {
+                                domain: { type: "string", description: "Domain to filter assets.", default: this.config.defaultDomain },
+                                asset_type: { type: "string", enum: ["domain", "ip_address"], default: "domain", description: "Asset type to query" }
+                            },
+                            required: ["domain"]
+                        }
+                    },
+                    {
                         name: "call_api_endpoint",
                         description: "🔧 Low-level helper to query any SecurityScorecard API endpoint.",
                         inputSchema: {
@@ -181,6 +193,8 @@ class ScoreImpactSecurityScorecardServer {
                     return await this.getIssuesByROI(domain, request.params.arguments?.top_n);
                 case "find_high_impact_findings_across_assets":
                     return await this.findHighImpactFindingsAcrossAssets(request.params.arguments?.issue_types || this.config.defaultIssueTypes);
+                case "get_findings_by_asset":
+                    return await this.getFindingsByAsset(domain, request.params.arguments?.asset_type);
                 case "call_api_endpoint":
                     return await this.callApiEndpoint(request.params.arguments?.endpoint, request.params.arguments?.method ?? "GET", request.params.arguments?.body);
                 default:
@@ -374,6 +388,27 @@ class ScoreImpactSecurityScorecardServer {
         }
         catch (error) {
             text += `**An error occurred during the scan:** ${error.message}`;
+        }
+        return { content: [{ type: "text", text }] };
+    }
+    async getFindingsByAsset(domain, assetType = "domain") {
+        let text = `# 🔍 FINDINGS BY ASSET: ${domain}\n\n`;
+        try {
+            const assetsResponse = await this.makeRequest(`/esi/assets?type=${assetType}`);
+            const assets = (assetsResponse.entries || []).filter((a) => a.name.includes(domain));
+            if (assets.length === 0) {
+                return { content: [{ type: "text", text: `No ${assetType} assets found for ${domain}.` }] };
+            }
+            const results = {};
+            for (const asset of assets) {
+                const issues = await this.makeRequest(`/esi/assets/${asset.id}/issues`);
+                results[asset.name] = issues.entries || [];
+            }
+            text += `Found ${assets.length} ${assetType} assets.`;
+            text += `\n\n\`\`\`json\n${JSON.stringify(results, null, 2)}\n\`\`\``;
+        }
+        catch (error) {
+            text += `Error retrieving asset findings: ${error.message}`;
         }
         return { content: [{ type: "text", text }] };
     }
