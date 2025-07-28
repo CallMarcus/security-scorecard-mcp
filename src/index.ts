@@ -227,6 +227,19 @@ class ScoreImpactSecurityScorecardServer {
                 }
               }
             }
+          },
+          {
+            name: "call_api_endpoint",
+            description: "🔧 Low-level helper to query any SecurityScorecard API endpoint.",
+            inputSchema: {
+              type: "object",
+              properties: {
+                endpoint: { type: "string", description: "REST API path, e.g. /companies/example.com" },
+                method: { type: "string", default: "GET", description: "HTTP method" },
+                body: { type: "object", description: "Optional JSON body for POST/PUT" }
+              },
+              required: ["endpoint"]
+            }
           }
         ],
       };
@@ -254,6 +267,13 @@ class ScoreImpactSecurityScorecardServer {
         case "find_high_impact_findings_across_assets":
           return await this.findHighImpactFindingsAcrossAssets(
             request.params.arguments?.issue_types as string[]
+          );
+
+        case "call_api_endpoint":
+          return await this.callApiEndpoint(
+            request.params.arguments?.endpoint as string,
+            request.params.arguments?.method as string ?? "GET",
+            request.params.arguments?.body
           );
 
         default:
@@ -490,6 +510,13 @@ class ScoreImpactSecurityScorecardServer {
         text += `**An error occurred during the scan:** ${error.message}`;
     }
 
+    return { content: [{ type: "text", text }] };
+  }
+
+  private async callApiEndpoint(endpoint: string, method: string = "GET", body?: any): Promise<any> {
+    const json = await this.makeRequest(endpoint, method, body);
+    const summary = `Response from \`${endpoint}\``;
+    const text = `${summary}\n\n\`\`\`json\n${JSON.stringify(json, null, 2)}\n\`\`\``;
     return { content: [{ type: "text", text }] };
   }
 
