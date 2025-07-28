@@ -3,7 +3,7 @@
 
 const API_TOKEN = process.env.SECURITY_SCORECARD_API_TOKEN || "YOUR_TOKEN_HERE";
 const API_BASE_URL = "https://api.securityscorecard.io";
-const TEST_DOMAIN = "neste.com";
+const TEST_DOMAIN = process.env.COMPANY_DOMAIN || "example.com";
 
 async function testEndpoint(name, endpoint) {
     console.log(`\n${'='.repeat(60)}`);
