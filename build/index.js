@@ -2,16 +2,14 @@
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { CallToolRequestSchema, ErrorCode, ListToolsRequestSchema, McpError, } from "@modelcontextprotocol/sdk/types.js";
-import { getFindingsByCategory } from "./get_findings_by_category.js";
-// Security Scorecard API base URL
+// Base URL for the Security Scorecard API
 const API_BASE_URL = "https://api.securityscorecard.io";
-class SecurityScorecardServer {
-    server;
-    config;
+class ScoreImpactSecurityScorecardServer {
     constructor() {
+        this.factorCache = null;
         this.server = new Server({
-            name: "security-scorecard-enterprise-server",
-            version: "0.1.0",
+            name: "score-impact-securityscorecard-server-live",
+            version: "4.0.2", // Incremented version for the fix
         }, {
             capabilities: {
                 tools: {},
@@ -20,578 +18,418 @@ class SecurityScorecardServer {
         this.config = {
             apiToken: process.env.SECURITY_SCORECARD_API_TOKEN || "",
             defaultDomain: process.env.COMPANY_DOMAIN || "neste.com",
+            debugMode: process.env.DEBUG_MODE === "true",
         };
         this.setupToolHandlers();
     }
+    /**
+     * Makes a request to the Security Scorecard API with robust error handling and pagination support.
+     * @param endpoint The API endpoint to call.
+     * @param method The HTTP method (defaults to GET).
+     * @param body The request body for POST/PUT requests.
+     * @returns A promise that resolves to the full, aggregated list of entries from all pages.
+     */
     async makeRequest(endpoint, method = "GET", body) {
         if (!this.config.apiToken) {
-            throw new McpError(ErrorCode.InvalidRequest, "Security Scorecard API token not configured. Set SECURITY_SCORECARD_API_TOKEN environment variable.");
+            throw new McpError(ErrorCode.InvalidRequest, "Security Scorecard API token not configured. Set the SECURITY_SCORECARD_API_TOKEN environment variable.");
         }
-        const url = `${API_BASE_URL}${endpoint}`;
-        const headers = {
-            "Authorization": `Token ${this.config.apiToken}`,
-            "Accept": "application/json",
-        };
-        if (method !== "GET" && body) {
-            headers["Content-Type"] = "application/json";
-        }
-        try {
-            const response = await fetch(url, {
+        let allEntries = [];
+        let nextUrl = `${API_BASE_URL}${endpoint}`;
+        while (nextUrl) {
+            if (this.config.debugMode) {
+                console.error(`[API Call] Fetching: ${nextUrl}`);
+            }
+            const response = await fetch(nextUrl, {
                 method,
-                headers,
+                headers: {
+                    "Authorization": `Token ${this.config.apiToken}`,
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                },
                 body: body ? JSON.stringify(body) : undefined,
             });
             if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                const errorText = await response.text();
+                switch (response.status) {
+                    case 401:
+                        throw new McpError(ErrorCode.InvalidRequest, `Authentication failed. Please check your API token. (HTTP 401)`);
+                    case 403:
+                        throw new McpError(ErrorCode.InvalidRequest, `Permission denied. Your API token may not have access to this resource. (HTTP 403)`);
+                    case 404:
+                        throw new McpError(ErrorCode.InvalidRequest, `Resource not found at ${endpoint}. Check the domain or identifier. (HTTP 404)`);
+                    case 429:
+                        const retryAfter = response.headers.get('Retry-After') || '60';
+                        throw new McpError(ErrorCode.InvalidRequest, `Rate limit exceeded. Please wait ${retryAfter} seconds before trying again. (HTTP 429)`);
+                    default:
+                        throw new McpError(ErrorCode.InternalError, `API request failed with status ${response.status}: ${errorText}`);
+                }
             }
-            return await response.json();
+            const pageJson = await response.json();
+            if (pageJson.entries) {
+                allEntries = allEntries.concat(pageJson.entries);
+            }
+            else {
+                // For non-paginated endpoints, return the whole response
+                return pageJson;
+            }
+            // Check for cursor-based pagination
+            if (pageJson.next_cursor) {
+                // FIX: Explicitly typed `url` to avoid implicit 'any' error.
+                const url = new URL(nextUrl);
+                url.searchParams.set('cursor', pageJson.next_cursor);
+                nextUrl = url.toString();
+            }
+            else {
+                nextUrl = null;
+            }
         }
-        catch (error) {
-            throw new McpError(ErrorCode.InternalError, `Security Scorecard API request failed: ${error instanceof Error ? error.message : String(error)}`);
+        return { entries: allEntries };
+    }
+    /**
+     * Fetches and caches the list of all security factors and their weights.
+     * @returns A promise that resolves to an array of Factor objects.
+     */
+    async getFactors() {
+        if (this.factorCache) {
+            return this.factorCache;
         }
+        const data = await this.makeRequest('/factors');
+        this.factorCache = data.entries;
+        return this.factorCache;
     }
     setupToolHandlers() {
         this.server.setRequestHandler(ListToolsRequestSchema, async () => {
             return {
                 tools: [
                     {
-                        name: "get_company_overview",
-                        description: "Get comprehensive security overview for your company including current score, grade, and key metrics",
+                        name: "get_score_improvement_roadmap",
+                        description: "🎯 STRATEGIC: Get a roadmap to improve from the current grade to a target grade, with ROI prioritization.",
                         inputSchema: {
                             type: "object",
                             properties: {
-                                domain: {
-                                    type: "string",
-                                    description: `Company domain to analyze (defaults to ${this.config.defaultDomain})`,
-                                    default: this.config.defaultDomain,
-                                },
+                                domain: { type: "string", description: "The company domain to analyze.", default: this.config.defaultDomain },
+                                target_grade: { type: "string", enum: ["C", "B", "A"], description: "The target grade to achieve.", default: "A" },
                             },
+                            required: ["domain", "target_grade"],
                         },
                     },
                     {
-                        name: "get_current_findings",
-                        description: "Get all current security findings/issues for your company with detailed breakdown by category",
+                        name: "calculate_factor_score_impact",
+                        description: "💰 ROI ANALYSIS: Calculate which security factors have the biggest impact on the overall score based on real data.",
                         inputSchema: {
                             type: "object",
                             properties: {
-                                domain: {
-                                    type: "string",
-                                    description: `Company domain (defaults to ${this.config.defaultDomain})`,
-                                    default: this.config.defaultDomain,
-                                },
-                                severity: {
-                                    type: "string",
-                                    enum: ["critical", "high", "medium", "low"],
-                                    description: "Filter by severity level (optional)",
-                                },
-                                factor: {
-                                    type: "string",
-                                    description: "Filter by security factor (e.g., 'application_security', 'network_security')",
-                                },
-                                limit: {
-                                    type: "number",
-                                    description: "Maximum number of findings to return (default: 100)",
-                                    default: 100,
-                                },
+                                domain: { type: "string", description: "The company domain to analyze.", default: this.config.defaultDomain },
                             },
+                            required: ["domain"],
                         },
                     },
                     {
-                        name: "analyze_findings_by_priority",
-                        description: "Analyze and prioritize security findings based on risk impact, helping focus remediation efforts",
+                        name: "get_issues_by_roi",
+                        description: "🚀 PRIORITY: Get a list of active issue types ranked by ROI (Score Impact vs. Implementation Effort).",
                         inputSchema: {
                             type: "object",
                             properties: {
-                                domain: {
-                                    type: "string",
-                                    description: `Company domain (defaults to ${this.config.defaultDomain})`,
-                                    default: this.config.defaultDomain,
-                                },
-                                include_remediation: {
-                                    type: "boolean",
-                                    description: "Include remediation recommendations (default: true)",
-                                    default: true,
-                                },
+                                domain: { type: "string", description: "The company domain to analyze.", default: this.config.defaultDomain },
+                                top_n: { type: "number", default: 10, description: "Number of top ROI issues to return." },
                             },
+                            required: ["domain"],
                         },
                     },
                     {
-                        name: "get_factor_breakdown",
-                        description: "Get detailed breakdown of all 10 security factors with current scores and contributing issues",
+                        name: "find_high_impact_findings_across_assets",
+                        description: "🔍 TACTICAL: Scan all company assets to find the most common, high-impact findings.",
                         inputSchema: {
                             type: "object",
                             properties: {
-                                domain: {
-                                    type: "string",
-                                    description: `Company domain (defaults to ${this.config.defaultDomain})`,
-                                    default: this.config.defaultDomain,
-                                },
-                            },
-                        },
-                    },
-                    {
-                        name: "get_findings_by_asset",
-                        description: "Group security findings by affected assets (IP addresses, domains, subdomains) for targeted remediation",
-                        inputSchema: {
-                            type: "object",
-                            properties: {
-                                domain: {
-                                    type: "string",
-                                    description: `Company domain (defaults to ${this.config.defaultDomain})`,
-                                    default: this.config.defaultDomain,
-                                },
-                                asset_type: {
-                                    type: "string",
-                                    enum: ["ip", "domain", "subdomain"],
-                                    description: "Filter by asset type (optional)",
-                                },
-                            },
-                        },
-                    },
-                    {
-                        name: "get_findings_by_category",
-                        description: "Group security findings by SecurityScorecard factor to highlight weak areas",
-                        inputSchema: {
-                            type: "object",
-                            properties: {
-                                domain: {
-                                    type: "string",
-                                    description: `Company domain (defaults to ${this.config.defaultDomain})`,
-                                    default: this.config.defaultDomain,
-                                },
-                            },
-                        },
-                    },
-                    {
-                        name: "get_historical_trend",
-                        description: "Analyze security score trends over time to track improvement/deterioration patterns",
-                        inputSchema: {
-                            type: "object",
-                            properties: {
-                                domain: {
-                                    type: "string",
-                                    description: `Company domain (defaults to ${this.config.defaultDomain})`,
-                                    default: this.config.defaultDomain,
-                                },
-                                months: {
-                                    type: "number",
-                                    description: "Number of months of history to analyze (default: 12)",
-                                    default: 12,
-                                },
-                                factor: {
-                                    type: "string",
-                                    description: "Specific security factor to analyze (optional, analyzes overall score if not specified)",
-                                },
-                            },
-                        },
-                    },
-                    {
-                        name: "get_remediation_plan",
-                        description: "Generate a prioritized remediation plan based on current findings and their business impact",
-                        inputSchema: {
-                            type: "object",
-                            properties: {
-                                domain: {
-                                    type: "string",
-                                    description: `Company domain (defaults to ${this.config.defaultDomain})`,
-                                    default: this.config.defaultDomain,
-                                },
-                                focus_area: {
-                                    type: "string",
-                                    description: "Focus on specific security area (optional)",
-                                },
-                                timeline: {
-                                    type: "string",
-                                    enum: ["immediate", "30_days", "90_days", "annual"],
-                                    description: "Remediation timeline focus (default: 90_days)",
-                                    default: "90_days",
-                                },
-                            },
-                        },
-                    },
-                    {
-                        name: "compare_with_industry",
-                        description: "Compare your company's security posture with industry benchmarks and peers",
-                        inputSchema: {
-                            type: "object",
-                            properties: {
-                                domain: {
-                                    type: "string",
-                                    description: `Company domain (defaults to ${this.config.defaultDomain})`,
-                                    default: this.config.defaultDomain,
-                                },
-                                industry: {
-                                    type: "string",
-                                    description: "Industry category for comparison (optional, auto-detected if not specified)",
-                                },
-                            },
-                        },
-                    },
-                    {
-                        name: "get_security_events",
-                        description: "Get recent security events and changes that affected your score",
-                        inputSchema: {
-                            type: "object",
-                            properties: {
-                                domain: {
-                                    type: "string",
-                                    description: `Company domain (defaults to ${this.config.defaultDomain})`,
-                                    default: this.config.defaultDomain,
-                                },
-                                days: {
-                                    type: "number",
-                                    description: "Number of days to look back (default: 30)",
-                                    default: 30,
-                                },
-                                event_type: {
-                                    type: "string",
-                                    description: "Filter by event type (optional)",
-                                },
-                            },
-                        },
-                    },
-                    {
-                        name: "create_improvement_alert",
-                        description: "Set up alerts to monitor security improvement progress",
-                        inputSchema: {
-                            type: "object",
-                            properties: {
-                                domain: {
-                                    type: "string",
-                                    description: `Company domain (defaults to ${this.config.defaultDomain})`,
-                                    default: this.config.defaultDomain,
-                                },
-                                metric: {
-                                    type: "string",
-                                    enum: ["overall_score", "factor_score", "issue_count"],
-                                    description: "Metric to monitor",
-                                },
-                                target_value: {
-                                    type: "number",
-                                    description: "Target value to alert on (e.g., score threshold)",
-                                },
-                                alert_name: {
-                                    type: "string",
-                                    description: "Name for the alert",
-                                },
-                                factor: {
-                                    type: "string",
-                                    description: "Specific factor to monitor (required if metric is 'factor_score')",
-                                },
-                            },
-                            required: ["metric", "target_value", "alert_name"],
-                        },
-                    },
+                                issue_types: {
+                                    type: "array",
+                                    items: { type: "string" },
+                                    description: "Comma-separated list of issue types to scan for.",
+                                    default: ["spf_record_missing", "dmarc_contains_none", "patching_cadence_v3_critical"]
+                                }
+                            }
+                        }
+                    }
                 ],
             };
         });
         this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
             const domain = request.params.arguments?.domain || this.config.defaultDomain;
             switch (request.params.name) {
-                case "get_company_overview":
-                    return await this.getCompanyOverview(domain);
-                case "get_current_findings":
-                    return await this.getCurrentFindings(domain, request.params.arguments?.severity, request.params.arguments?.factor, request.params.arguments?.limit);
-                case "analyze_findings_by_priority":
-                    return await this.analyzeFindingsByPriority(domain, request.params.arguments?.include_remediation);
-                case "get_factor_breakdown":
-                    return await this.getFactorBreakdown(domain);
-                case "get_findings_by_asset":
-                    return await this.getFindingsByAsset(domain, request.params.arguments?.asset_type);
-                case "get_findings_by_category":
-                    return await this.getFindingsByCategory(domain);
-                case "get_historical_trend":
-                    return await this.getHistoricalTrend(domain, request.params.arguments?.months, request.params.arguments?.factor);
-                case "get_remediation_plan":
-                    return await this.getRemediationPlan(domain, request.params.arguments?.focus_area, request.params.arguments?.timeline);
-                case "compare_with_industry":
-                    return await this.compareWithIndustry(domain, request.params.arguments?.industry);
-                case "get_security_events":
-                    return await this.getSecurityEvents(domain, request.params.arguments?.days, request.params.arguments?.event_type);
-                case "create_improvement_alert":
-                    return await this.createImprovementAlert(domain, request.params.arguments?.metric, request.params.arguments?.target_value, request.params.arguments?.alert_name, request.params.arguments?.factor);
+                case "get_score_improvement_roadmap":
+                    return await this.getScoreImprovementRoadmap(domain, request.params.arguments?.target_grade);
+                case "calculate_factor_score_impact":
+                    return await this.calculateFactorScoreImpact(domain);
+                case "get_issues_by_roi":
+                    return await this.getIssuesByROI(domain, request.params.arguments?.top_n);
+                case "find_high_impact_findings_across_assets":
+                    return await this.findHighImpactFindingsAcrossAssets(request.params.arguments?.issue_types);
                 default:
                     throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${request.params.name}`);
             }
         });
     }
-    async getCompanyOverview(domain) {
-        const [scorecard, factors] = await Promise.all([
+    // --- TOOL IMPLEMENTATIONS ---
+    async getScoreImprovementRoadmap(domain, targetGrade) {
+        const [scorecard, companyFactors, allFactors] = await Promise.all([
             this.makeRequest(`/companies/${domain}`),
-            this.makeRequest(`/companies/${domain}/factors`)
+            this.makeRequest(`/companies/${domain}/factors`),
+            this.getFactors()
         ]);
-        const summary = {
-            company: scorecard.name || domain,
-            overall_score: scorecard.score,
-            overall_grade: scorecard.grade,
-            industry: scorecard.industry,
-            size: scorecard.size,
-            last_updated: scorecard.scorecard_date,
-            factor_summary: factors.entries?.map((factor) => ({
-                name: factor.name,
-                score: factor.score,
-                grade: factor.grade,
-                percentile: factor.percentile
-            }))
-        };
-        return {
-            content: [
-                {
-                    type: "text",
-                    text: `# Security Overview for ${domain}\n\n**Overall Security Score:** ${summary.overall_score}/100 (Grade: ${summary.overall_grade})\n**Industry:** ${summary.industry}\n**Company Size:** ${summary.size}\n**Last Updated:** ${summary.last_updated}\n\n## Factor Breakdown:\n${summary.factor_summary?.map((f) => `- **${f.name}**: ${f.score}/100 (${f.grade}) - ${f.percentile}th percentile`).join('\n')}\n\n*Full Details:*\n\`\`\`json\n${JSON.stringify({ scorecard, factors }, null, 2)}\n\`\`\``,
-                },
-            ],
-        };
-    }
-    async getCurrentFindings(domain, severity, factor, limit = 100) {
-        let endpoint = `/companies/${domain}/issues?limit=${limit}`;
-        const params = [];
-        if (severity)
-            params.push(`severity=${severity}`);
-        if (factor)
-            params.push(`factor=${factor}`);
-        if (params.length > 0) {
-            endpoint += `&${params.join('&')}`;
+        const currentScore = scorecard.score;
+        const gradeThresholds = { C: 70, B: 80, A: 90 };
+        const targetScore = gradeThresholds[targetGrade];
+        const pointsNeeded = Math.max(0, targetScore - currentScore);
+        if (pointsNeeded === 0) {
+            return { content: [{ type: "text", text: `🎉 Congratulations! The domain ${domain} with a score of ${currentScore} already meets or exceeds the target grade of ${targetGrade}.` }] };
         }
-        const issues = await this.makeRequest(endpoint);
-        // Group issues by type and severity for better analysis
-        const issueAnalysis = {
-            total_issues: issues.total || issues.entries?.length || 0,
-            by_severity: {},
-            by_factor: {},
-            by_type: {},
-            critical_assets: new Set(),
-        };
-        if (issues.entries) {
-            issues.entries.forEach((issue) => {
-                // Count by severity
-                const sev = issue.severity || 'unknown';
-                issueAnalysis.by_severity[sev] = (issueAnalysis.by_severity[sev] || 0) + 1;
-                // Count by factor
-                const fact = issue.factor || 'unknown';
-                issueAnalysis.by_factor[fact] = (issueAnalysis.by_factor[fact] || 0) + 1;
-                // Count by type
-                const type = issue.issue_type || 'unknown';
-                issueAnalysis.by_type[type] = (issueAnalysis.by_type[type] || 0) + 1;
-                // Track critical assets
-                if (issue.severity === 'critical' || issue.severity === 'high') {
-                    issueAnalysis.critical_assets.add(issue.subject || issue.ip || 'unknown');
+        const factorMap = new Map(allFactors.map(f => [f.name, f]));
+        const factorImprovements = companyFactors.entries.map((factor) => {
+            const factorDetails = factorMap.get(factor.name);
+            if (!factorDetails || factor.score === 100)
+                return null;
+            const pointsLost = (100 - factor.score) * (factorDetails.weight / 100);
+            const effort = this.getEffortForFactor(factor.name, factor.score);
+            const roi = pointsLost / this.getEffortScore(effort);
+            return {
+                factor: factor.name,
+                current_score: factor.score,
+                estimated_improvement: pointsLost,
+                effort,
+                roi,
+                key_issues: this.getKeyIssuesForFactor(factor.name),
+            };
+        }).filter(Boolean)
+            .sort((a, b) => b.roi - a.roi);
+        const quickWins = factorImprovements.filter((f) => f.effort === 'low');
+        const text = `# 🎯 SCORE IMPROVEMENT ROADMAP: ${domain}\n\n` +
+            `**GOAL: ${scorecard.grade} (${currentScore}) → ${targetGrade} (${targetScore}+)**\n` +
+            `**POINTS NEEDED: +${pointsNeeded.toFixed(1)}**\n\n` +
+            `## 🚀 STRATEGIC PRIORITIES (Ranked by ROI)\n\n` +
+            `${factorImprovements.slice(0, 5).map((f, i) => `### ${i + 1}. ${f.factor.replace(/_/g, ' ').toUpperCase()}\n` +
+                `- **Current Score**: ${f.current_score}/100\n` +
+                `- **Potential Gain**: +${f.estimated_improvement.toFixed(1)} overall points\n` +
+                `- **Effort Level**: ${f.effort}\n` +
+                `- **Key Issues**: ${f.key_issues.join(', ')}\n`).join('\n')}\n\n` +
+            `## ⚡ QUICK WINS (${quickWins.length} factors)\n` +
+            `${quickWins.map((f) => `- **${f.factor.replace(/_/g, ' ')}**: Low effort for an estimated +${f.estimated_improvement.toFixed(1)} point gain.`).join('\n')}\n\n` +
+            `**Next Steps**: Focus on the highest ROI factors and all quick wins to efficiently bridge the ${pointsNeeded.toFixed(1)}-point gap.`;
+        return { content: [{ type: "text", text }] };
+    }
+    async calculateFactorScoreImpact(domain) {
+        const [scorecard, companyFactors, allFactors] = await Promise.all([
+            this.makeRequest(`/companies/${domain}`),
+            this.makeRequest(`/companies/${domain}/factors`),
+            this.getFactors()
+        ]);
+        const factorMap = new Map(allFactors.map(f => [f.name, f]));
+        const factorAnalysis = companyFactors.entries.map((factor) => {
+            const factorDetails = factorMap.get(factor.name);
+            if (!factorDetails)
+                return null;
+            const weight = factorDetails.weight;
+            const pointsLost = (100 - factor.score) * (weight / 100);
+            const effort = this.getEffortForFactor(factor.name, factor.score);
+            const roi = pointsLost / this.getEffortScore(effort);
+            return {
+                factor_name: factor.name,
+                current_score: factor.score,
+                weight_percentage: weight,
+                points_lost: pointsLost,
+                improvement_potential: pointsLost,
+                effort_estimate: effort,
+                roi_score: roi,
+                // other fields not used in this view
+                current_grade: factor.grade,
+                max_possible_score: 100,
+                overall_score_impact: pointsLost,
+                priority_rank: 0
+            };
+        }).filter(Boolean)
+            .sort((a, b) => b.roi_score - a.roi_score)
+            .map((f, index) => ({ ...f, priority_rank: index + 1 }));
+        const text = `# 💰 FACTOR SCORE IMPACT ANALYSIS: ${domain}\n\n` +
+            `**Current Overall Score**: ${scorecard.score}/100 (${scorecard.grade})\n\n` +
+            `## 🎯 ROI-RANKED IMPROVEMENT OPPORTUNITIES\n\n` +
+            `${factorAnalysis.map((factor) => `### ${factor.priority_rank}. ${factor.factor_name.replace(/_/g, ' ').toUpperCase()}\n` +
+                `- **ROI Score**: ${factor.roi_score.toFixed(1)} (Higher is better)\n` +
+                `- **Current Score**: ${factor.current_score}/100 (Weight: ${factor.weight_percentage}%)\n` +
+                `- **Impact on Score**: -${factor.points_lost.toFixed(1)} points from overall score\n` +
+                `- **Effort to Improve**: ${factor.effort_estimate}\n`).join('\n')}\n\n` +
+            `**Strategic Insight**: To maximize score improvement, prioritize factors with the highest ROI score. Start with **${factorAnalysis[0]?.factor_name.replace(/_/g, ' ')}**.`;
+        return { content: [{ type: "text", text }] };
+    }
+    async getIssuesByROI(domain, topN) {
+        const [allIssues, allFactors] = await Promise.all([
+            this.makeRequest(`/companies/${domain}/issues`),
+            this.getFactors()
+        ]);
+        if (!allIssues.entries || allIssues.entries.length === 0) {
+            return { content: [{ type: "text", text: `✅ No active issues found for ${domain}.` }] };
+        }
+        const factorMap = new Map(allFactors.map(f => [f.name, f]));
+        const issueCounts = allIssues.entries.reduce((acc, issue) => {
+            acc[issue.type] = (acc[issue.type] || 0) + 1;
+            return acc;
+        }, {});
+        const issueDetailsMap = new Map(allIssues.entries.map((issue) => [issue.type, issue]));
+        // FIX: The map/filter/sort chain was refactored to be type-safe.
+        // 1. Map to an array that can contain nulls.
+        // 2. Filter out the nulls, which tells TypeScript the remaining items are valid IssueROI objects.
+        // 3. Now sort and slice can be safely called.
+        const issuesByRoi = Object.keys(issueCounts)
+            .map((issueType) => {
+            const issueDetail = issueDetailsMap.get(issueType);
+            if (!issueDetail) {
+                return null;
+            }
+            const factorName = this.getFactorForIssueType(issueType);
+            const factorDetails = factorMap.get(factorName);
+            const factorWeight = factorDetails?.weight || 5;
+            const severityScore = this.getSeverityScore(issueDetail.severity);
+            const estimatedScoreImpact = (severityScore / 5) * (factorWeight / 100) * Math.log1p(issueCounts[issueType]) * 10;
+            const effort = this.getEffortForIssue(issueType);
+            const roiScore = estimatedScoreImpact / this.getEffortScore(effort);
+            return {
+                issue_type: issueType,
+                volume: issueCounts[issueType],
+                factor: factorName,
+                severity: issueDetail.severity,
+                estimated_score_impact: estimatedScoreImpact,
+                effort_level: effort,
+                roi_score: roiScore,
+            };
+        })
+            .filter((issue) => issue !== null)
+            .sort((a, b) => b.roi_score - a.roi_score)
+            .slice(0, topN);
+        const text = `# 🚀 ISSUES RANKED BY ROI: ${domain}\n\n` +
+            `**Top ${issuesByRoi.length} highest ROI security improvements based on active findings:**\n\n` +
+            `${issuesByRoi.map((issue, i) => `## ${i + 1}. ${issue.issue_type.replace(/_/g, ' ').toUpperCase()}\n` +
+                `- **📊 ROI Score**: ${issue.roi_score.toFixed(1)}\n` +
+                `- **🎯 Est. Score Impact**: +${issue.estimated_score_impact.toFixed(2)} points\n` +
+                `- **📈 Volume**: ${issue.volume} findings\n` +
+                `- **⚡ Effort Level**: ${issue.effort_level.replace(/_/g, ' ')}\n` +
+                `- **📂 Factor**: ${issue.factor.replace(/_/g, ' ')}\n`).join('\n')}\n\n` +
+            `**Implementation Strategy**: Address these issues in order of their ROI score to achieve the fastest possible improvement in your security posture.`;
+        return { content: [{ type: "text", text }] };
+    }
+    async findHighImpactFindingsAcrossAssets(issueTypes) {
+        let text = `# 🔍 TACTICAL FINDINGS ACROSS ALL ASSETS\n\nScanning for: ${issueTypes.join(', ')}\n\n`;
+        try {
+            const assetsResponse = await this.makeRequest('/esi/assets?type=domain');
+            const domains = assetsResponse.entries;
+            if (!domains || domains.length === 0) {
+                return { content: [{ type: "text", text: "Could not find any domain assets for this organization." }] };
+            }
+            text += `Found ${domains.length} domains. Starting scan...\n\n`;
+            const results = {};
+            issueTypes.forEach(it => results[it] = []);
+            const promises = domains.flatMap(domain => issueTypes.map(async (issueType) => {
+                try {
+                    const issues = await this.makeRequest(`/companies/${domain.name}/issues/${issueType}`);
+                    if (issues.entries && issues.entries.length > 0) {
+                        results[issueType].push(domain.name);
+                    }
                 }
+                catch (error) {
+                    // Ignore 404s for domains not yet scored, log others
+                    if (!error.message || !error.message.includes('404')) {
+                        console.error(`Error scanning ${domain.name} for ${issueType}: ${error.message}`);
+                    }
+                }
+            }));
+            await Promise.all(promises);
+            text += "## 📊 SCAN RESULTS\n\n";
+            issueTypes.forEach(issueType => {
+                const affectedDomains = results[issueType];
+                const effort = this.getEffortForIssue(issueType);
+                text += `### ${issueType.replace(/_/g, ' ').toUpperCase()}\n` +
+                    `- **Affected Domains**: ${affectedDomains.length} / ${domains.length}\n` +
+                    `- **Effort to Fix**: ${effort.replace(/_/g, ' ')}\n` +
+                    `- **Recommendation**: ${affectedDomains.length > 0 ? `High priority. Remediate across all ${affectedDomains.length} domains.` : 'No findings. ✅'}\n\n`;
             });
         }
-        return {
-            content: [
-                {
-                    type: "text",
-                    text: `# Current Security Findings for ${domain}\n\n**Total Issues:** ${issueAnalysis.total_issues}\n\n## Severity Distribution:\n${Object.entries(issueAnalysis.by_severity).map(([sev, count]) => `- **${sev.toUpperCase()}**: ${count} issues`).join('\n')}\n\n## By Security Factor:\n${Object.entries(issueAnalysis.by_factor).map(([factor, count]) => `- **${factor}**: ${count} issues`).join('\n')}\n\n## Most Common Issue Types:\n${Object.entries(issueAnalysis.by_type).slice(0, 10).map(([type, count]) => `- **${type}**: ${count} occurrences`).join('\n')}\n\n## Critical Assets (High/Critical Issues):\n${Array.from(issueAnalysis.critical_assets).slice(0, 20).map(asset => `- ${asset}`).join('\n')}\n\n*Full Issue Details:*\n\`\`\`json\n${JSON.stringify(issues, null, 2)}\n\`\`\``,
-                },
-            ],
-        };
-    }
-    async analyzeFindingsByPriority(domain, includeRemediation = true) {
-        const [issues, factors] = await Promise.all([
-            this.makeRequest(`/companies/${domain}/issues?limit=200`),
-            this.makeRequest(`/companies/${domain}/factors`)
-        ]);
-        // Priority scoring algorithm
-        const prioritizedIssues = issues.entries?.map((issue) => {
-            let priorityScore = 0;
-            // Severity weighting
-            const severityWeights = { critical: 100, high: 75, medium: 50, low: 25 };
-            const severity = issue.severity;
-            priorityScore += severityWeights[severity] || 0;
-            // Factor impact (lower factor score = higher priority)
-            const relatedFactor = factors.entries?.find((f) => f.name === issue.factor);
-            if (relatedFactor) {
-                priorityScore += (100 - relatedFactor.score) * 0.5;
-            }
-            // Asset criticality (external-facing assets get higher priority)
-            if (issue.subject && (issue.subject.includes('www') || issue.subject.includes('api'))) {
-                priorityScore += 20;
-            }
-            return {
-                ...issue,
-                priority_score: Math.round(priorityScore),
-                priority_level: priorityScore > 80 ? 'CRITICAL' : priorityScore > 60 ? 'HIGH' : priorityScore > 40 ? 'MEDIUM' : 'LOW'
-            };
-        }).sort((a, b) => b.priority_score - a.priority_score) || [];
-        const top10Issues = prioritizedIssues.slice(0, 10);
-        return {
-            content: [
-                {
-                    type: "text",
-                    text: `# Prioritized Security Findings for ${domain}\n\n## Top 10 Priority Issues:\n\n${top10Issues.map((issue, index) => `### ${index + 1}. ${issue.issue_type} [${issue.priority_level}]\n` +
-                        `- **Priority Score:** ${issue.priority_score}/100\n` +
-                        `- **Severity:** ${issue.severity?.toUpperCase()}\n` +
-                        `- **Factor:** ${issue.factor}\n` +
-                        `- **Affected Asset:** ${issue.subject || issue.ip || 'N/A'}\n` +
-                        `- **Description:** ${issue.description || 'N/A'}\n` +
-                        (includeRemediation ? `- **Remediation:** ${issue.remediation || 'Contact security team for specific guidance'}\n` : '') +
-                        `---\n`).join('\n')}\n\n*Complete Analysis:*\n\`\`\`json\n${JSON.stringify({ total_analyzed: prioritizedIssues.length, top_issues: top10Issues }, null, 2)}\n\`\`\``,
-                },
-            ],
-        };
-    }
-    async getFactorBreakdown(domain) {
-        const factors = await this.makeRequest(`/companies/${domain}/factors`);
-        return {
-            content: [
-                {
-                    type: "text",
-                    text: `# Security Factor Breakdown for ${domain}\n\n${factors.entries?.map((factor) => `## ${factor.name}\n` +
-                        `- **Score:** ${factor.score}/100 (Grade: ${factor.grade})\n` +
-                        `- **Percentile:** ${factor.percentile}th percentile\n` +
-                        `- **Issue Count:** ${factor.issue_count || 0}\n` +
-                        `- **Description:** ${factor.description || 'N/A'}\n\n`).join('')}\n\n*Detailed Factor Data:*\n\`\`\`json\n${JSON.stringify(factors, null, 2)}\n\`\`\``,
-                },
-            ],
-        };
-    }
-    async getFindingsByAsset(domain, assetType) {
-        const issues = await this.makeRequest(`/companies/${domain}/issues?limit=200`);
-        const assetMap = new Map();
-        issues.entries?.forEach((issue) => {
-            const asset = issue.subject || issue.ip || 'unknown';
-            if (!assetMap.has(asset)) {
-                assetMap.set(asset, []);
-            }
-            assetMap.get(asset).push(issue);
-        });
-        const assetSummary = Array.from(assetMap.entries())
-            .map(([asset, assetIssues]) => ({
-            asset,
-            issue_count: assetIssues.length,
-            critical_count: assetIssues.filter(i => i.severity === 'critical').length,
-            high_count: assetIssues.filter(i => i.severity === 'high').length,
-            issues: assetIssues
-        }))
-            .sort((a, b) => (b.critical_count * 10 + b.high_count * 5 + b.issue_count) - (a.critical_count * 10 + a.high_count * 5 + a.issue_count));
-        return {
-            content: [
-                {
-                    type: "text",
-                    text: `# Security Findings by Asset for ${domain}\n\n## Asset Risk Summary:\n\n${assetSummary.slice(0, 20).map((asset) => `### ${asset.asset}\n` +
-                        `- **Total Issues:** ${asset.issue_count}\n` +
-                        `- **Critical:** ${asset.critical_count}, **High:** ${asset.high_count}\n` +
-                        `- **Top Issues:** ${asset.issues.slice(0, 3).map((i) => i.issue_type).join(', ')}\n\n`).join('')}\n\n*Complete Asset Analysis:*\n\`\`\`json\n${JSON.stringify(assetSummary, null, 2)}\n\`\`\``,
-                },
-            ],
-        };
-    }
-    async getFindingsByCategory(domain) {
-        const factorSummary = await getFindingsByCategory(this.makeRequest.bind(this), domain);
-        return {
-            content: [
-                {
-                    type: "text",
-                    text: `# Security Findings by Category for ${domain}\n\n## Factor Risk Summary:\n\n${factorSummary.slice(0, 20).map((f) => `### ${f.factor}\n` +
-                        `- **Total Issues:** ${f.issue_count}\n` +
-                        `- **Critical:** ${f.critical_count}, **High:** ${f.high_count}\n` +
-                        `- **Top Issues:** ${f.issues.slice(0, 3).map((i) => i.issue_type).join(', ')}\n\n`).join('')}\n\n*Complete Category Analysis:*\n\`\`\`json\n${JSON.stringify(factorSummary, null, 2)}\n\`\`\``,
-                },
-            ],
-        };
-    }
-    async getHistoricalTrend(domain, months = 12, factor) {
-        const fromDate = new Date();
-        fromDate.setMonth(fromDate.getMonth() - months);
-        let endpoint = `/companies/${domain}/history/score?from=${fromDate.toISOString().split('T')[0]}`;
-        if (factor) {
-            endpoint = `/companies/${domain}/history/factors/${factor}?from=${fromDate.toISOString().split('T')[0]}`;
+        catch (error) {
+            text += `**An error occurred during the scan:** ${error.message}`;
         }
-        const history = await this.makeRequest(endpoint);
-        return {
-            content: [
-                {
-                    type: "text",
-                    text: `# Security Score Trend for ${domain} (${months} months)\n\n${factor ? `**Factor:** ${factor}\n\n` : '**Overall Security Score**\n\n'}*Historical Data:*\n\`\`\`json\n${JSON.stringify(history, null, 2)}\n\`\`\``,
-                },
-            ],
-        };
+        return { content: [{ type: "text", text }] };
     }
-    async getRemediationPlan(domain, focusArea, timeline = "90_days") {
-        const [issues, factors] = await Promise.all([
-            this.makeRequest(`/companies/${domain}/issues?limit=100`),
-            this.makeRequest(`/companies/${domain}/factors`)
-        ]);
-        const plan = {
-            timeline,
-            focus_area: focusArea,
-            immediate_actions: [],
-            short_term: [],
-            long_term: [],
+    // --- HELPER METHODS ---
+    getKeyIssuesForFactor(factorName) {
+        const issueMap = {
+            'patching_cadence': ['unpatched vulnerabilities', 'slow patch times'],
+            'dns_health': ['SPF/DMARC records', 'DNSSEC', 'nameserver config'],
+            'network_security': ['TLS/SSL config', 'open ports', 'certificate validity'],
+            'application_security': ['security headers', 'XSS', 'cookie security'],
+            'endpoint_security': ['malware signatures', 'device policies'],
+            'cubit_score': ['credential compromise', 'leaked data'],
         };
-        // This would be enhanced with actual remediation logic
-        return {
-            content: [
-                {
-                    type: "text",
-                    text: `# Security Remediation Plan for ${domain}\n\n**Timeline Focus:** ${timeline}\n${focusArea ? `**Focus Area:** ${focusArea}\n` : ''}\n\n## Immediate Actions (0-7 days):\n- Review critical severity findings\n- Patch critical vulnerabilities\n- Update security configurations\n\n## Short-term (1-4 weeks):\n- Address high severity issues\n- Implement missing security controls\n- Update documentation and procedures\n\n## Long-term (1-3 months):\n- Comprehensive security review\n- Process improvements\n- Training and awareness programs\n\n*Detailed Analysis Data:*\n\`\`\`json\n${JSON.stringify({ issues: issues.entries?.slice(0, 20), factors }, null, 2)}\n\`\`\``,
-                },
-            ],
-        };
+        return issueMap[factorName] || ['general configuration'];
     }
-    async compareWithIndustry(domain, industry) {
-        const [scorecard, factors] = await Promise.all([
-            this.makeRequest(`/companies/${domain}`),
-            this.makeRequest(`/companies/${domain}/factors`)
-        ]);
-        // Industry comparison would need industry benchmark data
-        return {
-            content: [
-                {
-                    type: "text",
-                    text: `# Industry Comparison for ${domain}\n\n**Industry:** ${industry || scorecard.industry}\n**Your Score:** ${scorecard.score}/100\n**Your Grade:** ${scorecard.grade}\n\n## Factor Comparison:\n${factors.entries?.map((factor) => `- **${factor.name}:** ${factor.score}/100 (${factor.percentile}th percentile)`).join('\n')}\n\n*Full Comparison Data:*\n\`\`\`json\n${JSON.stringify({ scorecard, factors }, null, 2)}\n\`\`\``,
-                },
-            ],
-        };
-    }
-    async getSecurityEvents(domain, days = 30, eventType) {
-        let endpoint = `/companies/${domain}/events?limit=50`;
-        const fromDate = new Date();
-        fromDate.setDate(fromDate.getDate() - days);
-        endpoint += `&from=${fromDate.toISOString().split('T')[0]}`;
-        if (eventType) {
-            endpoint += `&event_type=${eventType}`;
+    getEffortForFactor(factorName, currentScore) {
+        if (currentScore > 85)
+            return 'low';
+        if (factorName.includes('patching') || factorName.includes('application_security')) {
+            return currentScore < 70 ? 'high' : 'medium';
         }
-        const events = await this.makeRequest(endpoint);
-        return {
-            content: [
-                {
-                    type: "text",
-                    text: `# Recent Security Events for ${domain} (${days} days)\n\n${events.entries?.map((event) => `## ${event.date}\n` +
-                        `- **Type:** ${event.event_type}\n` +
-                        `- **Description:** ${event.description}\n` +
-                        `- **Impact:** ${event.score_change ? `Score change: ${event.score_change}` : 'No score impact'}\n\n`).join('')}\n\n*Complete Event Log:*\n\`\`\`json\n${JSON.stringify(events, null, 2)}\n\`\`\``,
-                },
-            ],
-        };
+        if (factorName.includes('dns_health'))
+            return 'low';
+        return 'medium';
     }
-    async createImprovementAlert(domain, metric, targetValue, alertName, factor) {
-        const alertConfig = {
-            domain,
-            metric,
-            target_value: targetValue,
-            factor,
-            name: alertName,
-        };
-        // This would create the actual alert via Security Scorecard API
-        const result = { message: "Alert configuration prepared", config: alertConfig };
-        return {
-            content: [
-                {
-                    type: "text",
-                    text: `# Improvement Alert Created for ${domain}\n\n**Alert Name:** ${alertName}\n**Metric:** ${metric}\n**Target:** ${targetValue}\n${factor ? `**Factor:** ${factor}\n` : ''}\n\n*Alert Configuration:*\n\`\`\`json\n${JSON.stringify(result, null, 2)}\n\`\`\``,
-                },
-            ],
-        };
+    getEffortForIssue(issueType) {
+        if (issueType.includes('spf') || issueType.includes('dmarc') || issueType.includes('hsts'))
+            return 'quick_win';
+        if (issueType.includes('patching_cadence_v3_critical'))
+            return 'major_project';
+        if (issueType.includes('patching'))
+            return 'moderate';
+        return 'moderate';
+    }
+    getEffortScore(effort) {
+        switch (effort) {
+            case 'low':
+            case 'quick_win':
+                return 1;
+            case 'medium':
+            case 'moderate':
+                return 2.5;
+            case 'high':
+            case 'major_project':
+                return 5;
+            default:
+                return 2.5;
+        }
+    }
+    getSeverityScore(severity) {
+        switch (severity) {
+            case 'critical': return 5;
+            case 'high': return 4;
+            case 'medium': return 3;
+            case 'low': return 2;
+            default: return 1;
+        }
+    }
+    getFactorForIssueType(issueType) {
+        // This is a simplified mapping. A more robust solution might query an API endpoint if available.
+        if (issueType.includes('patching') || issueType.includes('vuln'))
+            return 'patching_cadence';
+        if (issueType.includes('spf') || issueType.includes('dmarc') || issueType.includes('dns'))
+            return 'dns_health';
+        if (issueType.includes('tls') || issueType.includes('ssl') || issueType.includes('cert'))
+            return 'network_security';
+        if (issueType.includes('csp') || issueType.includes('hsts') || issueType.includes('xss'))
+            return 'application_security';
+        if (issueType.includes('leaked') || issueType.includes('breach'))
+            return 'cubit_score';
+        return 'endpoint_security'; // A reasonable default
     }
     async run() {
         const transport = new StdioServerTransport();
         await this.server.connect(transport);
-        console.error("Security Scorecard Enterprise MCP server running on stdio");
+        console.error("✅ Live SecurityScorecard MCP Server running - Ready for analysis!");
     }
 }
-const server = new SecurityScorecardServer();
+const server = new ScoreImpactSecurityScorecardServer();
 server.run().catch(console.error);
-//# sourceMappingURL=index.js.map
