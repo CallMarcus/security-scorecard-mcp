@@ -257,6 +257,17 @@ class ScoreImpactSecurityScorecardServer {
           }
         },
         {
+          name: "generate_remediation_report",
+          description: "🛠️ Compile all findings and recommend fixes grouped by factor with prioritization.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              domain: { type: "string", description: "Company domain to analyze.", default: this.config.defaultDomain }
+            },
+            required: ["domain"]
+          }
+        },
+        {
           name: "call_api_endpoint",
           description: "🔧 Low-level helper to query any SecurityScorecard API endpoint.",
           inputSchema: {
@@ -305,6 +316,11 @@ class ScoreImpactSecurityScorecardServer {
 
         case "get_findings_by_category":
           return await this.getFindingsByCategoryTool(
+            domain
+          );
+
+        case "generate_remediation_report":
+          return await this.generateRemediationReport(
             domain
           );
 
@@ -587,6 +603,44 @@ class ScoreImpactSecurityScorecardServer {
       text += `\n\n\`\`\`json\n${JSON.stringify(summary, null, 2)}\n\`\`\``;
     } catch (error: any) {
       text += `Error retrieving category findings: ${error.message}`;
+    }
+    return { content: [{ type: "text", text }] };
+  }
+
+  private async generateRemediationReport(domain: string): Promise<any> {
+    let text = `# 🛠️ REMEDIATION REPORT: ${domain}\n\n`;
+    try {
+      const [categories, factors] = await Promise.all([
+        getFindingsByCategory(this.makeRequest.bind(this), domain),
+        this.getFactors()
+      ]);
+      const weightMap = new Map(factors.map(f => [f.name, f.weight]));
+
+      const prioritized = categories.map(cat => {
+        const weight = weightMap.get(cat.factor) || 0;
+        const priority = weight * (cat.critical_count * 5 + cat.high_count * 2 + cat.issue_count);
+        const topIssues = Array.from(new Set((cat.issues || []).map(i => i.issue_type).filter(Boolean))).slice(0, 3);
+        return {
+          factor: cat.factor,
+          weight,
+          issue_count: cat.issue_count,
+          critical_count: cat.critical_count,
+          high_count: cat.high_count,
+          top_issues: topIssues,
+          priority_score: priority
+        };
+      }).sort((a, b) => b.priority_score - a.priority_score);
+
+      text += prioritized.map((f, i) =>
+        `## ${i + 1}. ${f.factor.replace(/_/g, ' ').toUpperCase()} (Weight ${f.weight}%)\n` +
+        `- **Critical**: ${f.critical_count}, **High**: ${f.high_count}, **Total**: ${f.issue_count}\n` +
+        `- **Top Issues**: ${f.top_issues.join(', ') || 'None'}\n` +
+        `- **Recommendation**: Focus on ${this.getKeyIssuesForFactor(f.factor).join(', ')}\n`
+      ).join('\n');
+
+      text += `\n\n\`\`\`json\n${JSON.stringify(prioritized, null, 2)}\n\`\`\``;
+    } catch (error: any) {
+      text += `Error generating remediation report: ${error.message}`;
     }
     return { content: [{ type: "text", text }] };
   }
