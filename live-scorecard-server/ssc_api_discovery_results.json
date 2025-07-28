@@ -1,0 +1,481 @@
+{
+  "domain": "neste.com",
+  "summary": {
+    "successful": 10,
+    "with_issues_data": 7,
+    "with_entries": 2,
+    "total_tests": 13
+  },
+  "timestamp": "2025-07-28T15:23:06.0726423+03:00",
+  "results": [
+    {
+      "Endpoint": "/companies/neste.com/issues",
+      "HasEntries": false,
+      "EntriesCount": 0,
+      "SampleData": {
+        "name": "Neste",
+        "domain": "neste.com",
+        "grade": "D",
+        "grade_url": "https://s3.amazonaws.com/ssc-static/grades/factor_d.svg",
+        "score": 65,
+        "industry": "energy",
+        "size": "size_5001_to_10000",
+        "uuid": "ed270fb8-61e7-5450-a0bc-e7402f16aa52",
+        "last30day_score_change": 0,
+        "is_custom": false,
+        "is_entity": false,
+        "is_un_published": true,
+        "created_at": "2017-04-23T20:59:17.549Z",
+        "disputed": false,
+        "description": ""
+      },
+      "Success": true,
+      "Description": "Current MCP Issues Endpoint",
+      "Keys": [
+        "created_at",
+        "description",
+        "disputed",
+        "domain",
+        "grade",
+        "grade_url",
+        "industry",
+        "is_custom",
+        "is_entity",
+        "is_un_published",
+        "last30day_score_change",
+        "name",
+        "score",
+        "size",
+        "uuid"
+      ]
+    },
+    {
+      "Endpoint": "/companies/neste.com/findings",
+      "HasEntries": false,
+      "EntriesCount": 0,
+      "SampleData": {
+        "name": "Neste",
+        "domain": "neste.com",
+        "grade": "D",
+        "grade_url": "https://s3.amazonaws.com/ssc-static/grades/factor_d.svg",
+        "score": 65,
+        "industry": "energy",
+        "size": "size_5001_to_10000",
+        "uuid": "ed270fb8-61e7-5450-a0bc-e7402f16aa52",
+        "last30day_score_change": 0,
+        "is_custom": false,
+        "is_entity": false,
+        "is_un_published": true,
+        "created_at": "2017-04-23T20:59:17.549Z",
+        "disputed": false,
+        "description": ""
+      },
+      "Success": true,
+      "Description": "Alternative: findings",
+      "Keys": [
+        "created_at",
+        "description",
+        "disputed",
+        "domain",
+        "grade",
+        "grade_url",
+        "industry",
+        "is_custom",
+        "is_entity",
+        "is_un_published",
+        "last30day_score_change",
+        "name",
+        "score",
+        "size",
+        "uuid"
+      ]
+    },
+    {
+      "Endpoint": "/companies/neste.com/issues/summary",
+      "Description": "Alternative: issues summary",
+      "Error": "NotFound - Response status code does not indicate success: 404 (Not Found).",
+      "Success": false
+    },
+    {
+      "Endpoint": "/companies/neste.com/scorecard/issues",
+      "HasEntries": false,
+      "EntriesCount": 0,
+      "SampleData": {
+        "name": "Neste",
+        "domain": "neste.com",
+        "grade": "D",
+        "grade_url": "https://s3.amazonaws.com/ssc-static/grades/factor_d.svg",
+        "score": 65,
+        "industry": "energy",
+        "size": "size_5001_to_10000",
+        "uuid": "ed270fb8-61e7-5450-a0bc-e7402f16aa52",
+        "last30day_score_change": 0,
+        "is_custom": false,
+        "is_entity": false,
+        "is_un_published": true,
+        "created_at": "2017-04-23T20:59:17.549Z",
+        "disputed": false,
+        "description": ""
+      },
+      "Success": true,
+      "Description": "Alternative: scorecard/issues",
+      "Keys": [
+        "created_at",
+        "description",
+        "disputed",
+        "domain",
+        "grade",
+        "grade_url",
+        "industry",
+        "is_custom",
+        "is_entity",
+        "is_un_published",
+        "last30day_score_change",
+        "name",
+        "score",
+        "size",
+        "uuid"
+      ]
+    },
+    {
+      "Endpoint": "/companies/neste.com/factors/application_security/issues",
+      "HasEntries": false,
+      "EntriesCount": 0,
+      "SampleData": {
+        "name": "Neste",
+        "domain": "neste.com",
+        "grade": "D",
+        "grade_url": "https://s3.amazonaws.com/ssc-static/grades/factor_d.svg",
+        "score": 65,
+        "industry": "energy",
+        "size": "size_5001_to_10000",
+        "uuid": "ed270fb8-61e7-5450-a0bc-e7402f16aa52",
+        "last30day_score_change": 0,
+        "is_custom": false,
+        "is_entity": false,
+        "is_un_published": true,
+        "created_at": "2017-04-23T20:59:17.549Z",
+        "disputed": false,
+        "description": ""
+      },
+      "Success": true,
+      "Description": "Factor-specific: application_security",
+      "Keys": [
+        "created_at",
+        "description",
+        "disputed",
+        "domain",
+        "grade",
+        "grade_url",
+        "industry",
+        "is_custom",
+        "is_entity",
+        "is_un_published",
+        "last30day_score_change",
+        "name",
+        "score",
+        "size",
+        "uuid"
+      ]
+    },
+    {
+      "Endpoint": "/companies/neste.com/factors/network_security/issues",
+      "HasEntries": false,
+      "EntriesCount": 0,
+      "SampleData": {
+        "name": "Neste",
+        "domain": "neste.com",
+        "grade": "D",
+        "grade_url": "https://s3.amazonaws.com/ssc-static/grades/factor_d.svg",
+        "score": 65,
+        "industry": "energy",
+        "size": "size_5001_to_10000",
+        "uuid": "ed270fb8-61e7-5450-a0bc-e7402f16aa52",
+        "last30day_score_change": 0,
+        "is_custom": false,
+        "is_entity": false,
+        "is_un_published": true,
+        "created_at": "2017-04-23T20:59:17.549Z",
+        "disputed": false,
+        "description": ""
+      },
+      "Success": true,
+      "Description": "Factor-specific: network_security",
+      "Keys": [
+        "created_at",
+        "description",
+        "disputed",
+        "domain",
+        "grade",
+        "grade_url",
+        "industry",
+        "is_custom",
+        "is_entity",
+        "is_un_published",
+        "last30day_score_change",
+        "name",
+        "score",
+        "size",
+        "uuid"
+      ]
+    },
+    {
+      "Endpoint": "/companies/neste.com/factors/patching_cadence/issues",
+      "HasEntries": false,
+      "EntriesCount": 0,
+      "SampleData": {
+        "name": "Neste",
+        "domain": "neste.com",
+        "grade": "D",
+        "grade_url": "https://s3.amazonaws.com/ssc-static/grades/factor_d.svg",
+        "score": 65,
+        "industry": "energy",
+        "size": "size_5001_to_10000",
+        "uuid": "ed270fb8-61e7-5450-a0bc-e7402f16aa52",
+        "last30day_score_change": 0,
+        "is_custom": false,
+        "is_entity": false,
+        "is_un_published": true,
+        "created_at": "2017-04-23T20:59:17.549Z",
+        "disputed": false,
+        "description": ""
+      },
+      "Success": true,
+      "Description": "Factor-specific: patching_cadence",
+      "Keys": [
+        "created_at",
+        "description",
+        "disputed",
+        "domain",
+        "grade",
+        "grade_url",
+        "industry",
+        "is_custom",
+        "is_entity",
+        "is_un_published",
+        "last30day_score_change",
+        "name",
+        "score",
+        "size",
+        "uuid"
+      ]
+    },
+    {
+      "Endpoint": "/companies/neste.com/issues/potentially_vulnerable",
+      "HasEntries": true,
+      "EntriesCount": 0,
+      "SampleData": null,
+      "Success": true,
+      "Description": "Issue type: potentially_vulnerable",
+      "Keys": "entries"
+    },
+    {
+      "Endpoint": "/companies/neste.com/issues/ssl_certificate",
+      "Description": "Issue type: ssl_certificate",
+      "Error": "NotFound - Response status code does not indicate success: 404 (Not Found).",
+      "Success": false
+    },
+    {
+      "Endpoint": "/companies/neste.com/issues/missing_spf_record",
+      "Description": "Issue type: missing_spf_record",
+      "Error": "NotFound - Response status code does not indicate success: 404 (Not Found).",
+      "Success": false
+    },
+    {
+      "Endpoint": "/companies/neste.com",
+      "HasEntries": false,
+      "EntriesCount": 0,
+      "SampleData": {
+        "name": "Neste",
+        "domain": "neste.com",
+        "grade": "D",
+        "grade_url": "https://s3.amazonaws.com/ssc-static/grades/factor_d.svg",
+        "score": 65,
+        "industry": "energy",
+        "size": "size_5001_to_10000",
+        "uuid": "ed270fb8-61e7-5450-a0bc-e7402f16aa52",
+        "last30day_score_change": 0,
+        "is_custom": false,
+        "is_entity": false,
+        "is_un_published": true,
+        "created_at": "2017-04-23T20:59:17.549Z",
+        "disputed": false,
+        "description": ""
+      },
+      "Success": true,
+      "Description": "Reference: Company data (working)",
+      "Keys": [
+        "created_at",
+        "description",
+        "disputed",
+        "domain",
+        "grade",
+        "grade_url",
+        "industry",
+        "is_custom",
+        "is_entity",
+        "is_un_published",
+        "last30day_score_change",
+        "name",
+        "score",
+        "size",
+        "uuid"
+      ]
+    },
+    {
+      "Endpoint": "/companies/neste.com/factors",
+      "HasEntries": true,
+      "EntriesCount": 10,
+      "SampleData": {
+        "name": "application_security",
+        "score": 74,
+        "grade": "C",
+        "grade_url": "https://s3.amazonaws.com/ssc-static/grades/factor_c.svg",
+        "issue_summary": [
+          {
+            "type": "x_content_type_options_incorrect_v2",
+            "count": 23,
+            "severity": "low",
+            "total_score_impact": 0.19064585864543915,
+            "detail_url": "https://api.securityscorecard.io/companies/neste.com/issues/x_content_type_options_incorrect_v2/"
+          },
+          {
+            "type": "cookie_missing_http_only",
+            "count": 1,
+            "severity": "high",
+            "total_score_impact": 1.2061572074890137,
+            "detail_url": "https://api.securityscorecard.io/companies/neste.com/issues/cookie_missing_http_only/"
+          },
+          {
+            "type": "redirect_chain_contains_http_v2",
+            "count": 32,
+            "severity": "high",
+            "total_score_impact": 3.995371103286743,
+            "detail_url": "https://api.securityscorecard.io/companies/neste.com/issues/redirect_chain_contains_http_v2/"
+          },
+          {
+            "type": "potentially_vulnerable_cve_2023_3519",
+            "count": 6,
+            "severity": "info",
+            "total_score_impact": 0,
+            "detail_url": "https://api.securityscorecard.io/companies/neste.com/issues/potentially_vulnerable_cve_2023_3519/"
+          },
+          {
+            "type": "waf_detected_v2",
+            "count": 2,
+            "severity": "info",
+            "total_score_impact": 0,
+            "detail_url": "https://api.securityscorecard.io/companies/neste.com/issues/waf_detected_v2/"
+          },
+          {
+            "type": "hsts_incorrect_v2",
+            "count": 46,
+            "severity": "low",
+            "total_score_impact": 0.05979268252849579,
+            "detail_url": "https://api.securityscorecard.io/companies/neste.com/issues/hsts_incorrect_v2/"
+          },
+          {
+            "type": "csp_unsafe_policy_v2",
+            "count": 14,
+            "severity": "low",
+            "total_score_impact": 0.07396737486124039,
+            "detail_url": "https://api.securityscorecard.io/companies/neste.com/issues/csp_unsafe_policy_v2/"
+          },
+          {
+            "type": "insecure_https_redirect_pattern_v2",
+            "count": 100,
+            "severity": "low",
+            "total_score_impact": 0.10040818154811859,
+            "detail_url": "https://api.securityscorecard.io/companies/neste.com/issues/insecure_https_redirect_pattern_v2/"
+          },
+          {
+            "type": "unsafe_sri_v2",
+            "count": 20,
+            "severity": "low",
+            "total_score_impact": 0.3644002377986908,
+            "detail_url": "https://api.securityscorecard.io/companies/neste.com/issues/unsafe_sri_v2/"
+          },
+          {
+            "type": "domain_missing_https_v2",
+            "count": 10,
+            "severity": "low",
+            "total_score_impact": 0.29119446873664856,
+            "detail_url": "https://api.securityscorecard.io/companies/neste.com/issues/domain_missing_https_v2/"
+          },
+          {
+            "type": "csp_too_broad_v2",
+            "count": 15,
+            "severity": "low",
+            "total_score_impact": 0.08965504169464111,
+            "detail_url": "https://api.securityscorecard.io/companies/neste.com/issues/csp_too_broad_v2/"
+          },
+          {
+            "type": "cookie_missing_secure_attribute",
+            "count": 1,
+            "severity": "high",
+            "total_score_impact": 0.949691116809845,
+            "detail_url": "https://api.securityscorecard.io/companies/neste.com/issues/cookie_missing_secure_attribute/"
+          },
+          {
+            "type": "x_frame_options_incorrect_v2",
+            "count": 12,
+            "severity": "low",
+            "total_score_impact": 0.5139608979225159,
+            "detail_url": "https://api.securityscorecard.io/companies/neste.com/issues/x_frame_options_incorrect_v2/"
+          },
+          {
+            "type": "csp_no_policy_v2",
+            "count": 22,
+            "severity": "low",
+            "total_score_impact": 0.16100163757801056,
+            "detail_url": "https://api.securityscorecard.io/companies/neste.com/issues/csp_no_policy_v2/"
+          },
+          {
+            "type": "site_emits_browser_log",
+            "count": 3,
+            "severity": "low",
+            "total_score_impact": 0.0467701256275177,
+            "detail_url": "https://api.securityscorecard.io/companies/neste.com/issues/site_emits_browser_log/"
+          },
+          {
+            "type": "potentially_vulnerable_cve_2023_37979",
+            "count": 1,
+            "severity": "info",
+            "total_score_impact": 0,
+            "detail_url": "https://api.securityscorecard.io/companies/neste.com/issues/potentially_vulnerable_cve_2023_37979/"
+          }
+        ]
+      },
+      "Success": true,
+      "Description": "Reference: Factors data (working)",
+      "Keys": [
+        "entries",
+        "total"
+      ]
+    },
+    {
+      "Endpoint": "/portfolios",
+      "HasEntries": true,
+      "EntriesCount": 5,
+      "SampleData": {
+        "id": "239ee45c-1764-51cb-b2a9-a6200aedbf58",
+        "name": "marcus.westermark@partners.neste.com",
+        "privacy": "private",
+        "read_only": true,
+        "created_at": "2025-01-20T09:13:00.017Z",
+        "is_public": false,
+        "owner_organization_id": "",
+        "owner_team_id": "",
+        "owner_user_id": "4a2797de-3491-5684-9400-bf64e4afdfa9",
+        "shared_access": "",
+        "visibility": "PRIVATE"
+      },
+      "Success": true,
+      "Description": "Reference: Portfolios (working)",
+      "Keys": [
+        "entries",
+        "total"
+      ]
+    }
+  ]
+}

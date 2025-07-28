@@ -1,0 +1,370 @@
+{
+  "total_issues": 3373,
+  "issue_types": [
+    {
+      "endpoint": "/companies/neste.com/issues/",
+      "count": 457,
+      "factor": "patching_cadence",
+      "issue_type": null
+    },
+    {
+      "endpoint": "/companies/neste.com/issues/",
+      "count": 410,
+      "factor": "patching_cadence",
+      "issue_type": null
+    },
+    {
+      "endpoint": "/companies/neste.com/issues/",
+      "count": 289,
+      "factor": "patching_cadence",
+      "issue_type": null
+    },
+    {
+      "endpoint": "/companies/neste.com/issues/",
+      "count": 279,
+      "factor": "social_engineering",
+      "issue_type": null
+    },
+    {
+      "endpoint": "/companies/neste.com/issues/",
+      "count": 275,
+      "factor": "patching_cadence",
+      "issue_type": null
+    },
+    {
+      "endpoint": "/companies/neste.com/issues/",
+      "count": 207,
+      "factor": "patching_cadence",
+      "issue_type": null
+    },
+    {
+      "endpoint": "/companies/neste.com/issues/",
+      "count": 193,
+      "factor": "dns_health",
+      "issue_type": null
+    },
+    {
+      "endpoint": "/companies/neste.com/issues/",
+      "count": 188,
+      "factor": "patching_cadence",
+      "issue_type": null
+    },
+    {
+      "endpoint": "/companies/neste.com/issues/",
+      "count": 157,
+      "factor": "dns_health",
+      "issue_type": null
+    },
+    {
+      "endpoint": "/companies/neste.com/issues/",
+      "count": 126,
+      "factor": "patching_cadence",
+      "issue_type": null
+    },
+    {
+      "endpoint": "/companies/neste.com/issues/",
+      "count": 117,
+      "factor": "dns_health",
+      "issue_type": null
+    },
+    {
+      "endpoint": "/companies/neste.com/issues/",
+      "count": 100,
+      "factor": "application_security",
+      "issue_type": null
+    },
+    {
+      "endpoint": "/companies/neste.com/issues/",
+      "count": 56,
+      "factor": "patching_cadence",
+      "issue_type": null
+    },
+    {
+      "endpoint": "/companies/neste.com/issues/",
+      "count": 49,
+      "factor": "network_security",
+      "issue_type": null
+    },
+    {
+      "endpoint": "/companies/neste.com/issues/",
+      "count": 46,
+      "factor": "application_security",
+      "issue_type": null
+    },
+    {
+      "endpoint": "/companies/neste.com/issues/",
+      "count": 45,
+      "factor": "network_security",
+      "issue_type": null
+    },
+    {
+      "endpoint": "/companies/neste.com/issues/",
+      "count": 42,
+      "factor": "network_security",
+      "issue_type": null
+    },
+    {
+      "endpoint": "/companies/neste.com/issues/",
+      "count": 37,
+      "factor": "network_security",
+      "issue_type": null
+    },
+    {
+      "endpoint": "/companies/neste.com/issues/",
+      "count": 32,
+      "factor": "application_security",
+      "issue_type": null
+    },
+    {
+      "endpoint": "/companies/neste.com/issues/",
+      "count": 30,
+      "factor": "network_security",
+      "issue_type": null
+    },
+    {
+      "endpoint": "/companies/neste.com/issues/",
+      "count": 23,
+      "factor": "application_security",
+      "issue_type": null
+    },
+    {
+      "endpoint": "/companies/neste.com/issues/",
+      "count": 22,
+      "factor": "application_security",
+      "issue_type": null
+    },
+    {
+      "endpoint": "/companies/neste.com/issues/",
+      "count": 20,
+      "factor": "application_security",
+      "issue_type": null
+    },
+    {
+      "endpoint": "/companies/neste.com/issues/",
+      "count": 17,
+      "factor": "network_security",
+      "issue_type": null
+    },
+    {
+      "endpoint": "/companies/neste.com/issues/",
+      "count": 16,
+      "factor": "network_security",
+      "issue_type": null
+    },
+    {
+      "endpoint": "/companies/neste.com/issues/",
+      "count": 15,
+      "factor": "application_security",
+      "issue_type": null
+    },
+    {
+      "endpoint": "/companies/neste.com/issues/",
+      "count": 14,
+      "factor": "application_security",
+      "issue_type": null
+    },
+    {
+      "endpoint": "/companies/neste.com/issues/",
+      "count": 13,
+      "factor": "dns_health",
+      "issue_type": null
+    },
+    {
+      "endpoint": "/companies/neste.com/issues/",
+      "count": 13,
+      "factor": "network_security",
+      "issue_type": null
+    },
+    {
+      "endpoint": "/companies/neste.com/issues/",
+      "count": 12,
+      "factor": "application_security",
+      "issue_type": null
+    },
+    {
+      "endpoint": "/companies/neste.com/issues/",
+      "count": 11,
+      "factor": "network_security",
+      "issue_type": null
+    },
+    {
+      "endpoint": "/companies/neste.com/issues/",
+      "count": 10,
+      "factor": "application_security",
+      "issue_type": null
+    },
+    {
+      "endpoint": "/companies/neste.com/issues/",
+      "count": 9,
+      "factor": "leaked_information",
+      "issue_type": null
+    },
+    {
+      "endpoint": "/companies/neste.com/issues/",
+      "count": 9,
+      "factor": "network_security",
+      "issue_type": null
+    },
+    {
+      "endpoint": "/companies/neste.com/issues/",
+      "count": 6,
+      "factor": "application_security",
+      "issue_type": null
+    },
+    {
+      "endpoint": "/companies/neste.com/issues/",
+      "count": 4,
+      "factor": "network_security",
+      "issue_type": null
+    },
+    {
+      "endpoint": "/companies/neste.com/issues/",
+      "count": 3,
+      "factor": "application_security",
+      "issue_type": null
+    },
+    {
+      "endpoint": "/companies/neste.com/issues/",
+      "count": 3,
+      "factor": "dns_health",
+      "issue_type": null
+    },
+    {
+      "endpoint": "/companies/neste.com/issues/",
+      "count": 3,
+      "factor": "network_security",
+      "issue_type": null
+    },
+    {
+      "endpoint": "/companies/neste.com/issues/",
+      "count": 2,
+      "factor": "patching_cadence",
+      "issue_type": null
+    },
+    {
+      "endpoint": "/companies/neste.com/issues/",
+      "count": 2,
+      "factor": "application_security",
+      "issue_type": null
+    },
+    {
+      "endpoint": "/companies/neste.com/issues/",
+      "count": 2,
+      "factor": "leaked_information",
+      "issue_type": null
+    },
+    {
+      "endpoint": "/companies/neste.com/issues/",
+      "count": 2,
+      "factor": "dns_health",
+      "issue_type": null
+    },
+    {
+      "endpoint": "/companies/neste.com/issues/",
+      "count": 1,
+      "factor": "application_security",
+      "issue_type": null
+    },
+    {
+      "endpoint": "/companies/neste.com/issues/",
+      "count": 1,
+      "factor": "patching_cadence",
+      "issue_type": null
+    },
+    {
+      "endpoint": "/companies/neste.com/issues/",
+      "count": 1,
+      "factor": "application_security",
+      "issue_type": null
+    },
+    {
+      "endpoint": "/companies/neste.com/issues/",
+      "count": 1,
+      "factor": "patching_cadence",
+      "issue_type": null
+    },
+    {
+      "endpoint": "/companies/neste.com/issues/",
+      "count": 1,
+      "factor": "application_security",
+      "issue_type": null
+    },
+    {
+      "endpoint": "/companies/neste.com/issues/",
+      "count": 1,
+      "factor": "patching_cadence",
+      "issue_type": null
+    },
+    {
+      "endpoint": "/companies/neste.com/issues/",
+      "count": 1,
+      "factor": "dns_health",
+      "issue_type": null
+    }
+  ],
+  "domain": "neste.com",
+  "total_issue_types": 50,
+  "factors_summary": [
+    {
+      "grade": "C",
+      "score": 74,
+      "issue_types_count": 16,
+      "factor": "application_security"
+    },
+    {
+      "grade": "A",
+      "score": 100,
+      "issue_types_count": 0,
+      "factor": "cubit_score"
+    },
+    {
+      "grade": "D",
+      "score": 67,
+      "issue_types_count": 7,
+      "factor": "dns_health"
+    },
+    {
+      "grade": "A",
+      "score": 100,
+      "issue_types_count": 0,
+      "factor": "endpoint_security"
+    },
+    {
+      "grade": "A",
+      "score": 100,
+      "issue_types_count": 0,
+      "factor": "hacker_chatter"
+    },
+    {
+      "grade": "A",
+      "score": 100,
+      "issue_types_count": 0,
+      "factor": "ip_reputation"
+    },
+    {
+      "grade": "A",
+      "score": 100,
+      "issue_types_count": 2,
+      "factor": "leaked_information"
+    },
+    {
+      "grade": "C",
+      "score": 71,
+      "issue_types_count": 12,
+      "factor": "network_security"
+    },
+    {
+      "grade": "D",
+      "score": 62,
+      "issue_types_count": 12,
+      "factor": "patching_cadence"
+    },
+    {
+      "grade": "A",
+      "score": 100,
+      "issue_types_count": 1,
+      "factor": "social_engineering"
+    }
+  ],
+  "timestamp": "2025-07-28T15:31:46.9199252+03:00"
+}

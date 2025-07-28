@@ -1,0 +1,428 @@
+{
+  "total_issues": 3373,
+  "issue_types": [
+    {
+      "IssueType": "patching_cadence_v3_high",
+      "Count": 457,
+      "Factor": "patching_cadence",
+      "AllProperties": "count, detail_url, severity, total_score_impact, type"
+    },
+    {
+      "IssueType": "service_vuln_host_v3_high",
+      "Count": 410,
+      "Factor": "patching_cadence",
+      "AllProperties": "count, detail_url, severity, total_score_impact, type"
+    },
+    {
+      "IssueType": "patching_cadence_v3_medium",
+      "Count": 289,
+      "Factor": "patching_cadence",
+      "AllProperties": "count, detail_url, severity, total_score_impact, type"
+    },
+    {
+      "IssueType": "typosquat",
+      "Count": 279,
+      "Factor": "social_engineering",
+      "AllProperties": "count, detail_url, severity, total_score_impact, type"
+    },
+    {
+      "IssueType": "patching_cadence_v3_critical",
+      "Count": 275,
+      "Factor": "patching_cadence",
+      "AllProperties": "count, detail_url, severity, total_score_impact, type"
+    },
+    {
+      "IssueType": "service_vuln_host_v3_medium",
+      "Count": 207,
+      "Factor": "patching_cadence",
+      "AllProperties": "count, detail_url, severity, total_score_impact, type"
+    },
+    {
+      "IssueType": "subdomain_dmarc_contains_none",
+      "Count": 193,
+      "Factor": "dns_health",
+      "AllProperties": "count, detail_url, severity, total_score_impact, type"
+    },
+    {
+      "IssueType": "service_vuln_host_v3_critical",
+      "Count": 188,
+      "Factor": "patching_cadence",
+      "AllProperties": "count, detail_url, severity, total_score_impact, type"
+    },
+    {
+      "IssueType": "dmarc_contains_none",
+      "Count": 157,
+      "Factor": "dns_health",
+      "AllProperties": "count, detail_url, severity, total_score_impact, type"
+    },
+    {
+      "IssueType": "patching_cadence_medium",
+      "Count": 126,
+      "Factor": "patching_cadence",
+      "AllProperties": "count, detail_url, severity, total_score_impact, type"
+    },
+    {
+      "IssueType": "spf_record_missing",
+      "Count": 117,
+      "Factor": "dns_health",
+      "AllProperties": "count, detail_url, severity, total_score_impact, type"
+    },
+    {
+      "IssueType": "insecure_https_redirect_pattern_v2",
+      "Count": 100,
+      "Factor": "application_security",
+      "AllProperties": "count, detail_url, severity, total_score_impact, type"
+    },
+    {
+      "IssueType": "service_vuln_host_medium",
+      "Count": 56,
+      "Factor": "patching_cadence",
+      "AllProperties": "count, detail_url, severity, total_score_impact, type"
+    },
+    {
+      "IssueType": "tls_weak_cipher",
+      "Count": 49,
+      "Factor": "network_security",
+      "AllProperties": "count, detail_url, severity, total_score_impact, type"
+    },
+    {
+      "IssueType": "hsts_incorrect_v2",
+      "Count": 46,
+      "Factor": "application_security",
+      "AllProperties": "count, detail_url, severity, total_score_impact, type"
+    },
+    {
+      "IssueType": "service_cloud_provider",
+      "Count": 45,
+      "Factor": "network_security",
+      "AllProperties": "count, detail_url, severity, total_score_impact, type"
+    },
+    {
+      "IssueType": "tls_weak_protocol",
+      "Count": 42,
+      "Factor": "network_security",
+      "AllProperties": "count, detail_url, severity, total_score_impact, type"
+    },
+    {
+      "IssueType": "tls_ocsp_stapling",
+      "Count": 37,
+      "Factor": "network_security",
+      "AllProperties": "count, detail_url, severity, total_score_impact, type"
+    },
+    {
+      "IssueType": "redirect_chain_contains_http_v2",
+      "Count": 32,
+      "Factor": "application_security",
+      "AllProperties": "count, detail_url, severity, total_score_impact, type"
+    },
+    {
+      "IssueType": "tlscert_excessive_expiration",
+      "Count": 30,
+      "Factor": "network_security",
+      "AllProperties": "count, detail_url, severity, total_score_impact, type"
+    },
+    {
+      "IssueType": "x_content_type_options_incorrect_v2",
+      "Count": 23,
+      "Factor": "application_security",
+      "AllProperties": "count, detail_url, severity, total_score_impact, type"
+    },
+    {
+      "IssueType": "csp_no_policy_v2",
+      "Count": 22,
+      "Factor": "application_security",
+      "AllProperties": "count, detail_url, severity, total_score_impact, type"
+    },
+    {
+      "IssueType": "unsafe_sri_v2",
+      "Count": 20,
+      "Factor": "application_security",
+      "AllProperties": "count, detail_url, severity, total_score_impact, type"
+    },
+    {
+      "IssueType": "tlscert_no_revocation",
+      "Count": 17,
+      "Factor": "network_security",
+      "AllProperties": "count, detail_url, severity, total_score_impact, type"
+    },
+    {
+      "IssueType": "tlscert_self_signed",
+      "Count": 16,
+      "Factor": "network_security",
+      "AllProperties": "count, detail_url, severity, total_score_impact, type"
+    },
+    {
+      "IssueType": "csp_too_broad_v2",
+      "Count": 15,
+      "Factor": "application_security",
+      "AllProperties": "count, detail_url, severity, total_score_impact, type"
+    },
+    {
+      "IssueType": "csp_unsafe_policy_v2",
+      "Count": 14,
+      "Factor": "application_security",
+      "AllProperties": "count, detail_url, severity, total_score_impact, type"
+    },
+    {
+      "IssueType": "dmarc_record_missing",
+      "Count": 13,
+      "Factor": "dns_health",
+      "AllProperties": "count, detail_url, severity, total_score_impact, type"
+    },
+    {
+      "IssueType": "service_http_proxy",
+      "Count": 13,
+      "Factor": "network_security",
+      "AllProperties": "count, detail_url, severity, total_score_impact, type"
+    },
+    {
+      "IssueType": "x_frame_options_incorrect_v2",
+      "Count": 12,
+      "Factor": "application_security",
+      "AllProperties": "count, detail_url, severity, total_score_impact, type"
+    },
+    {
+      "IssueType": "uses_go_daddy_infrastructure",
+      "Count": 11,
+      "Factor": "network_security",
+      "AllProperties": "count, detail_url, severity, total_score_impact, type"
+    },
+    {
+      "IssueType": "domain_missing_https_v2",
+      "Count": 10,
+      "Factor": "application_security",
+      "AllProperties": "count, detail_url, severity, total_score_impact, type"
+    },
+    {
+      "IssueType": "historical_compromised_credentials_found",
+      "Count": 9,
+      "Factor": "leaked_information",
+      "AllProperties": "count, detail_url, severity, total_score_impact, type"
+    },
+    {
+      "IssueType": "tlscert_expired",
+      "Count": 9,
+      "Factor": "network_security",
+      "AllProperties": "count, detail_url, severity, total_score_impact, type"
+    },
+    {
+      "IssueType": "potentially_vulnerable_cve_2023_3519",
+      "Count": 6,
+      "Factor": "application_security",
+      "AllProperties": "count, detail_url, severity, total_score_impact, type"
+    },
+    {
+      "IssueType": "open_port",
+      "Count": 4,
+      "Factor": "network_security",
+      "AllProperties": "count, detail_url, severity, total_score_impact, type"
+    },
+    {
+      "IssueType": "site_emits_browser_log",
+      "Count": 3,
+      "Factor": "application_security",
+      "AllProperties": "count, detail_url, severity, total_score_impact, type"
+    },
+    {
+      "IssueType": "spf_record_softfail",
+      "Count": 3,
+      "Factor": "dns_health",
+      "AllProperties": "count, detail_url, severity, total_score_impact, type"
+    },
+    {
+      "IssueType": "service_dns",
+      "Count": 3,
+      "Factor": "network_security",
+      "AllProperties": "count, detail_url, severity, total_score_impact, type"
+    },
+    {
+      "IssueType": "patching_cadence_high",
+      "Count": 2,
+      "Factor": "patching_cadence",
+      "AllProperties": "count, detail_url, severity, total_score_impact, type"
+    },
+    {
+      "IssueType": "waf_detected_v2",
+      "Count": 2,
+      "Factor": "application_security",
+      "AllProperties": "count, detail_url, severity, total_score_impact, type"
+    },
+    {
+      "IssueType": "compromised_credentials_found",
+      "Count": 2,
+      "Factor": "leaked_information",
+      "AllProperties": "count, detail_url, severity, total_score_impact, type"
+    },
+    {
+      "IssueType": "dkim_insufficient_key_length",
+      "Count": 2,
+      "Factor": "dns_health",
+      "AllProperties": "count, detail_url, severity, total_score_impact, type"
+    },
+    {
+      "IssueType": "cookie_missing_secure_attribute",
+      "Count": 1,
+      "Factor": "application_security",
+      "AllProperties": "count, detail_url, severity, total_score_impact, type"
+    },
+    {
+      "IssueType": "patching_analysis_medium",
+      "Count": 1,
+      "Factor": "patching_cadence",
+      "AllProperties": "count, detail_url, severity, total_score_impact, type"
+    },
+    {
+      "IssueType": "cookie_missing_http_only",
+      "Count": 1,
+      "Factor": "application_security",
+      "AllProperties": "count, detail_url, severity, total_score_impact, type"
+    },
+    {
+      "IssueType": "patching_analysis_high",
+      "Count": 1,
+      "Factor": "patching_cadence",
+      "AllProperties": "count, detail_url, severity, total_score_impact, type"
+    },
+    {
+      "IssueType": "potentially_vulnerable_cve_2023_37979",
+      "Count": 1,
+      "Factor": "application_security",
+      "AllProperties": "count, detail_url, severity, total_score_impact, type"
+    },
+    {
+      "IssueType": "patching_analysis_low",
+      "Count": 1,
+      "Factor": "patching_cadence",
+      "AllProperties": "count, detail_url, severity, total_score_impact, type"
+    },
+    {
+      "IssueType": "spf_record_wildcard",
+      "Count": 1,
+      "Factor": "dns_health",
+      "AllProperties": "count, detail_url, severity, total_score_impact, type"
+    }
+  ],
+  "raw_factors_sample": {
+    "name": "application_security",
+    "score": 74,
+    "grade": "C",
+    "grade_url": "https://s3.amazonaws.com/ssc-static/grades/factor_c.svg",
+    "issue_summary": [
+      {
+        "type": "x_content_type_options_incorrect_v2",
+        "count": 23,
+        "severity": "low",
+        "total_score_impact": 0.19064585864543915,
+        "detail_url": "https://api.securityscorecard.io/companies/neste.com/issues/x_content_type_options_incorrect_v2/"
+      },
+      {
+        "type": "cookie_missing_http_only",
+        "count": 1,
+        "severity": "high",
+        "total_score_impact": 1.2061572074890137,
+        "detail_url": "https://api.securityscorecard.io/companies/neste.com/issues/cookie_missing_http_only/"
+      },
+      {
+        "type": "redirect_chain_contains_http_v2",
+        "count": 32,
+        "severity": "high",
+        "total_score_impact": 3.995371103286743,
+        "detail_url": "https://api.securityscorecard.io/companies/neste.com/issues/redirect_chain_contains_http_v2/"
+      },
+      {
+        "type": "potentially_vulnerable_cve_2023_3519",
+        "count": 6,
+        "severity": "info",
+        "total_score_impact": 0,
+        "detail_url": "https://api.securityscorecard.io/companies/neste.com/issues/potentially_vulnerable_cve_2023_3519/"
+      },
+      {
+        "type": "waf_detected_v2",
+        "count": 2,
+        "severity": "info",
+        "total_score_impact": 0,
+        "detail_url": "https://api.securityscorecard.io/companies/neste.com/issues/waf_detected_v2/"
+      },
+      {
+        "type": "hsts_incorrect_v2",
+        "count": 46,
+        "severity": "low",
+        "total_score_impact": 0.05979268252849579,
+        "detail_url": "https://api.securityscorecard.io/companies/neste.com/issues/hsts_incorrect_v2/"
+      },
+      {
+        "type": "csp_unsafe_policy_v2",
+        "count": 14,
+        "severity": "low",
+        "total_score_impact": 0.07396737486124039,
+        "detail_url": "https://api.securityscorecard.io/companies/neste.com/issues/csp_unsafe_policy_v2/"
+      },
+      {
+        "type": "insecure_https_redirect_pattern_v2",
+        "count": 100,
+        "severity": "low",
+        "total_score_impact": 0.10040818154811859,
+        "detail_url": "https://api.securityscorecard.io/companies/neste.com/issues/insecure_https_redirect_pattern_v2/"
+      },
+      {
+        "type": "unsafe_sri_v2",
+        "count": 20,
+        "severity": "low",
+        "total_score_impact": 0.3644002377986908,
+        "detail_url": "https://api.securityscorecard.io/companies/neste.com/issues/unsafe_sri_v2/"
+      },
+      {
+        "type": "domain_missing_https_v2",
+        "count": 10,
+        "severity": "low",
+        "total_score_impact": 0.29119446873664856,
+        "detail_url": "https://api.securityscorecard.io/companies/neste.com/issues/domain_missing_https_v2/"
+      },
+      {
+        "type": "csp_too_broad_v2",
+        "count": 15,
+        "severity": "low",
+        "total_score_impact": 0.08965504169464111,
+        "detail_url": "https://api.securityscorecard.io/companies/neste.com/issues/csp_too_broad_v2/"
+      },
+      {
+        "type": "cookie_missing_secure_attribute",
+        "count": 1,
+        "severity": "high",
+        "total_score_impact": 0.949691116809845,
+        "detail_url": "https://api.securityscorecard.io/companies/neste.com/issues/cookie_missing_secure_attribute/"
+      },
+      {
+        "type": "x_frame_options_incorrect_v2",
+        "count": 12,
+        "severity": "low",
+        "total_score_impact": 0.5139608979225159,
+        "detail_url": "https://api.securityscorecard.io/companies/neste.com/issues/x_frame_options_incorrect_v2/"
+      },
+      {
+        "type": "csp_no_policy_v2",
+        "count": 22,
+        "severity": "low",
+        "total_score_impact": 0.16100163757801056,
+        "detail_url": "https://api.securityscorecard.io/companies/neste.com/issues/csp_no_policy_v2/"
+      },
+      {
+        "type": "site_emits_browser_log",
+        "count": 3,
+        "severity": "low",
+        "total_score_impact": 0.0467701256275177,
+        "detail_url": "https://api.securityscorecard.io/companies/neste.com/issues/site_emits_browser_log/"
+      },
+      {
+        "type": "potentially_vulnerable_cve_2023_37979",
+        "count": 1,
+        "severity": "info",
+        "total_score_impact": 0,
+        "detail_url": "https://api.securityscorecard.io/companies/neste.com/issues/potentially_vulnerable_cve_2023_37979/"
+      }
+    ]
+  },
+  "domain": "neste.com",
+  "total_issue_types": 50,
+  "timestamp": "2025-07-28T15:37:08.4491977+03:00"
+}

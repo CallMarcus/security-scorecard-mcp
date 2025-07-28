@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "security-scorecard-enhanced": {
+      "command": "node",
+      "args": ["C:\\Temp\\scorecard\\build\\index.js"],
+      "env": {
+        "SECURITY_SCORECARD_API_TOKEN": "YOUR_ACTUAL_TOKEN_HERE",
+        "COMPANY_DOMAIN": "neste.com",
+        "DEBUG_MODE": "false"
+      }
+    }
+  }
+}
