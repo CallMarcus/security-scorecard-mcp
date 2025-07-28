@@ -84,6 +84,8 @@ Add `--dev`/`-Dev` to either command to pull the most recent development build.
    export COMPANY_DOMAIN="example.com"
    # optional default issue types used by some tools
    export DEFAULT_ISSUE_TYPES="spf_record_missing,dmarc_contains_none,patching_cadence_v3_critical"
+   # optional verbose debugging
+   export DEBUG_MODE="true"
    ```
 3. Start the MCP server:
    ```bash
@@ -120,6 +122,7 @@ Claude Desktop looks for its configuration file at `%APPDATA%/Claude/claude_desk
         "SECURITY_SCORECARD_API_TOKEN": "YOUR_TOKEN_HERE",
         "COMPANY_DOMAIN": "example.com",
         "DEFAULT_ISSUE_TYPES": "spf_record_missing,dmarc_contains_none,patching_cadence_v3_critical"
+          "DEBUG_MODE": "false"
       },
       "shell": false
     }
@@ -130,34 +133,54 @@ Claude Desktop looks for its configuration file at `%APPDATA%/Claude/claude_desk
 
 You can also find this example at `build_docs/claude_desktop_config.sample.json`.
 
+
+
 ## MCP tools
 
-The MCP server exposes several tools that map to SecurityScorecard API queries.
-Invoke them using the MCP `call_tool` request type.
+The server exposes the following tools. Invoke them with the MCP `call_tool` request type.
 
-- **get_findings_by_category** - Fetch current findings and group them by
-  SecurityScorecard factor to pinpoint weak areas.
-
-Example request:
+- **get_score_improvement_roadmap** - Generate a prioritized roadmap to reach a target grade.
 
 ```json
 {
-  "name": "get_findings_by_category",
+  "name": "get_score_improvement_roadmap",
+  "arguments": {"domain": "example.com", "target_grade": "A"}
+}
+```
+
+- **calculate_factor_score_impact** - Analyze ROI for each factor contributing to the score.
+
+```json
+{
+  "name": "calculate_factor_score_impact",
   "arguments": {"domain": "example.com"}
 }
 ```
 
-- **call_api_endpoint** - Send a raw request to any SecurityScorecard REST endpoint.
+- **get_issues_by_roi** - Return active issue types ranked by ROI.
 
-Example request:
+```json
+{
+  "name": "get_issues_by_roi",
+  "arguments": {"domain": "example.com", "top_n": 5}
+}
+```
+
+- **find_high_impact_findings_across_assets** - Scan all company assets for common high-impact issues.
+
+```json
+{
+  "name": "find_high_impact_findings_across_assets",
+  "arguments": {"issue_types": ["spf_record_missing", "dmarc_contains_none"]}
+}
+```
+
+- **call_api_endpoint** - Generic helper to query any SecurityScorecard REST endpoint. Use this for custom API paths not yet covered by the built-in tools.
 
 ```json
 {
   "name": "call_api_endpoint",
-  "arguments": {
-    "endpoint": "/companies/example.com",
-    "method": "GET"
-  }
+  "arguments": {"endpoint": "/companies/example.com", "method": "GET"}
 }
 ```
 
