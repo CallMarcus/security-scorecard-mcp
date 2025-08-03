@@ -150,98 +150,303 @@ You can also find this example at `build_docs/claude_desktop_config.sample.json`
 
 ## MCP tools
 
-The server exposes the following tools. Invoke them with the MCP `call_tool` request type.
+Each tool is invoked with the MCP `call_tool` request. Responses are returned in
+`content[0].text` as Markdown. Errors use the same structure and are prefixed
+with `Error running <tool>:` or return an MCP error code such as
+`InvalidRequest`. Examples below omit the outer MCP envelope for brevity.
 
-- **get_score_improvement_roadmap** - Generate a prioritized roadmap to reach a target grade.
+### get_score_improvement_roadmap
+**Description:** Generate a prioritized roadmap to reach a target grade.
 
+**Parameters**
+- `domain` (string, required) – Company domain to analyze.
+- `target_grade` (string, required; one of `A`, `B`, `C`) – Desired grade.
+
+**Response**
+Markdown sections showing points needed, ROI‑ranked factors and quick wins.
+
+**Errors**
+- `InvalidRequest` if the domain cannot be accessed or grade is invalid.
+
+**Sample request**
 ```json
-{
-  "name": "get_score_improvement_roadmap",
-  "arguments": {"domain": "example.com", "target_grade": "A"}
-}
+{ "name": "get_score_improvement_roadmap", "arguments": {"domain": "example.com", "target_grade": "A"} }
 ```
 
-- **calculate_factor_score_impact** - Analyze ROI for each factor contributing to the score.
+**Sample response**
+```text
+# 🎯 SCORE IMPROVEMENT ROADMAP: example.com
+...
+```
 
+**Edge cases**
+- Returns a congratulatory message if the current score already meets the target.
+
+### calculate_factor_score_impact
+**Description:** Analyze ROI for each factor contributing to the score.
+
+**Parameters**
+- `domain` (string, required)
+
+**Response**
+Markdown list ranking factors by ROI.
+
+**Errors**
+- `InvalidRequest` for inaccessible domain.
+
+**Sample request**
 ```json
-{
-  "name": "calculate_factor_score_impact",
-  "arguments": {"domain": "example.com"}
-}
+{ "name": "calculate_factor_score_impact", "arguments": {"domain": "example.com"} }
 ```
 
-- **get_issues_by_roi** - Return active issue types ranked by ROI.
+**Sample response**
+```text
+# 💰 FACTOR SCORE IMPACT ANALYSIS: example.com
+...
+```
 
+**Edge cases**
+- If all factors are already at 100, the list may be empty.
+
+### get_issues_by_roi
+**Description:** Return active issue types ranked by ROI.
+
+**Parameters**
+- `domain` (string, required)
+- `top_n` (number, optional, default 10) – Number of issues to return.
+
+**Response**
+Markdown list of issues with ROI scores and estimated impact.
+
+**Errors**
+- `InvalidRequest` if the domain is not found.
+- Returns `No active issues found` when the domain has zero findings.
+
+**Sample request**
 ```json
-{
-  "name": "get_issues_by_roi",
-  "arguments": {"domain": "example.com", "top_n": 5}
-}
+{ "name": "get_issues_by_roi", "arguments": {"domain": "example.com", "top_n": 5} }
 ```
 
-- **find_high_impact_findings_across_assets** - Scan all company assets for common high-impact issues.
+**Sample response**
+```text
+# 🚀 ISSUES RANKED BY ROI: example.com
+...
+```
 
+**Edge cases**
+- Large `top_n` values are capped at the number of available issues.
+
+### simulate_score_improvement
+**Description:** Forecast score impact of fixing specific issue types.
+
+**Parameters**
+- `domain` (string, required)
+- `issue_types` (array of strings, optional) – Issue types to simulate fixing.
+
+**Response**
+Markdown summary with projected overall score and factor‑level improvements.
+
+**Errors**
+- `InvalidRequest` if the domain cannot be accessed.
+
+**Sample request**
 ```json
-{
-  "name": "find_high_impact_findings_across_assets",
-  "arguments": {"issue_types": ["spf_record_missing", "dmarc_contains_none"]}
-}
+{ "name": "simulate_score_improvement", "arguments": {"domain": "example.com", "issue_types": ["spf_record_missing"]} }
 ```
 
-- **get_findings_by_asset** - List issues grouped by each asset using the ESI API.
+**Sample response**
+```text
+# 🔮 SCORE IMPROVEMENT SIMULATION: example.com
+...
+```
 
+**Edge cases**
+- Unknown issue types are ignored, resulting in little or no improvement.
+
+### get_quick_wins
+**Description:** Find high‑impact, low‑effort improvements.
+
+**Parameters**
+- `domain` (string, required)
+- `max_effort` (string, optional; `low` or `medium`, default `medium`) – Maximum effort level.
+
+**Response**
+Markdown list of quick wins with estimated score impact and timelines.
+
+**Errors**
+- Falls back to a predefined list if API calls fail.
+
+**Sample request**
 ```json
-{
-  "name": "get_findings_by_asset",
-  "arguments": {"domain": "example.com", "asset_type": "domain"}
-}
+{ "name": "get_quick_wins", "arguments": {"domain": "example.com", "max_effort": "low"} }
 ```
 
-On Windows 11 run:
-
-```powershell
-echo '{"type":"call_tool","id":1,"params":{"name":"get_findings_by_asset","arguments":{"domain":"example.com","asset_type":"domain"}}}' |
-  node .\build\index.js
+**Sample response**
+```text
+# ⚡ QUICK WINS FOR example.com
+...
 ```
 
-- **get_findings_by_category** - List issues grouped by SecurityScorecard factor.
+**Edge cases**
+- Using `low` filters out medium‑effort items.
 
+### benchmark_grade_requirements
+**Description:** Show score requirements and peer comparison for grade levels.
+
+**Parameters**
+- `domain` (string, required)
+
+**Response**
+Markdown summary of current score, grade requirements and next milestone.
+
+**Errors**
+- `InvalidRequest` if the domain cannot be retrieved.
+
+**Sample request**
 ```json
-{
-  "name": "get_findings_by_category",
-  "arguments": {"domain": "example.com"}
-}
+{ "name": "benchmark_grade_requirements", "arguments": {"domain": "example.com"} }
 ```
 
-On Windows 11 run:
-
-```powershell
-echo '{"type":"call_tool","id":1,"params":{"name":"get_findings_by_category","arguments":{"domain":"example.com"}}}' |
-  node .\build\index.js
+**Sample response**
+```text
+# 📊 GRADE BENCHMARKING: example.com
+...
 ```
 
-- **generate_remediation_report** - Retrieve all findings and output remediation advice prioritized by factor.
+**Edge cases**
+- If already at the highest grade, the "Next milestone" section notes this.
 
+### find_high_impact_findings_across_assets
+**Description:** Scan assets for common high‑impact issues.
+
+**Parameters**
+- `domain` (string, required)
+- `issue_types` (array of strings, optional) – Issue types to search for.
+
+**Response**
+Markdown summary listing assets where each issue type appears.
+
+**Errors**
+- Returns `No issue types specified` if the list is empty.
+- Partial results may be returned when some asset lookups fail.
+
+**Sample request**
 ```json
-{
-  "name": "generate_remediation_report",
-  "arguments": {"domain": "example.com"}
-}
+{ "name": "find_high_impact_findings_across_assets", "arguments": {"domain": "example.com", "issue_types": ["spf_record_missing"]} }
 ```
 
-On Windows 11 run:
-
-```powershell
-echo '{"type":"call_tool","id":1,"params":{"name":"generate_remediation_report","arguments":{"domain":"example.com"}}}' |
-  node .\build\index.js
+**Sample response**
+```text
+# 🔍 TACTICAL FINDINGS ACROSS ALL ASSETS
+...
 ```
 
-- **call_api_endpoint** - Generic helper to query any SecurityScorecard REST endpoint. Use this for custom API paths not yet covered by the built-in tools.
+**Edge cases**
+- Scanning many assets can be slow; missing assets are skipped.
 
+### get_findings_by_asset
+**Description:** List issues grouped by each asset.
+
+**Parameters**
+- `domain` (string, required)
+- `asset_type` (string, optional; `domain` or `ip_address`, default `domain`)
+
+**Response**
+Markdown sections for each asset with associated issues.
+
+**Errors**
+- `InvalidRequest` if the asset type is unsupported.
+
+**Sample request**
 ```json
-{
-  "name": "call_api_endpoint",
-  "arguments": {"endpoint": "/companies/example.com", "method": "GET"}
-}
+{ "name": "get_findings_by_asset", "arguments": {"domain": "example.com", "asset_type": "domain"} }
 ```
+
+**Sample response**
+```text
+# ISSUES BY ASSET: example.com
+...
+```
+
+**Edge cases**
+- If the domain has no assets, the response indicates none were found.
+
+### get_findings_by_category
+**Description:** List issues grouped by SecurityScorecard factor.
+
+**Parameters**
+- `domain` (string, required)
+
+**Response**
+Markdown section per factor with related issues.
+
+**Errors**
+- `InvalidRequest` if the domain is invalid.
+
+**Sample request**
+```json
+{ "name": "get_findings_by_category", "arguments": {"domain": "example.com"} }
+```
+
+**Sample response**
+```text
+# FINDINGS BY CATEGORY: example.com
+...
+```
+
+**Edge cases**
+- Factors with no issues are omitted from the output.
+
+### generate_remediation_report
+**Description:** Retrieve all findings and suggest fixes by factor.
+
+**Parameters**
+- `domain` (string, required)
+
+**Response**
+Markdown report grouped by factor with remediation advice.
+
+**Errors**
+- `InvalidRequest` if the domain lookup fails.
+
+**Sample request**
+```json
+{ "name": "generate_remediation_report", "arguments": {"domain": "example.com"} }
+```
+
+**Sample response**
+```text
+# REMEDIATION REPORT: example.com
+...
+```
+
+**Edge cases**
+- Large reports may be truncated by some clients.
+
+### call_api_endpoint
+**Description:** Query any SecurityScorecard REST endpoint.
+
+**Parameters**
+- `endpoint` (string, required) – API path such as `/companies/example.com`.
+- `method` (string, optional, default `GET`).
+- `body` (object, optional) – JSON body for POST/PUT requests.
+
+**Response**
+Raw JSON from the API rendered in a code block.
+
+**Errors**
+- Mirrors underlying HTTP errors (401 unauthorized, 403 forbidden, 404 not found, 429 rate limit, etc.).
+
+**Sample request**
+```json
+{ "name": "call_api_endpoint", "arguments": {"endpoint": "/companies/example.com", "method": "GET"} }
+```
+
+**Sample response**
+```json
+{ "name": "Example Corp", "score": 75 }
+```
+
+**Edge cases**
+- The endpoint must be relative; full URLs are rejected.
 
