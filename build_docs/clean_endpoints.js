@@ -15,23 +15,41 @@ function isMeaningful(str) {
   return typeof str === 'string' && str.trim() !== '' && !containsBadPhrase(str);
 }
 
+function isValidName(str = '') {
+  return /^[A-Za-z0-9_.-]+$/.test(str);
+}
+
+function normalizeParam(item = {}) {
+  return {
+    name: (item.name || '').trim(),
+    type: (item.type || '').trim(),
+    required: Boolean(item.required),
+    description: (item.description || '').trim(),
+  };
+}
+
 function cleanEntries(entries = []) {
-  return entries.filter(item => {
-    const nameOk = isMeaningful(item.name);
-    const typeOk = isMeaningful(item.type);
-    const descOk = !containsBadPhrase(item.description || '');
-    return nameOk && typeOk && descOk;
-  }).map(item => ({
-    ...item,
-    name: item.name.trim(),
-    type: item.type.trim(),
-  }));
+  return entries
+    .filter(item => {
+      const nameOk = isMeaningful(item.name) && isValidName(item.name);
+      const typeOk = isMeaningful(item.type);
+      const descOk = !containsBadPhrase(item.description || '');
+      return nameOk && typeOk && descOk;
+    })
+    .map(normalizeParam);
+}
+
+function extractPathTokens(url = '') {
+  const matches = url.match(/\{([^}]+)\}/g) || [];
+  return matches.map(m => m.slice(1, -1));
 }
 
 const cleanedEndpoints = raw.endpoints.map(ep => {
   const params = ep.parameters || {};
   return {
-    ...ep,
+    method: (ep.method || '').toUpperCase(),
+    url: (ep.url || '').trim(),
+    description: (ep.description || '').trim(),
     parameters: {
       path: cleanEntries(params.path),
       query: cleanEntries(params.query),
@@ -65,7 +83,6 @@ function mergeParamArrays(a = [], b = []) {
 function mergeEndpoints(a, b) {
   return {
     ...a,
-    title: isMeaningful(a.title) ? a.title : b.title,
     description: isMeaningful(a.description) ? a.description : b.description,
     parameters: {
       path: mergeParamArrays(a.parameters.path, b.parameters.path),
@@ -84,13 +101,35 @@ const mergedEndpoints = Object.values(
   }, {})
 );
 
+function validatePathParams(ep) {
+  const tokens = extractPathTokens(ep.url);
+  const params = ep.parameters.path.filter(p => tokens.includes(p.name));
+  const missing = tokens.filter(t => !params.some(p => p.name === t));
+  const missingParams = missing.map(name => ({
+    name,
+    type: 'string',
+    required: true,
+    description: '',
+  }));
+  return {
+    ...ep,
+    parameters: {
+      ...ep.parameters,
+      path: [...params, ...missingParams],
+    },
+  };
+}
+
+const normalizedEndpoints = mergedEndpoints.map(validatePathParams);
+
 const output = {
   metadata: {
     ...raw.metadata,
-    total_endpoints: mergedEndpoints.length,
+    total_endpoints: normalizedEndpoints.length,
   },
-  endpoints: mergedEndpoints,
+  endpoints: normalizedEndpoints,
 };
 
-// Print the sanitized JSON so callers can redirect it to a file
-console.log(JSON.stringify(output, null, 2));
+const outFile = new URL('./securityscorecard_api_clean.json', import.meta.url);
+fs.writeFileSync(outFile, JSON.stringify(output, null, 2));
+console.log(`Wrote ${outFile.pathname}`);
