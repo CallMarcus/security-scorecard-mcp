@@ -3,6 +3,7 @@
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { getFindingsByCategory } from "./get_findings_by_category.js";
+import { getEndpointDetails } from "./api_reference.js";
 import {
   CallToolRequestSchema,
   ErrorCode,
@@ -327,7 +328,7 @@ class ScoreImpactSecurityScorecardServer {
         case "call_api_endpoint":
           return await this.callApiEndpoint(
             request.params.arguments?.endpoint as string,
-            request.params.arguments?.method as string ?? "GET",
+            request.params.arguments?.method as string,
             request.params.arguments?.body
           );
 
@@ -610,6 +611,17 @@ class ScoreImpactSecurityScorecardServer {
   private async generateRemediationReport(domain: string): Promise<any> {
     let text = `# 🛠️ REMEDIATION REPORT: ${domain}\n\n`;
     try {
+      const [issuesInfo, factorsInfo] = await Promise.all([
+        getEndpointDetails('/companies/{domain}/issues'),
+        getEndpointDetails('/companies/{domain}/factors')
+      ]);
+      if (issuesInfo || factorsInfo) {
+        text += '> Data sources:\n';
+        if (issuesInfo) text += `> - ${issuesInfo.method} ${issuesInfo.url}\n`;
+        if (factorsInfo) text += `> - ${factorsInfo.method} ${factorsInfo.url}\n`;
+        text += '\n';
+      }
+
       const [categories, factors] = await Promise.all([
         getFindingsByCategory(this.makeRequest.bind(this), domain),
         this.getFactors()
@@ -645,9 +657,13 @@ class ScoreImpactSecurityScorecardServer {
     return { content: [{ type: "text", text }] };
   }
 
-  private async callApiEndpoint(endpoint: string, method: string = "GET", body?: any): Promise<any> {
-    const json = await this.makeRequest(endpoint, method, body);
-    const summary = `Response from \`${endpoint}\``;
+  private async callApiEndpoint(endpoint: string, method?: string, body?: any): Promise<any> {
+    const details = await getEndpointDetails(endpoint, method);
+    const httpMethod = method || details?.method || "GET";
+    const json = await this.makeRequest(endpoint, httpMethod, body);
+    const summary = details
+      ? `${httpMethod} ${details.url} - ${details.description || ''}`
+      : `Response from \`${endpoint}\``;
     const text = `${summary}\n\n\`\`\`json\n${JSON.stringify(json, null, 2)}\n\`\`\``;
     return { content: [{ type: "text", text }] };
   }

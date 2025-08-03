@@ -98,7 +98,7 @@ Refer to the files in `build_docs/` for API references, debugging instructions a
 
 ## Testing API Endpoints
 
-A small helper script `build_docs/api_test_tool.js` allows testing any SecurityScorecard REST endpoint. Provide the endpoint path and optionally your domain and API token. The `{domain}` placeholder inside the endpoint will be replaced with your domain.
+A small helper script `build_docs/api_test_tool.js` allows testing any SecurityScorecard REST endpoint. Provide the endpoint path and optionally your domain and API token. The `{domain}` placeholder inside the endpoint will be replaced with your domain. The tool now consults the bundled API reference to auto-fill the HTTP method and display endpoint descriptions.
 
 ```bash
 # Example
@@ -107,6 +107,19 @@ node build_docs/api_test_tool.js /companies/{domain}/issues?limit=5 \
 ```
 
 The script prints the HTTP status and a short preview of the response so you can validate what the API returns before integrating a new MCP tool.
+
+### API Reference utilities
+
+Developer-oriented helpers in `src/api_reference.ts` load `build_docs/api_reference.json` and expose lookup functions. For example:
+
+```typescript
+import { loadApiReference, getEndpointDetails } from "./build/api_reference.js";
+
+const allEndpoints = await loadApiReference();
+const issuesInfo = await getEndpointDetails("/companies/{domain}/issues");
+```
+
+These utilities power the endpoint testing script and are used by the remediation report builder to note which API resources were queried.
 
 ## Sample Claude Desktop configuration
 
