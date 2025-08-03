@@ -96,6 +96,57 @@ export class ScoreImpactSecurityScorecardServer {
   }
 
   /**
+   * Log helper for debugging and troubleshooting. Respects DEBUG_MODE flag.
+   */
+  private log(message: string, data?: unknown) {
+    if (this.config.debugMode) {
+      if (data !== undefined) {
+        console.error(`[debug] ${message}`, data);
+      } else {
+        console.error(`[debug] ${message}`);
+      }
+    }
+  }
+
+  /**
+   * Wraps tool execution with logging and error handling to provide
+   * user-friendly feedback and partial results when possible.
+   */
+  private async executeTool(
+    name: string,
+    fn: () => Promise<any>
+  ): Promise<any> {
+    this.log(`Executing tool: ${name}`);
+    try {
+      const result = await fn();
+      this.log(`Tool succeeded: ${name}`);
+      return result;
+    } catch (error: any) {
+      this.log(`Tool failed: ${name}`, error);
+      const message = error?.message || "Unknown error";
+      const partial = error?.partial || error?.partialResult;
+      if (partial) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `${message}\n\n\`\`\`json\n${JSON.stringify(partial, null, 2)}\n\`\`\``,
+            },
+          ],
+        };
+      }
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Error running ${name}: ${message}`,
+          },
+        ],
+      };
+    }
+  }
+
+  /**
    * Makes a request to the Security Scorecard API with robust error handling and pagination support.
    * @param endpoint The API endpoint to call.
    * @param method The HTTP method (defaults to GET).
@@ -286,54 +337,80 @@ export class ScoreImpactSecurityScorecardServer {
     });
 
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
-      const domain = request.params.arguments?.domain as string || this.config.defaultDomain;
-      
+      const domain =
+        (request.params.arguments?.domain as string) || this.config.defaultDomain;
+
       switch (request.params.name) {
         case "get_score_improvement_roadmap":
-          return await this.getScoreImprovementRoadmap(
-            domain,
-            request.params.arguments?.target_grade as "A" | "B" | "C"
+          return await this.executeTool(
+            "get_score_improvement_roadmap",
+            () =>
+              this.getScoreImprovementRoadmap(
+                domain,
+                request.params.arguments?.target_grade as "A" | "B" | "C"
+              )
           );
 
         case "calculate_factor_score_impact":
-          return await this.calculateFactorScoreImpact(domain);
+          return await this.executeTool("calculate_factor_score_impact", () =>
+            this.calculateFactorScoreImpact(domain)
+          );
 
         case "get_issues_by_roi":
-          return await this.getIssuesByROI(
-            domain,
-            request.params.arguments?.top_n as number
+          return await this.executeTool("get_issues_by_roi", () =>
+            this.getIssuesByROI(
+              domain,
+              request.params.arguments?.top_n as number
+            )
           );
-        
+
         case "find_high_impact_findings_across_assets":
-          return await this.findHighImpactFindingsAcrossAssets(
-            (request.params.arguments?.issue_types as string[]) || this.config.defaultIssueTypes
+          return await this.executeTool(
+            "find_high_impact_findings_across_assets",
+            () =>
+              this.findHighImpactFindingsAcrossAssets(
+                (request.params.arguments?.issue_types as string[]) ||
+                  this.config.defaultIssueTypes
+              )
           );
 
         case "get_findings_by_asset":
-          return await this.getFindingsByAsset(
-            domain,
-            request.params.arguments?.asset_type as string
+          return await this.executeTool("get_findings_by_asset", () =>
+            this.getFindingsByAsset(
+              domain,
+              request.params.arguments?.asset_type as string
+            )
           );
 
         case "get_findings_by_category":
-          return await this.getFindingsByCategoryTool(
-            domain
+          return await this.executeTool("get_findings_by_category", () =>
+            this.getFindingsByCategoryTool(domain)
           );
 
         case "generate_remediation_report":
-          return await this.generateRemediationReport(
-            domain
+          return await this.executeTool("generate_remediation_report", () =>
+            this.generateRemediationReport(domain)
           );
 
         case "call_api_endpoint":
-          return await this.callApiEndpoint(
-            request.params.arguments?.endpoint as string,
-            request.params.arguments?.method as string,
-            request.params.arguments?.body
+          return await this.executeTool("call_api_endpoint", () =>
+            this.callApiEndpoint(
+              request.params.arguments?.endpoint as string,
+              request.params.arguments?.method as string,
+              request.params.arguments?.body
+            )
           );
 
         default:
-          throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${request.params.name}`);
+          this.log(`Unknown tool requested: ${request.params.name}`);
+          return {
+            content: [
+              {
+                type: "text",
+                text: `Unknown tool: ${request.params.name}`,
+              },
+            ],
+          };
       }
     });
   }

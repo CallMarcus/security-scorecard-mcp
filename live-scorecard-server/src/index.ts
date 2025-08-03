@@ -125,6 +125,53 @@ export class ScoreImpactSecurityScorecardServer {
   }
 
   /**
+   * Simple logging helper for troubleshooting. Outputs only when DEBUG_MODE is enabled.
+   */
+  private log(message: string, data?: unknown) {
+    if (this.config.debugMode) {
+      if (data !== undefined) {
+        console.error(`[debug] ${message}`, data);
+      } else {
+        console.error(`[debug] ${message}`);
+      }
+    }
+  }
+
+  /**
+   * Executes a tool function with standardized error handling and logging.
+   */
+  private async executeTool(
+    name: string,
+    fn: () => Promise<any>
+  ): Promise<any> {
+    this.log(`Executing tool: ${name}`);
+    try {
+      const result = await fn();
+      this.log(`Tool succeeded: ${name}`);
+      return result;
+    } catch (error: any) {
+      this.log(`Tool failed: ${name}`, error);
+      const message = error?.message || "Unknown error";
+      const partial = error?.partial || error?.partialResult;
+      if (partial) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `${message}\n\n\`\`\`json\n${JSON.stringify(partial, null, 2)}\n\`\`\``,
+            },
+          ],
+        };
+      }
+      return {
+        content: [
+          { type: "text", text: `Error running ${name}: ${message}` },
+        ],
+      };
+    }
+  }
+
+  /**
    * Makes a request to the Security Scorecard API with robust error handling and pagination support.
    * @param endpoint The API endpoint to call.
    * @param method The HTTP method (defaults to GET).
@@ -318,47 +365,82 @@ export class ScoreImpactSecurityScorecardServer {
     });
 
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
-      const domain = request.params.arguments?.domain as string || this.config.defaultDomain;
-      
+      const domain =
+        (request.params.arguments?.domain as string) || this.config.defaultDomain;
+
       switch (request.params.name) {
         case "get_score_improvement_roadmap":
-          return await this.getScoreImprovementRoadmap(
-            domain,
-            request.params.arguments?.target_grade as "A" | "B" | "C"
+          return await this.executeTool(
+            "get_score_improvement_roadmap",
+            () =>
+              this.getScoreImprovementRoadmap(
+                domain,
+                request.params.arguments?.target_grade as "A" | "B" | "C"
+              )
           );
 
         case "calculate_factor_score_impact":
-          return await this.calculateFactorScoreImpact(domain);
+          return await this.executeTool("calculate_factor_score_impact", () =>
+            this.calculateFactorScoreImpact(domain)
+          );
 
         case "get_issues_by_roi":
-          return await this.getIssuesByROI(
-            domain,
-            request.params.arguments?.top_n as number || 10
+          return await this.executeTool("get_issues_by_roi", () =>
+            this.getIssuesByROI(
+              domain,
+              request.params.arguments?.top_n as number || 10
+            )
           );
 
         case "simulate_score_improvement":
-          return await this.simulateScoreImprovement(
-            domain,
-            request.params.arguments?.issue_types as string[] || ["spf_record_missing", "dmarc_contains_none", "patching_cadence_v3_critical"]
+          return await this.executeTool("simulate_score_improvement", () =>
+            this.simulateScoreImprovement(
+              domain,
+              request.params.arguments?.issue_types as string[] || [
+                "spf_record_missing",
+                "dmarc_contains_none",
+                "patching_cadence_v3_critical",
+              ]
+            )
           );
 
         case "get_quick_wins":
-          return await this.getQuickWins(
-            domain,
-            request.params.arguments?.max_effort as string || "medium"
+          return await this.executeTool("get_quick_wins", () =>
+            this.getQuickWins(
+              domain,
+              request.params.arguments?.max_effort as string || "medium"
+            )
           );
 
         case "benchmark_grade_requirements":
-          return await this.benchmarkGradeRequirements(domain);
+          return await this.executeTool("benchmark_grade_requirements", () =>
+            this.benchmarkGradeRequirements(domain)
+          );
 
         case "find_high_impact_findings_across_assets":
-          return await this.findHighImpactFindingsAcrossAssets(
-            domain,
-            request.params.arguments?.issue_types as string[] || ["spf_record_missing", "dmarc_contains_none", "patching_cadence_v3_critical"]
+          return await this.executeTool(
+            "find_high_impact_findings_across_assets",
+            () =>
+              this.findHighImpactFindingsAcrossAssets(
+                domain,
+                request.params.arguments?.issue_types as string[] || [
+                  "spf_record_missing",
+                  "dmarc_contains_none",
+                  "patching_cadence_v3_critical",
+                ]
+              )
           );
 
         default:
-          throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${request.params.name}`);
+          this.log(`Unknown tool requested: ${request.params.name}`);
+          return {
+            content: [
+              {
+                type: "text",
+                text: `Unknown tool: ${request.params.name}`,
+              },
+            ],
+          };
       }
     });
   }
