@@ -117,7 +117,9 @@ export class ScoreImpactSecurityScorecardServer {
 
     this.config = {
       apiToken: process.env.SECURITY_SCORECARD_API_TOKEN || "",
-      defaultDomain: process.env.COMPANY_DOMAIN || "neste.com",
+      defaultDomain: this.sanitizeDomain(
+        process.env.COMPANY_DOMAIN || "neste.com"
+      ),
       debugMode: process.env.DEBUG_MODE === "true",
     };
 
@@ -365,34 +367,40 @@ export class ScoreImpactSecurityScorecardServer {
     });
 
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
-      const domain =
+      const rawDomain =
         (request.params.arguments?.domain as string) || this.config.defaultDomain;
 
       switch (request.params.name) {
-        case "get_score_improvement_roadmap":
+        case "get_score_improvement_roadmap": {
+          const domain = this.sanitizeDomain(rawDomain);
+          const grade = this.validateTargetGrade(
+            request.params.arguments?.target_grade as string
+          );
           return await this.executeTool(
             "get_score_improvement_roadmap",
-            () =>
-              this.getScoreImprovementRoadmap(
-                domain,
-                request.params.arguments?.target_grade as "A" | "B" | "C"
-              )
+            () => this.getScoreImprovementRoadmap(domain, grade)
           );
+        }
 
-        case "calculate_factor_score_impact":
+        case "calculate_factor_score_impact": {
+          const domain = this.sanitizeDomain(rawDomain);
           return await this.executeTool("calculate_factor_score_impact", () =>
             this.calculateFactorScoreImpact(domain)
           );
+        }
 
-        case "get_issues_by_roi":
+        case "get_issues_by_roi": {
+          const domain = this.sanitizeDomain(rawDomain);
+          const topNArg = request.params.arguments?.top_n;
+          const topN =
+            topNArg !== undefined ? this.validateTopN(Number(topNArg)) : 10;
           return await this.executeTool("get_issues_by_roi", () =>
-            this.getIssuesByROI(
-              domain,
-              request.params.arguments?.top_n as number || 10
-            )
+            this.getIssuesByROI(domain, topN)
           );
+        }
 
-        case "simulate_score_improvement":
+        case "simulate_score_improvement": {
+          const domain = this.sanitizeDomain(rawDomain);
           return await this.executeTool("simulate_score_improvement", () =>
             this.simulateScoreImprovement(
               domain,
@@ -403,21 +411,27 @@ export class ScoreImpactSecurityScorecardServer {
               ]
             )
           );
+        }
 
-        case "get_quick_wins":
-          return await this.executeTool("get_quick_wins", () =>
-            this.getQuickWins(
-              domain,
-              request.params.arguments?.max_effort as string || "medium"
-            )
+        case "get_quick_wins": {
+          const domain = this.sanitizeDomain(rawDomain);
+          const maxEffort = this.validateMaxEffort(
+            (request.params.arguments?.max_effort as string) || "medium"
           );
+          return await this.executeTool("get_quick_wins", () =>
+            this.getQuickWins(domain, maxEffort)
+          );
+        }
 
-        case "benchmark_grade_requirements":
+        case "benchmark_grade_requirements": {
+          const domain = this.sanitizeDomain(rawDomain);
           return await this.executeTool("benchmark_grade_requirements", () =>
             this.benchmarkGradeRequirements(domain)
           );
+        }
 
-        case "find_high_impact_findings_across_assets":
+        case "find_high_impact_findings_across_assets": {
+          const domain = this.sanitizeDomain(rawDomain);
           return await this.executeTool(
             "find_high_impact_findings_across_assets",
             () =>
@@ -430,6 +444,7 @@ export class ScoreImpactSecurityScorecardServer {
                 ]
               )
           );
+        }
 
         default:
           this.log(`Unknown tool requested: ${request.params.name}`);
@@ -448,6 +463,8 @@ export class ScoreImpactSecurityScorecardServer {
   // --- TOOL IMPLEMENTATIONS ---
 
   private async getScoreImprovementRoadmap(domain: string, targetGrade: "A" | "B" | "C"): Promise<any> {
+    domain = this.sanitizeDomain(domain);
+    targetGrade = this.validateTargetGrade(targetGrade);
     try {
       const [scorecard, companyFactors] = await Promise.all([
         this.makeRequest(`/companies/${domain}`),
@@ -521,6 +538,7 @@ export class ScoreImpactSecurityScorecardServer {
   }
 
   private async calculateFactorScoreImpact(domain: string): Promise<any> {
+    domain = this.sanitizeDomain(domain);
     try {
       const [scorecard, companyFactors] = await Promise.all([
         this.makeRequest(`/companies/${domain}`),
@@ -583,6 +601,8 @@ export class ScoreImpactSecurityScorecardServer {
   }
   
   private async getIssuesByROI(domain: string, topN: number): Promise<any> {
+    domain = this.sanitizeDomain(domain);
+    topN = this.validateTopN(topN);
     try {
       const allIssues = await this.makeRequest(`/companies/${domain}/issues`);
 
@@ -661,6 +681,8 @@ export class ScoreImpactSecurityScorecardServer {
   }
 
   private async getIssuesByROIFallback(domain: string, topN: number): Promise<any> {
+    domain = this.sanitizeDomain(domain);
+    topN = this.validateTopN(topN);
     // Fallback with common issue patterns
     const knownIssues: IssueROI[] = [
       {
@@ -713,6 +735,7 @@ export class ScoreImpactSecurityScorecardServer {
   }
 
   private async simulateScoreImprovement(domain: string, issueTypes: string[]): Promise<any> {
+    domain = this.sanitizeDomain(domain);
     try {
       const [scorecard, companyFactors] = await Promise.all([
         this.makeRequest(`/companies/${domain}`),
@@ -785,6 +808,8 @@ export class ScoreImpactSecurityScorecardServer {
   }
 
   private async getQuickWins(domain: string, maxEffort: string): Promise<any> {
+    domain = this.sanitizeDomain(domain);
+    maxEffort = this.validateMaxEffort(maxEffort);
     try {
       const allIssues = await this.makeRequest(`/companies/${domain}/issues`);
 
@@ -855,6 +880,8 @@ export class ScoreImpactSecurityScorecardServer {
   }
 
   private async getQuickWinsFallback(domain: string, maxEffort: string): Promise<any> {
+    domain = this.sanitizeDomain(domain);
+    maxEffort = this.validateMaxEffort(maxEffort);
     const quickWinIssues = [
       {
         issue: "SPF Record Configuration",
@@ -903,6 +930,7 @@ export class ScoreImpactSecurityScorecardServer {
   }
 
   private async benchmarkGradeRequirements(domain: string): Promise<any> {
+    domain = this.sanitizeDomain(domain);
     const scorecard = await this.makeRequest(`/companies/${domain}`);
     
     const gradeRequirements = [
@@ -949,6 +977,7 @@ export class ScoreImpactSecurityScorecardServer {
   }
 
   private async findHighImpactFindingsAcrossAssets(domain: string, issueTypes: string[]): Promise<any> {
+    domain = this.sanitizeDomain(domain);
     // Using a simpler approach based on the primary domain's issues
     let text = `# 🔍 HIGH-IMPACT FINDINGS ANALYSIS: ${domain}\n\nScanning for: ${issueTypes.join(', ')}\n\n`;
     
@@ -1007,6 +1036,50 @@ export class ScoreImpactSecurityScorecardServer {
   }
 
   // --- HELPER METHODS ---
+
+  private sanitizeDomain(domain: string): string {
+    const trimmed = domain.trim().toLowerCase();
+    const domainRegex = /^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$/;
+    if (!domainRegex.test(trimmed)) {
+      throw new McpError(
+        ErrorCode.InvalidRequest,
+        `Invalid domain format: ${domain}`
+      );
+    }
+    return trimmed;
+  }
+
+  private validateTopN(value: number): number {
+    if (!Number.isInteger(value) || value < 1 || value > 100) {
+      throw new McpError(
+        ErrorCode.InvalidRequest,
+        `Invalid top_n value: ${value}. Must be an integer between 1 and 100.`
+      );
+    }
+    return value;
+  }
+
+  private validateTargetGrade(value: string): "A" | "B" | "C" {
+    const allowed = ["A", "B", "C"];
+    if (!allowed.includes(value)) {
+      throw new McpError(
+        ErrorCode.InvalidRequest,
+        `Invalid target_grade: ${value}`
+      );
+    }
+    return value as "A" | "B" | "C";
+  }
+
+  private validateMaxEffort(value: string): "low" | "medium" | "high" {
+    const allowed = ["low", "medium", "high"];
+    if (!allowed.includes(value)) {
+      throw new McpError(
+        ErrorCode.InvalidRequest,
+        `Invalid max_effort: ${value}`
+      );
+    }
+    return value as "low" | "medium" | "high";
+  }
 
   private getKeyIssuesForFactor(factorName: string): string[] {
     const issueMap: Record<string, string[]> = {

@@ -85,7 +85,9 @@ export class ScoreImpactSecurityScorecardServer {
 
     this.config = {
       apiToken: process.env.SECURITY_SCORECARD_API_TOKEN || "",
-      defaultDomain: process.env.COMPANY_DOMAIN || "",
+      defaultDomain: process.env.COMPANY_DOMAIN
+        ? this.sanitizeDomain(process.env.COMPANY_DOMAIN)
+        : "",
       defaultIssueTypes: process.env.DEFAULT_ISSUE_TYPES
         ? process.env.DEFAULT_ISSUE_TYPES.split(',').map(s => s.trim()).filter(Boolean)
         : [],
@@ -337,32 +339,37 @@ export class ScoreImpactSecurityScorecardServer {
     });
 
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
-      const domain =
+      const rawDomain =
         (request.params.arguments?.domain as string) || this.config.defaultDomain;
 
       switch (request.params.name) {
-        case "get_score_improvement_roadmap":
+        case "get_score_improvement_roadmap": {
+          const domain = this.sanitizeDomain(rawDomain);
+          const grade = this.validateTargetGrade(
+            request.params.arguments?.target_grade as string
+          );
           return await this.executeTool(
             "get_score_improvement_roadmap",
-            () =>
-              this.getScoreImprovementRoadmap(
-                domain,
-                request.params.arguments?.target_grade as "A" | "B" | "C"
-              )
+            () => this.getScoreImprovementRoadmap(domain, grade)
           );
+        }
 
-        case "calculate_factor_score_impact":
+        case "calculate_factor_score_impact": {
+          const domain = this.sanitizeDomain(rawDomain);
           return await this.executeTool("calculate_factor_score_impact", () =>
             this.calculateFactorScoreImpact(domain)
           );
+        }
 
-        case "get_issues_by_roi":
+        case "get_issues_by_roi": {
+          const domain = this.sanitizeDomain(rawDomain);
+          const topNArg = request.params.arguments?.top_n;
+          const topN =
+            topNArg !== undefined ? this.validateTopN(Number(topNArg)) : 10;
           return await this.executeTool("get_issues_by_roi", () =>
-            this.getIssuesByROI(
-              domain,
-              request.params.arguments?.top_n as number
-            )
+            this.getIssuesByROI(domain, topN)
           );
+        }
 
         case "find_high_impact_findings_across_assets":
           return await this.executeTool(
@@ -374,23 +381,29 @@ export class ScoreImpactSecurityScorecardServer {
               )
           );
 
-        case "get_findings_by_asset":
-          return await this.executeTool("get_findings_by_asset", () =>
-            this.getFindingsByAsset(
-              domain,
-              request.params.arguments?.asset_type as string
-            )
+        case "get_findings_by_asset": {
+          const domain = this.sanitizeDomain(rawDomain);
+          const assetType = this.validateAssetType(
+            (request.params.arguments?.asset_type as string) || "domain"
           );
+          return await this.executeTool("get_findings_by_asset", () =>
+            this.getFindingsByAsset(domain, assetType)
+          );
+        }
 
-        case "get_findings_by_category":
+        case "get_findings_by_category": {
+          const domain = this.sanitizeDomain(rawDomain);
           return await this.executeTool("get_findings_by_category", () =>
             this.getFindingsByCategoryTool(domain)
           );
+        }
 
-        case "generate_remediation_report":
+        case "generate_remediation_report": {
+          const domain = this.sanitizeDomain(rawDomain);
           return await this.executeTool("generate_remediation_report", () =>
             this.generateRemediationReport(domain)
           );
+        }
 
         case "call_api_endpoint":
           return await this.executeTool("call_api_endpoint", () =>
@@ -418,6 +431,8 @@ export class ScoreImpactSecurityScorecardServer {
   // --- TOOL IMPLEMENTATIONS ---
 
   private async getScoreImprovementRoadmap(domain: string, targetGrade: "A" | "B" | "C"): Promise<any> {
+      domain = this.sanitizeDomain(domain);
+      targetGrade = this.validateTargetGrade(targetGrade);
       const [scorecard, companyFactors, allFactors] = await Promise.all([
           this.makeRequest(`/companies/${domain}`),
           this.makeRequest(`/companies/${domain}/factors`),
@@ -526,6 +541,7 @@ export class ScoreImpactSecurityScorecardServer {
   }
 
   private async calculateFactorScoreImpact(domain: string): Promise<any> {
+    domain = this.sanitizeDomain(domain);
     const [scorecard, companyFactors, allFactors] = await Promise.all([
         this.makeRequest(`/companies/${domain}`),
         this.makeRequest(`/companies/${domain}/factors`),
@@ -577,6 +593,8 @@ export class ScoreImpactSecurityScorecardServer {
   }
   
   private async getIssuesByROI(domain: string, topN: number): Promise<any> {
+      domain = this.sanitizeDomain(domain);
+      topN = this.validateTopN(topN);
       const [allIssues, allFactors] = await Promise.all([
           this.makeRequest(`/companies/${domain}/issues`),
           this.getFactors()
@@ -702,6 +720,8 @@ export class ScoreImpactSecurityScorecardServer {
   }
 
   private async getFindingsByAsset(domain: string, assetType: string = "domain"): Promise<any> {
+    domain = this.sanitizeDomain(domain);
+    assetType = this.validateAssetType(assetType);
     let text = `# 🔍 FINDINGS BY ASSET: ${domain}\n\n`;
     try {
         const assetsResponse = await this.makeRequest(`/esi/assets?type=${assetType}`);
@@ -726,6 +746,7 @@ export class ScoreImpactSecurityScorecardServer {
   }
 
   private async getFindingsByCategoryTool(domain: string): Promise<any> {
+    domain = this.sanitizeDomain(domain);
     let text = `# 📊 FINDINGS BY CATEGORY: ${domain}\n\n`;
     try {
       const summary = await getFindingsByCategory(this.makeRequest.bind(this), domain);
@@ -737,6 +758,7 @@ export class ScoreImpactSecurityScorecardServer {
   }
 
   private async generateRemediationReport(domain: string): Promise<any> {
+    domain = this.sanitizeDomain(domain);
     let text = `# 🛠️ REMEDIATION REPORT: ${domain}\n\n`;
     try {
       const [issuesInfo, factorsInfo] = await Promise.all([
@@ -797,6 +819,50 @@ export class ScoreImpactSecurityScorecardServer {
   }
 
   // --- HELPER METHODS ---
+
+  private sanitizeDomain(domain: string): string {
+    const trimmed = domain.trim().toLowerCase();
+    const domainRegex = /^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$/;
+    if (!domainRegex.test(trimmed)) {
+      throw new McpError(
+        ErrorCode.InvalidRequest,
+        `Invalid domain format: ${domain}`
+      );
+    }
+    return trimmed;
+  }
+
+  private validateTopN(value: number): number {
+    if (!Number.isInteger(value) || value < 1 || value > 100) {
+      throw new McpError(
+        ErrorCode.InvalidRequest,
+        `Invalid top_n value: ${value}. Must be an integer between 1 and 100.`
+      );
+    }
+    return value;
+  }
+
+  private validateAssetType(value: string): string {
+    const allowed = ["domain", "ip_address"];
+    if (!allowed.includes(value)) {
+      throw new McpError(
+        ErrorCode.InvalidRequest,
+        `Invalid asset_type: ${value}`
+      );
+    }
+    return value;
+  }
+
+  private validateTargetGrade(value: string): "A" | "B" | "C" {
+    const allowed = ["A", "B", "C"];
+    if (!allowed.includes(value)) {
+      throw new McpError(
+        ErrorCode.InvalidRequest,
+        `Invalid target_grade: ${value}`
+      );
+    }
+    return value as "A" | "B" | "C";
+  }
 
   private getKeyIssuesForFactor(factorName: string): string[] {
     const issueMap: Record<string, string[]> = {
