@@ -2,6 +2,7 @@
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { getFindingsByCategory } from "./get_findings_by_category.js";
+import { getEndpointDetails } from "./api_reference.js";
 import { CallToolRequestSchema, ErrorCode, ListToolsRequestSchema, McpError, } from "@modelcontextprotocol/sdk/types.js";
 // Base URL for the Security Scorecard API
 const API_BASE_URL = "https://api.securityscorecard.io";
@@ -223,7 +224,7 @@ class ScoreImpactSecurityScorecardServer {
                 case "generate_remediation_report":
                     return await this.generateRemediationReport(domain);
                 case "call_api_endpoint":
-                    return await this.callApiEndpoint(request.params.arguments?.endpoint, request.params.arguments?.method ?? "GET", request.params.arguments?.body);
+                    return await this.callApiEndpoint(request.params.arguments?.endpoint, request.params.arguments?.method, request.params.arguments?.body);
                 default:
                     throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${request.params.name}`);
             }
@@ -453,6 +454,18 @@ class ScoreImpactSecurityScorecardServer {
     async generateRemediationReport(domain) {
         let text = `# 🛠️ REMEDIATION REPORT: ${domain}\n\n`;
         try {
+            const [issuesInfo, factorsInfo] = await Promise.all([
+                getEndpointDetails('/companies/{domain}/issues'),
+                getEndpointDetails('/companies/{domain}/factors')
+            ]);
+            if (issuesInfo || factorsInfo) {
+                text += '> Data sources:\n';
+                if (issuesInfo)
+                    text += `> - ${issuesInfo.method} ${issuesInfo.url}\n`;
+                if (factorsInfo)
+                    text += `> - ${factorsInfo.method} ${factorsInfo.url}\n`;
+                text += '\n';
+            }
             const [categories, factors] = await Promise.all([
                 getFindingsByCategory(this.makeRequest.bind(this), domain),
                 this.getFactors()
@@ -483,9 +496,13 @@ class ScoreImpactSecurityScorecardServer {
         }
         return { content: [{ type: "text", text }] };
     }
-    async callApiEndpoint(endpoint, method = "GET", body) {
-        const json = await this.makeRequest(endpoint, method, body);
-        const summary = `Response from \`${endpoint}\``;
+    async callApiEndpoint(endpoint, method, body) {
+        const details = await getEndpointDetails(endpoint, method);
+        const httpMethod = method || details?.method || "GET";
+        const json = await this.makeRequest(endpoint, httpMethod, body);
+        const summary = details
+            ? `${httpMethod} ${details.url} - ${details.description || ''}`
+            : `Response from \`${endpoint}\``;
         const text = `${summary}\n\n\`\`\`json\n${JSON.stringify(json, null, 2)}\n\`\`\``;
         return { content: [{ type: "text", text }] };
     }

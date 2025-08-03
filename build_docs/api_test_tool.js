@@ -1,9 +1,11 @@
+import { getEndpointDetails } from "../build/api_reference.js";
+
 const API_BASE_URL = "https://api.securityscorecard.io";
 
 // Simple argument parser
 function parseArgs() {
   const args = process.argv.slice(2);
-  const opts = { method: 'GET' };
+  const opts = {};
   if (args.length === 0) return opts;
   opts.endpoint = args[0];
   for (let i = 1; i < args.length; i++) {
@@ -30,17 +32,23 @@ async function main() {
 
   const domain = opts.domain || process.env.COMPANY_DOMAIN || 'company.com';
   const token = opts.token || process.env.SECURITY_SCORECARD_API_TOKEN || 'YOUR_TOKEN_HERE';
+  const info = await getEndpointDetails(opts.endpoint);
+  if (info) {
+    console.log(`Reference: ${info.method} ${info.url}`);
+    if (info.description) console.log(info.description);
+  }
+  if (!opts.method) opts.method = info?.method || 'GET';
   const endpoint = opts.endpoint.replace('{domain}', domain);
 
   const url = `${API_BASE_URL}${endpoint}`;
   const requestOptions = {
-    method: opts.method,
+    method: opts.method || 'GET',
     headers: {
       'Authorization': `Token ${token}`,
       'Accept': 'application/json'
     }
   };
-  if (opts.method !== 'GET' && opts.body) {
+  if ((opts.method || 'GET') !== 'GET' && opts.body) {
     requestOptions.headers['Content-Type'] = 'application/json';
     requestOptions.body = opts.body;
   }
