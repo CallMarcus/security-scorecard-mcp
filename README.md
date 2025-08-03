@@ -86,6 +86,11 @@ Add `--dev`/`-Dev` to either command to pull the most recent development build.
    export DEFAULT_ISSUE_TYPES="spf_record_missing,dmarc_contains_none,patching_cadence_v3_critical"
    # optional verbose debugging
    export DEBUG_MODE="true"
+   # optional request caching & rate limiting
+   export REQUEST_CACHE_TTL_MS="300000"      # cache duration in ms
+   export REQUESTS_PER_INTERVAL="5"          # requests added per interval
+   export REQUEST_INTERVAL_MS="1000"         # interval length in ms
+   export REQUEST_BURST_LIMIT="5"            # max burst size
    ```
 3. Start the MCP server:
    ```bash

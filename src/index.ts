@@ -69,6 +69,13 @@ export class ScoreImpactSecurityScorecardServer {
     debugMode: boolean;
   };
   private factorCache: Factor[] | null = null;
+  private requestCache: Map<string, { expiry: number; data: any }> = new Map();
+  private cacheTTL: number;
+  private requestsPerInterval: number;
+  private intervalMs: number;
+  private burstLimit: number;
+  private tokens: number;
+  private lastRefill: number;
 
   constructor() {
     this.server = new Server(
@@ -93,6 +100,20 @@ export class ScoreImpactSecurityScorecardServer {
         : [],
       debugMode: process.env.DEBUG_MODE === "true",
     };
+
+    // Configure cache and rate limiter
+    this.cacheTTL = parseInt(process.env.REQUEST_CACHE_TTL_MS || "300000", 10);
+    this.requestsPerInterval = parseInt(
+      process.env.REQUESTS_PER_INTERVAL || "5",
+      10
+    );
+    this.intervalMs = parseInt(process.env.REQUEST_INTERVAL_MS || "1000", 10);
+    this.burstLimit = parseInt(
+      process.env.REQUEST_BURST_LIMIT || String(this.requestsPerInterval),
+      10
+    );
+    this.tokens = this.burstLimit;
+    this.lastRefill = Date.now();
 
     this.setupToolHandlers();
   }
@@ -163,14 +184,25 @@ export class ScoreImpactSecurityScorecardServer {
       );
     }
 
+    const cacheKey = `${method}:${endpoint}:${body ? JSON.stringify(body) : ""}`;
+    if (method === "GET") {
+      const cached = this.requestCache.get(cacheKey);
+      if (cached && cached.expiry > Date.now()) {
+        this.log(`Cache hit: ${cacheKey}`);
+        return cached.data;
+      }
+    }
+
     let allEntries: any[] = [];
     let nextUrl: string | null = `${API_BASE_URL}${endpoint}`;
+    let result: any = null;
 
     while (nextUrl) {
+      await this.throttleRequest();
       if (this.config.debugMode) {
         console.error(`[API Call] Fetching: ${nextUrl}`);
       }
-      
+
       const response = await fetch(nextUrl, {
         method,
         headers: {
@@ -184,40 +216,85 @@ export class ScoreImpactSecurityScorecardServer {
       if (!response.ok) {
         const errorText = await response.text();
         switch (response.status) {
-            case 401:
-                throw new McpError(ErrorCode.InvalidRequest, `Authentication failed. Please check your API token. (HTTP 401)`);
-            case 403:
-                throw new McpError(ErrorCode.InvalidRequest, `Permission denied. Your API token may not have access to this resource. (HTTP 403)`);
-            case 404:
-                throw new McpError(ErrorCode.InvalidRequest, `Resource not found at ${endpoint}. Check the domain or identifier. (HTTP 404)`);
-            case 429:
-                const retryAfter = response.headers.get('Retry-After') || '60';
-                throw new McpError(ErrorCode.InvalidRequest, `Rate limit exceeded. Please wait ${retryAfter} seconds before trying again. (HTTP 429)`);
-            default:
-                throw new McpError(ErrorCode.InternalError, `API request failed with status ${response.status}: ${errorText}`);
+          case 401:
+            throw new McpError(
+              ErrorCode.InvalidRequest,
+              `Authentication failed. Please check your API token. (HTTP 401)`
+            );
+          case 403:
+            throw new McpError(
+              ErrorCode.InvalidRequest,
+              `Permission denied. Your API token may not have access to this resource. (HTTP 403)`
+            );
+          case 404:
+            throw new McpError(
+              ErrorCode.InvalidRequest,
+              `Resource not found at ${endpoint}. Check the domain or identifier. (HTTP 404)`
+            );
+          case 429:
+            const retryAfter = response.headers.get("Retry-After") || "60";
+            throw new McpError(
+              ErrorCode.InvalidRequest,
+              `Rate limit exceeded. Please wait ${retryAfter} seconds before trying again. (HTTP 429)`
+            );
+          default:
+            throw new McpError(
+              ErrorCode.InternalError,
+              `API request failed with status ${response.status}: ${errorText}`
+            );
         }
       }
 
       const pageJson = await response.json();
       if (pageJson.entries) {
         allEntries = allEntries.concat(pageJson.entries);
+        result = { entries: allEntries };
       } else {
-        // For non-paginated endpoints, return the whole response
-        return pageJson;
+        result = pageJson;
+        nextUrl = null;
+        continue;
       }
 
       // Check for cursor-based pagination
       if (pageJson.next_cursor) {
-        // FIX: Explicitly typed `url` to avoid implicit 'any' error.
         const url: URL = new URL(nextUrl!);
-        url.searchParams.set('cursor', pageJson.next_cursor);
+        url.searchParams.set("cursor", pageJson.next_cursor);
         nextUrl = url.toString();
       } else {
         nextUrl = null;
       }
     }
 
-    return { entries: allEntries };
+    if (method === "GET" && result) {
+      this.requestCache.set(cacheKey, {
+        expiry: Date.now() + this.cacheTTL,
+        data: result,
+      });
+    }
+
+    return result;
+  }
+
+  /**
+   * Simple token bucket throttle to limit request rate and bursts.
+   */
+  private async throttleRequest(): Promise<void> {
+    while (true) {
+      const now = Date.now();
+      const elapsed = now - this.lastRefill;
+      if (elapsed >= this.intervalMs) {
+        const tokensToAdd =
+          Math.floor(elapsed / this.intervalMs) * this.requestsPerInterval;
+        this.tokens = Math.min(this.burstLimit, this.tokens + tokensToAdd);
+        this.lastRefill = now;
+      }
+      if (this.tokens > 0) {
+        this.tokens--;
+        return;
+      }
+      const wait = this.intervalMs - (now - this.lastRefill);
+      await new Promise((r) => setTimeout(r, wait));
+    }
   }
 
   /**
