@@ -94,7 +94,7 @@ const DEFAULT_FACTOR_WEIGHTS: Record<string, number> = {
   'ip_reputation': 10
 };
 
-class ScoreImpactSecurityScorecardServer {
+export class ScoreImpactSecurityScorecardServer {
   private server: Server;
   private config: {
     apiToken: string;
@@ -1056,5 +1056,7 @@ class ScoreImpactSecurityScorecardServer {
   }
 }
 
-const server = new ScoreImpactSecurityScorecardServer();
-server.run().catch(console.error);
+if (process.env.NODE_ENV !== 'test') {
+  const server = new ScoreImpactSecurityScorecardServer();
+  server.run().catch(console.error);
+}
