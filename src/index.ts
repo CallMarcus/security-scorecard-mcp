@@ -60,7 +60,7 @@ interface IssueROI {
 }
 
 
-class ScoreImpactSecurityScorecardServer {
+export class ScoreImpactSecurityScorecardServer {
   private server: Server;
   private config: {
     apiToken: string;
@@ -358,43 +358,94 @@ class ScoreImpactSecurityScorecardServer {
 
       const factorMap = new Map(allFactors.map(f => [f.name, f]));
 
-      const factorImprovements = companyFactors.entries.map((factor: any) => {
-          const factorDetails = factorMap.get(factor.name);
+      const factorImprovements = companyFactors.entries
+        .map((factor: any) => {
+          const factorName = typeof factor.name === 'string'
+            ? factor.name
+            : (() => {
+                console.error(
+                  `[getScoreImprovementRoadmap] Expected factor name to be string but got: ${JSON.stringify(factor.name)}`
+                );
+                return String(factor.name);
+              })();
+
+          const factorDetails = factorMap.get(factorName);
           if (!factorDetails || factor.score === 100) return null;
 
           const pointsLost = (100 - factor.score) * (factorDetails.weight / 100);
-          const effort = this.getEffortForFactor(factor.name, factor.score);
+          const effort = this.getEffortForFactor(factorName, factor.score);
           const roi = pointsLost / this.getEffortScore(effort);
 
           return {
-              factor: factor.name,
-              current_score: factor.score,
-              estimated_improvement: pointsLost,
-              effort,
-              roi,
-              key_issues: this.getKeyIssuesForFactor(factor.name),
+            factor: factorName,
+            current_score: factor.score,
+            estimated_improvement: pointsLost,
+            effort,
+            roi,
+            key_issues: this.getKeyIssuesForFactor(factorName),
           };
-      }).filter(Boolean)
+        })
+        .filter(Boolean)
         .sort((a: any, b: any) => b.roi - a.roi);
 
       const quickWins = factorImprovements.filter((f: any) => f.effort === 'low');
-      
-      const text = `# 🎯 SCORE IMPROVEMENT ROADMAP: ${domain}\n\n` +
-                   `**GOAL: ${scorecard.grade} (${currentScore}) → ${targetGrade} (${targetScore}+)**\n` +
-                   `**POINTS NEEDED: +${pointsNeeded.toFixed(1)}**\n\n` +
-                   `## 🚀 STRATEGIC PRIORITIES (Ranked by ROI)\n\n` +
-                   `${factorImprovements.slice(0, 5).map((f: any, i: number) =>
-                       `### ${i + 1}. ${f.factor.replace(/_/g, ' ').toUpperCase()}\n` +
-                       `- **Current Score**: ${f.current_score}/100\n` +
-                       `- **Potential Gain**: +${f.estimated_improvement.toFixed(1)} overall points\n` +
-                       `- **Effort Level**: ${f.effort}\n` +
-                       `- **Key Issues**: ${f.key_issues.join(', ')}\n`
-                   ).join('\n')}\n\n` +
-                   `## ⚡ QUICK WINS (${quickWins.length} factors)\n` +
-                   `${quickWins.map((f: any) => `- **${f.factor.replace(/_/g, ' ')}**: Low effort for an estimated +${f.estimated_improvement.toFixed(1)} point gain.`).join('\n')}\n\n` +
-                   `**Next Steps**: Focus on the highest ROI factors and all quick wins to efficiently bridge the ${pointsNeeded.toFixed(1)}-point gap.`;
 
-      return { content: [{ type: "text", text }] };
+      const formatFactor = (value: any, context: string): string => {
+        if (typeof value === 'string') return value;
+        console.error(
+          `[getScoreImprovementRoadmap] ${context} is not a string: ${JSON.stringify(value)}`
+        );
+        return String(value);
+      };
+
+      const formatIssues = (issues: any[]): string[] => {
+        if (!Array.isArray(issues)) {
+          console.error(
+            `[getScoreImprovementRoadmap] key_issues is not an array: ${JSON.stringify(issues)}`
+          );
+          return [];
+        }
+        return issues.map(issue => {
+          if (typeof issue === 'string') return issue;
+          console.error(
+            `[getScoreImprovementRoadmap] key issue is not a string: ${JSON.stringify(issue)}`
+          );
+          return String(issue);
+        });
+      };
+
+      const text =
+        `# 🎯 SCORE IMPROVEMENT ROADMAP: ${domain}\n\n` +
+        `**GOAL: ${scorecard.grade} (${currentScore}) → ${targetGrade} (${targetScore}+)**\n` +
+        `**POINTS NEEDED: +${pointsNeeded.toFixed(1)}**\n\n` +
+        `## 🚀 STRATEGIC PRIORITIES (Ranked by ROI)\n\n` +
+        `${factorImprovements
+          .slice(0, 5)
+          .map(
+            (f: any, i: number) =>
+              `### ${i + 1}. ${formatFactor(f.factor, 'factor name')
+                .replace(/_/g, ' ')
+                .toUpperCase()}\n` +
+              `- **Current Score**: ${f.current_score}/100\n` +
+              `- **Potential Gain**: +${f.estimated_improvement.toFixed(1)} overall points\n` +
+              `- **Effort Level**: ${f.effort}\n` +
+              `- **Key Issues**: ${formatIssues(f.key_issues).join(', ')}\n`
+          )
+          .join('\n')}\n\n` +
+        `## ⚡ QUICK WINS (${quickWins.length} factors)\n` +
+        `${quickWins
+          .map(
+            (f: any) =>
+              `- **${formatFactor(f.factor, 'factor name').replace(/_/g, ' ')}**: Low effort for an estimated +${f.estimated_improvement.toFixed(
+                1
+              )} point gain.`
+          )
+          .join('\n')}\n\n` +
+        `**Next Steps**: Focus on the highest ROI factors and all quick wins to efficiently bridge the ${pointsNeeded.toFixed(
+          1
+        )}-point gap.`;
+
+      return { content: [{ type: 'text', text }] };
   }
 
   private async calculateFactorScoreImpact(domain: string): Promise<any> {
@@ -741,5 +792,7 @@ class ScoreImpactSecurityScorecardServer {
   }
 }
 
-const server = new ScoreImpactSecurityScorecardServer();
-server.run().catch(console.error);
+if (process.env.NODE_ENV !== 'test') {
+  const server = new ScoreImpactSecurityScorecardServer();
+  server.run().catch(console.error);
+}
