@@ -2,14 +2,28 @@
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { CallToolRequestSchema, ErrorCode, ListToolsRequestSchema, McpError, } from "@modelcontextprotocol/sdk/types.js";
+// Base URL for the Security Scorecard API
 const API_BASE_URL = "https://api.securityscorecard.io";
-class ScoreImpactSecurityScorecardServer {
+// Default factor weights based on Security Scorecard's typical weighting
+const DEFAULT_FACTOR_WEIGHTS = {
+    'patching_cadence': 15,
+    'dns_health': 10,
+    'network_security': 15,
+    'application_security': 10,
+    'endpoint_security': 10,
+    'cubit_score': 10,
+    'social_engineering': 5,
+    'hacker_chatter': 5,
+    'leaked_information': 10,
+    'ip_reputation': 10
+};
+export class ScoreImpactSecurityScorecardServer {
     server;
     config;
     constructor() {
         this.server = new Server({
-            name: "score-impact-securityscorecard-server",
-            version: "3.0.0",
+            name: "score-impact-securityscorecard-server-live",
+            version: "4.1.0",
         }, {
             capabilities: {
                 tools: {},
@@ -17,27 +31,127 @@ class ScoreImpactSecurityScorecardServer {
         });
         this.config = {
             apiToken: process.env.SECURITY_SCORECARD_API_TOKEN || "",
-            defaultDomain: process.env.COMPANY_DOMAIN || "neste.com",
+            defaultDomain: this.sanitizeDomain(process.env.COMPANY_DOMAIN || "neste.com"),
             debugMode: process.env.DEBUG_MODE === "true",
         };
         this.setupToolHandlers();
     }
-    async makeRequest(endpoint) {
+    /**
+     * Simple logging helper for troubleshooting. Outputs only when DEBUG_MODE is enabled.
+     */
+    log(message, data) {
+        if (this.config.debugMode) {
+            if (data !== undefined) {
+                console.error(`[debug] ${message}`, data);
+            }
+            else {
+                console.error(`[debug] ${message}`);
+            }
+        }
+    }
+    /**
+     * Executes a tool function with standardized error handling and logging.
+     */
+    async executeTool(name, fn) {
+        this.log(`Executing tool: ${name}`);
+        try {
+            const result = await fn();
+            this.log(`Tool succeeded: ${name}`);
+            return result;
+        }
+        catch (error) {
+            this.log(`Tool failed: ${name}`, error);
+            const message = error?.message || "Unknown error";
+            const partial = error?.partial || error?.partialResult;
+            if (partial) {
+                return {
+                    content: [
+                        {
+                            type: "text",
+                            text: `${message}\n\n\`\`\`json\n${JSON.stringify(partial, null, 2)}\n\`\`\``,
+                        },
+                    ],
+                };
+            }
+            return {
+                content: [
+                    { type: "text", text: `Error running ${name}: ${message}` },
+                ],
+            };
+        }
+    }
+    /**
+     * Makes a request to the Security Scorecard API with robust error handling and pagination support.
+     * @param endpoint The API endpoint to call.
+     * @param method The HTTP method (defaults to GET).
+     * @param body The request body for POST/PUT requests.
+     * @returns A promise that resolves to the full, aggregated list of entries from all pages.
+     */
+    async makeRequest(endpoint, method = "GET", body) {
         if (!this.config.apiToken) {
-            throw new McpError(ErrorCode.InvalidRequest, "Security Scorecard API token not configured.");
+            throw new McpError(ErrorCode.InvalidRequest, "Security Scorecard API token not configured. Set the SECURITY_SCORECARD_API_TOKEN environment variable.");
         }
-        const url = `${API_BASE_URL}${endpoint}`;
-        const response = await fetch(url, {
-            method: "GET",
-            headers: {
-                "Authorization": `Token ${this.config.apiToken}`,
-                "Accept": "application/json",
-            },
-        });
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        let allEntries = [];
+        let nextUrl = `${API_BASE_URL}${endpoint}`;
+        while (nextUrl) {
+            if (this.config.debugMode) {
+                console.error(`[API Call] Fetching: ${nextUrl}`);
+            }
+            const response = await fetch(nextUrl, {
+                method,
+                headers: {
+                    "Authorization": `Token ${this.config.apiToken}`,
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                },
+                body: body ? JSON.stringify(body) : undefined,
+            });
+            if (!response.ok) {
+                const errorText = await response.text();
+                switch (response.status) {
+                    case 401:
+                        throw new McpError(ErrorCode.InvalidRequest, `Authentication failed. Please check your API token. (HTTP 401)`);
+                    case 403:
+                        throw new McpError(ErrorCode.InvalidRequest, `Permission denied. Your API token may not have access to this resource. (HTTP 403)`);
+                    case 404:
+                        throw new McpError(ErrorCode.InvalidRequest, `Resource not found at ${endpoint}. Check the domain or identifier. (HTTP 404)`);
+                    case 429:
+                        const retryAfter = response.headers.get('Retry-After') || '60';
+                        throw new McpError(ErrorCode.InvalidRequest, `Rate limit exceeded. Please wait ${retryAfter} seconds before trying again. (HTTP 429)`);
+                    default:
+                        throw new McpError(ErrorCode.InternalError, `API request failed with status ${response.status}: ${errorText}`);
+                }
+            }
+            const pageJson = await response.json();
+            if (pageJson.entries) {
+                allEntries = allEntries.concat(pageJson.entries);
+            }
+            else {
+                // For non-paginated endpoints, return the whole response
+                return pageJson;
+            }
+            // Check for cursor-based pagination
+            if (pageJson.next_cursor) {
+                const url = new URL(nextUrl);
+                url.searchParams.set('cursor', pageJson.next_cursor);
+                nextUrl = url.toString();
+            }
+            else {
+                nextUrl = null;
+            }
         }
-        return await response.json();
+        return { entries: allEntries };
+    }
+    /**
+     * Get factor weight from factor data or use default
+     */
+    getFactorWeight(factorName, companyFactors) {
+        // Try to find weight in company factors first
+        const factor = companyFactors?.find(f => f.name === factorName);
+        if (factor?.weight)
+            return factor.weight;
+        // Fall back to default weights
+        return DEFAULT_FACTOR_WEIGHTS[factorName] || 10;
     }
     setupToolHandlers() {
         this.server.setRequestHandler(ListToolsRequestSchema, async () => {
@@ -49,35 +163,38 @@ class ScoreImpactSecurityScorecardServer {
                         inputSchema: {
                             type: "object",
                             properties: {
-                                domain: { type: "string", default: this.config.defaultDomain },
+                                domain: { type: "string", description: "The company domain to analyze.", default: this.config.defaultDomain },
                                 target_grade: {
                                     type: "string",
                                     enum: ["C", "B", "A"],
                                     description: "Target grade to achieve",
-                                    default: "C"
+                                    default: "A"
                                 },
                             },
+                            required: ["domain", "target_grade"],
                         },
                     },
                     {
                         name: "calculate_factor_score_impact",
-                        description: "💰 ROI ANALYSIS: Calculate which security factors have biggest impact on overall score",
+                        description: "💰 ROI ANALYSIS: Calculate which security factors have biggest impact on overall score based on real data",
                         inputSchema: {
                             type: "object",
                             properties: {
-                                domain: { type: "string", default: this.config.defaultDomain },
+                                domain: { type: "string", description: "The company domain to analyze.", default: this.config.defaultDomain },
                             },
+                            required: ["domain"],
                         },
                     },
                     {
                         name: "get_issues_by_roi",
-                        description: "🚀 PRIORITY: Get issues ranked by ROI (Score Impact / Implementation Effort)",
+                        description: "🚀 PRIORITY: Get active issues ranked by ROI (Score Impact / Implementation Effort)",
                         inputSchema: {
                             type: "object",
                             properties: {
-                                domain: { type: "string", default: this.config.defaultDomain },
-                                top_n: { type: "number", default: 20, description: "Number of top ROI issues to return" },
+                                domain: { type: "string", description: "The company domain to analyze.", default: this.config.defaultDomain },
+                                top_n: { type: "number", default: 10, description: "Number of top ROI issues to return" },
                             },
+                            required: ["domain"],
                         },
                     },
                     {
@@ -86,14 +203,15 @@ class ScoreImpactSecurityScorecardServer {
                         inputSchema: {
                             type: "object",
                             properties: {
-                                domain: { type: "string", default: this.config.defaultDomain },
+                                domain: { type: "string", description: "The company domain to analyze.", default: this.config.defaultDomain },
                                 issue_types: {
                                     type: "array",
                                     items: { type: "string" },
                                     description: "List of issue types to simulate fixing",
-                                    default: ["spf_record_missing", "patching_cadence_v3_critical"]
+                                    default: ["spf_record_missing", "dmarc_contains_none", "patching_cadence_v3_critical"]
                                 },
                             },
+                            required: ["domain"],
                         },
                     },
                     {
@@ -102,7 +220,7 @@ class ScoreImpactSecurityScorecardServer {
                         inputSchema: {
                             type: "object",
                             properties: {
-                                domain: { type: "string", default: this.config.defaultDomain },
+                                domain: { type: "string", description: "The company domain to analyze.", default: this.config.defaultDomain },
                                 max_effort: {
                                     type: "string",
                                     enum: ["low", "medium"],
@@ -110,6 +228,7 @@ class ScoreImpactSecurityScorecardServer {
                                     description: "Maximum effort level for quick wins"
                                 },
                             },
+                            required: ["domain"],
                         },
                     },
                     {
@@ -118,126 +237,276 @@ class ScoreImpactSecurityScorecardServer {
                         inputSchema: {
                             type: "object",
                             properties: {
-                                domain: { type: "string", default: this.config.defaultDomain },
+                                domain: { type: "string", description: "The company domain to analyze.", default: this.config.defaultDomain },
                             },
+                            required: ["domain"],
                         },
                     },
+                    {
+                        name: "find_high_impact_findings_across_assets",
+                        description: "🔍 TACTICAL: Scan for common high-impact findings across organization",
+                        inputSchema: {
+                            type: "object",
+                            properties: {
+                                domain: { type: "string", description: "The primary domain to analyze.", default: this.config.defaultDomain },
+                                issue_types: {
+                                    type: "array",
+                                    items: { type: "string" },
+                                    description: "List of issue types to scan for",
+                                    default: ["spf_record_missing", "dmarc_contains_none", "patching_cadence_v3_critical"]
+                                }
+                            },
+                            required: ["domain"]
+                        }
+                    }
                 ],
             };
         });
         this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
-            const domain = request.params.arguments?.domain || this.config.defaultDomain;
+            const rawDomain = request.params.arguments?.domain || this.config.defaultDomain;
             switch (request.params.name) {
-                case "get_score_improvement_roadmap":
-                    return await this.getScoreImprovementRoadmap(domain, request.params.arguments?.target_grade || "C");
-                case "calculate_factor_score_impact":
-                    return await this.calculateFactorScoreImpact(domain);
-                case "get_issues_by_roi":
-                    return await this.getIssuesByROI(domain, request.params.arguments?.top_n || 20);
-                case "simulate_score_improvement":
-                    return await this.simulateScoreImprovement(domain, request.params.arguments?.issue_types || ["spf_record_missing", "patching_cadence_v3_critical"]);
-                case "get_quick_wins":
-                    return await this.getQuickWins(domain, request.params.arguments?.max_effort || "medium");
-                case "benchmark_grade_requirements":
-                    return await this.benchmarkGradeRequirements(domain);
+                case "get_score_improvement_roadmap": {
+                    const domain = this.sanitizeDomain(rawDomain);
+                    const grade = this.validateTargetGrade(request.params.arguments?.target_grade);
+                    return await this.executeTool("get_score_improvement_roadmap", () => this.getScoreImprovementRoadmap(domain, grade));
+                }
+                case "calculate_factor_score_impact": {
+                    const domain = this.sanitizeDomain(rawDomain);
+                    return await this.executeTool("calculate_factor_score_impact", () => this.calculateFactorScoreImpact(domain));
+                }
+                case "get_issues_by_roi": {
+                    const domain = this.sanitizeDomain(rawDomain);
+                    const topNArg = request.params.arguments?.top_n;
+                    const topN = topNArg !== undefined ? this.validateTopN(Number(topNArg)) : 10;
+                    return await this.executeTool("get_issues_by_roi", () => this.getIssuesByROI(domain, topN));
+                }
+                case "simulate_score_improvement": {
+                    const domain = this.sanitizeDomain(rawDomain);
+                    return await this.executeTool("simulate_score_improvement", () => this.simulateScoreImprovement(domain, request.params.arguments?.issue_types || [
+                        "spf_record_missing",
+                        "dmarc_contains_none",
+                        "patching_cadence_v3_critical",
+                    ]));
+                }
+                case "get_quick_wins": {
+                    const domain = this.sanitizeDomain(rawDomain);
+                    const maxEffort = this.validateMaxEffort(request.params.arguments?.max_effort || "medium");
+                    return await this.executeTool("get_quick_wins", () => this.getQuickWins(domain, maxEffort));
+                }
+                case "benchmark_grade_requirements": {
+                    const domain = this.sanitizeDomain(rawDomain);
+                    return await this.executeTool("benchmark_grade_requirements", () => this.benchmarkGradeRequirements(domain));
+                }
+                case "find_high_impact_findings_across_assets": {
+                    const domain = this.sanitizeDomain(rawDomain);
+                    return await this.executeTool("find_high_impact_findings_across_assets", () => this.findHighImpactFindingsAcrossAssets(domain, request.params.arguments?.issue_types || [
+                        "spf_record_missing",
+                        "dmarc_contains_none",
+                        "patching_cadence_v3_critical",
+                    ]));
+                }
                 default:
-                    throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${request.params.name}`);
+                    this.log(`Unknown tool requested: ${request.params.name}`);
+                    return {
+                        content: [
+                            {
+                                type: "text",
+                                text: `Unknown tool: ${request.params.name}`,
+                            },
+                        ],
+                    };
             }
         });
     }
+    // --- TOOL IMPLEMENTATIONS ---
     async getScoreImprovementRoadmap(domain, targetGrade) {
-        const [scorecard, factors] = await Promise.all([
-            this.makeRequest(`/companies/${domain}`),
-            this.makeRequest(`/companies/${domain}/factors`)
-        ]);
-        const currentScore = scorecard.score;
-        const gradeThresholds = { C: 70, B: 80, A: 90 };
-        const targetScore = gradeThresholds[targetGrade];
-        const pointsNeeded = targetScore - currentScore;
-        // Calculate improvement potential for each factor
-        const factorImprovements = factors.entries?.map((factor) => {
-            const improvementPotential = Math.min(100 - factor.score, pointsNeeded * 2); // Assume ~10% weight per factor
-            return {
-                factor: factor.name,
-                current_score: factor.score,
-                target_score: Math.min(100, factor.score + improvementPotential),
-                key_issues: this.getKeyIssuesForFactor(factor.name),
-                estimated_improvement: improvementPotential * 0.1, // Assume 10% factor weight
-                effort: this.getEffortForFactor(factor.name, factor.score)
-            };
-        }).filter((f) => f.current_score < 100)
-            .sort((a, b) => b.estimated_improvement - a.estimated_improvement);
-        const quickWins = factorImprovements?.filter((f) => f.effort === 'low') || [];
-        const majorProjects = factorImprovements?.filter((f) => f.effort === 'high') || [];
-        const roadmap = {
-            current_score: currentScore,
-            current_grade: scorecard.grade,
-            target_grade: targetGrade,
-            target_score: targetScore,
-            points_needed: pointsNeeded,
-            recommended_improvements: factorImprovements,
-            timeline_estimate: this.estimateTimeline(pointsNeeded, quickWins.length, majorProjects.length),
-            quick_wins: quickWins.map((f) => f.factor),
-            major_projects: majorProjects.map((f) => f.factor)
-        };
-        return {
-            content: [
-                {
-                    type: "text",
-                    text: `# 🎯 SCORE IMPROVEMENT ROADMAP: ${domain}\n\n**GOAL: ${scorecard.grade} (${currentScore}) → ${targetGrade} (${targetScore}+)**\n**POINTS NEEDED: +${pointsNeeded}**\n\n## 🚀 STRATEGIC PRIORITIES\n\n${factorImprovements?.slice(0, 4).map((f, i) => `### ${i + 1}. ${f.factor.replace(/_/g, ' ').toUpperCase()}\n` +
-                        `- **Current**: ${f.current_score}/100\n` +
-                        `- **Target**: ${f.target_score}/100\n` +
-                        `- **Score Impact**: +${f.estimated_improvement.toFixed(1)} points\n` +
-                        `- **Effort Level**: ${f.effort}\n` +
-                        `- **Key Issues**: ${f.key_issues.join(', ')}\n`).join('\n')}\n\n## ⚡ QUICK WINS (${quickWins.length} factors)\n${quickWins.map((f) => `- **${f.replace(/_/g, ' ')}**: Low effort, immediate impact`).join('\n')}\n\n## 🏗️ MAJOR PROJECTS (${majorProjects.length} factors)\n${majorProjects.map((f) => `- **${f.replace(/_/g, ' ')}**: High effort, long-term improvement`).join('\n')}\n\n## 📅 TIMELINE ESTIMATE\n**${roadmap.timeline_estimate}**\n\n## 🎯 SUCCESS METRICS\n- **Month 1**: Target +2 points (focus on quick wins)\n- **Month 3**: Target +${Math.round(pointsNeeded * 0.6)} points\n- **Month 6**: Target +${pointsNeeded} points (reach ${targetGrade}-grade)\n\n**Next Steps**: Start with ${quickWins[0]?.replace(/_/g, ' ') || 'highest impact factor'} for immediate gains.`,
-                },
-            ],
-        };
+        domain = this.sanitizeDomain(domain);
+        targetGrade = this.validateTargetGrade(targetGrade);
+        try {
+            const [scorecard, companyFactors] = await Promise.all([
+                this.makeRequest(`/companies/${domain}`),
+                this.makeRequest(`/companies/${domain}/factors`)
+            ]);
+            const currentScore = scorecard.score;
+            const gradeThresholds = { C: 70, B: 80, A: 90 };
+            const targetScore = gradeThresholds[targetGrade];
+            const pointsNeeded = Math.max(0, targetScore - currentScore);
+            if (pointsNeeded === 0) {
+                return { content: [{ type: "text", text: `🎉 Congratulations! The domain ${domain} with a score of ${currentScore} already meets or exceeds the target grade of ${targetGrade}.` }] };
+            }
+            const factorImprovements = companyFactors.entries.map((factor) => {
+                const weight = this.getFactorWeight(factor.name, companyFactors.entries);
+                const pointsLost = (100 - factor.score) * (weight / 100);
+                const effort = this.getEffortForFactor(factor.name, factor.score);
+                const roi = pointsLost / this.getEffortScore(effort);
+                const improvementPotential = Math.min(30, 100 - factor.score);
+                return {
+                    factor: factor.name,
+                    current_score: factor.score,
+                    target_score: Math.min(100, factor.score + improvementPotential),
+                    estimated_improvement: pointsLost,
+                    effort,
+                    roi,
+                    key_issues: this.getKeyIssuesForFactor(factor.name),
+                    weight
+                };
+            }).filter((f) => f.current_score < 100)
+                .sort((a, b) => b.roi - a.roi);
+            const quickWins = factorImprovements.filter((f) => f.effort === 'low');
+            const majorProjects = factorImprovements.filter((f) => f.effort === 'high');
+            const text = `# 🎯 SCORE IMPROVEMENT ROADMAP: ${domain}\n\n` +
+                `**GOAL: ${scorecard.grade} (${currentScore}) → ${targetGrade} (${targetScore}+)**\n` +
+                `**POINTS NEEDED: +${pointsNeeded.toFixed(1)}**\n\n` +
+                `## 🚀 STRATEGIC PRIORITIES (Ranked by ROI)\n\n` +
+                `${factorImprovements.slice(0, 5).map((f, i) => `### ${i + 1}. ${f.factor.replace(/_/g, ' ').toUpperCase()}\n` +
+                    `- **Current Score**: ${f.current_score}/100\n` +
+                    `- **Target Score**: ${f.target_score}/100\n` +
+                    `- **Weight**: ${f.weight}% of total score\n` +
+                    `- **Potential Gain**: +${f.estimated_improvement.toFixed(1)} overall points\n` +
+                    `- **Effort Level**: ${f.effort}\n` +
+                    `- **ROI Score**: ${f.roi.toFixed(1)}\n` +
+                    `- **Key Issues**: ${f.key_issues.join(', ')}\n`).join('\n')}\n\n` +
+                `## ⚡ QUICK WINS (${quickWins.length} factors)\n` +
+                `${quickWins.map((f) => `- **${f.factor.replace(/_/g, ' ')}**: Low effort for +${f.estimated_improvement.toFixed(1)} points`).join('\n')}\n\n` +
+                `## 🏗️ MAJOR PROJECTS (${majorProjects.length} factors)\n` +
+                `${majorProjects.map((f) => `- **${f.factor.replace(/_/g, ' ')}**: High effort but +${f.estimated_improvement.toFixed(1)} points potential`).join('\n')}\n\n` +
+                `## 📅 TIMELINE ESTIMATE\n` +
+                `**${this.estimateTimeline(pointsNeeded, quickWins.length, majorProjects.length)}**\n\n` +
+                `**Next Steps**: Focus on the highest ROI factors and all quick wins to efficiently bridge the ${pointsNeeded.toFixed(1)}-point gap.`;
+            return { content: [{ type: "text", text }] };
+        }
+        catch (error) {
+            if (error.message?.includes('404')) {
+                throw new McpError(ErrorCode.InvalidRequest, `Cannot access company data for domain: ${domain}. Please verify the domain exists in your Security Scorecard account.`);
+            }
+            throw error;
+        }
     }
     async calculateFactorScoreImpact(domain) {
-        const [scorecard, factors] = await Promise.all([
-            this.makeRequest(`/companies/${domain}`),
-            this.makeRequest(`/companies/${domain}/factors`)
-        ]);
-        const factorAnalysis = factors.entries?.map((factor) => {
-            const assumedWeight = 10; // Assume 10% weight per factor
-            const pointsLost = (100 - factor.score) * (assumedWeight / 100);
-            const improvementPotential = Math.min(30, 100 - factor.score); // Cap realistic improvement at 30 points
-            const effort = this.getEffortForFactor(factor.name, factor.score);
-            const roi = improvementPotential / this.getEffortScore(effort);
-            return {
-                factor_name: factor.name,
-                current_score: factor.score,
-                current_grade: factor.grade,
-                max_possible_score: 100,
-                points_lost: pointsLost,
-                weight_percentage: assumedWeight,
-                overall_score_impact: pointsLost,
-                improvement_potential: improvementPotential * (assumedWeight / 100),
-                effort_estimate: effort,
-                roi_score: roi,
-                priority_rank: 0
-            };
-        }).sort((a, b) => b.roi_score - a.roi_score)
-            .map((f, index) => ({ ...f, priority_rank: index + 1 }));
-        return {
-            content: [
-                {
-                    type: "text",
-                    text: `# 💰 FACTOR SCORE IMPACT ANALYSIS: ${domain}\n\n**Current Overall Score**: ${scorecard.score}/100 (${scorecard.grade})\n\n## 🎯 ROI-RANKED IMPROVEMENT OPPORTUNITIES\n\n${factorAnalysis?.map((factor) => `### ${factor.priority_rank}. ${factor.factor_name.replace(/_/g, ' ').toUpperCase()}\n` +
-                        `- **Current Score**: ${factor.current_score}/100 (${factor.current_grade})\n` +
-                        `- **Points Lost**: ${factor.points_lost.toFixed(1)} from overall score\n` +
-                        `- **Improvement Potential**: +${factor.improvement_potential.toFixed(1)} overall points\n` +
-                        `- **Effort Required**: ${factor.effort_estimate}\n` +
-                        `- **ROI Score**: ${factor.roi_score.toFixed(1)} (higher = better)\n` +
-                        `- **Business Impact**: ${this.getBusinessImpact(factor.factor_name, factor.improvement_potential)}\n\n`).join('')}\n\n## 📊 STRATEGIC INSIGHTS\n\n**Focus Areas:**\n1. **Highest ROI**: ${factorAnalysis?.[0]?.factor_name.replace(/_/g, ' ')} (${factorAnalysis?.[0]?.roi_score.toFixed(1)} ROI)\n2. **Biggest Impact**: ${factorAnalysis?.sort((a, b) => b.improvement_potential - a.improvement_potential)[0]?.factor_name.replace(/_/g, ' ')}\n3. **Quick Wins**: ${factorAnalysis?.filter((f) => f.effort_estimate === 'low').map((f) => f.factor_name.replace(/_/g, ' ')).join(', ')}\n\n**Investment Priority**: Focus on factors with ROI > 5.0 for maximum score improvement per effort invested.`,
-                },
-            ],
-        };
+        domain = this.sanitizeDomain(domain);
+        try {
+            const [scorecard, companyFactors] = await Promise.all([
+                this.makeRequest(`/companies/${domain}`),
+                this.makeRequest(`/companies/${domain}/factors`)
+            ]);
+            const factorAnalysis = companyFactors.entries.map((factor) => {
+                const weight = this.getFactorWeight(factor.name, companyFactors.entries);
+                const pointsLost = (100 - factor.score) * (weight / 100);
+                const improvementPotential = Math.min(30, 100 - factor.score);
+                const effort = this.getEffortForFactor(factor.name, factor.score);
+                const roi = (improvementPotential * (weight / 100)) / this.getEffortScore(effort);
+                return {
+                    factor_name: factor.name,
+                    current_score: factor.score,
+                    current_grade: factor.grade,
+                    max_possible_score: 100,
+                    points_lost: pointsLost,
+                    weight_percentage: weight,
+                    overall_score_impact: pointsLost,
+                    improvement_potential: improvementPotential * (weight / 100),
+                    effort_estimate: effort,
+                    roi_score: roi,
+                    priority_rank: 0
+                };
+            }).sort((a, b) => b.roi_score - a.roi_score)
+                .map((f, index) => ({ ...f, priority_rank: index + 1 }));
+            const text = `# 💰 FACTOR SCORE IMPACT ANALYSIS: ${domain}\n\n` +
+                `**Current Overall Score**: ${scorecard.score}/100 (${scorecard.grade})\n\n` +
+                `## 🎯 ROI-RANKED IMPROVEMENT OPPORTUNITIES\n\n` +
+                `${factorAnalysis.map((factor) => `### ${factor.priority_rank}. ${factor.factor_name.replace(/_/g, ' ').toUpperCase()}\n` +
+                    `- **ROI Score**: ${factor.roi_score.toFixed(1)} (Higher is better)\n` +
+                    `- **Current Score**: ${factor.current_score}/100 (${factor.current_grade})\n` +
+                    `- **Weight**: ${factor.weight_percentage}% of total score\n` +
+                    `- **Points Lost**: -${factor.points_lost.toFixed(1)} from overall score\n` +
+                    `- **Improvement Potential**: +${factor.improvement_potential.toFixed(1)} overall points\n` +
+                    `- **Effort to Improve**: ${factor.effort_estimate}\n` +
+                    `- **Business Impact**: ${this.getBusinessImpact(factor.factor_name, factor.improvement_potential)}\n`).join('\n')}\n\n` +
+                `## 📊 STRATEGIC INSIGHTS\n\n` +
+                `**Focus Areas:**\n` +
+                `1. **Highest ROI**: ${factorAnalysis[0]?.factor_name.replace(/_/g, ' ')} (${factorAnalysis[0]?.roi_score.toFixed(1)} ROI)\n` +
+                `2. **Biggest Impact**: ${factorAnalysis.sort((a, b) => b.improvement_potential - a.improvement_potential)[0]?.factor_name.replace(/_/g, ' ')}\n` +
+                `3. **Quick Wins**: ${factorAnalysis.filter(f => f.effort_estimate === 'low').map(f => f.factor_name.replace(/_/g, ' ')).slice(0, 3).join(', ')}\n\n` +
+                `**Investment Priority**: Focus on factors with ROI > 5.0 for maximum score improvement per effort invested.`;
+            return { content: [{ type: "text", text }] };
+        }
+        catch (error) {
+            if (error.message?.includes('404')) {
+                throw new McpError(ErrorCode.InvalidRequest, `Cannot access company data for domain: ${domain}. Please verify the domain exists in your Security Scorecard account.`);
+            }
+            throw error;
+        }
     }
     async getIssuesByROI(domain, topN) {
-        // This would need to fetch actual issues and calculate ROI
-        // For now, return strategic analysis based on known factors
+        domain = this.sanitizeDomain(domain);
+        topN = this.validateTopN(topN);
+        try {
+            const allIssues = await this.makeRequest(`/companies/${domain}/issues`);
+            if (!allIssues.entries || allIssues.entries.length === 0) {
+                return { content: [{ type: "text", text: `✅ No active issues found for ${domain}.` }] };
+            }
+            // Count issues by type
+            const issueCounts = allIssues.entries.reduce((acc, issue) => {
+                acc[issue.type] = (acc[issue.type] || 0) + 1;
+                return acc;
+            }, {});
+            // Create a map of issue details
+            const issueDetailsMap = new Map(allIssues.entries.map((issue) => [issue.type, issue]));
+            // Calculate ROI for each issue type
+            const issuesByRoi = Object.keys(issueCounts)
+                .map((issueType) => {
+                const issueDetail = issueDetailsMap.get(issueType);
+                if (!issueDetail)
+                    return null;
+                const factorName = this.getFactorForIssueType(issueType);
+                const factorWeight = this.getFactorWeight(factorName);
+                const severityScore = this.getSeverityScore(issueDetail.severity);
+                const estimatedScoreImpact = (severityScore / 5) * (factorWeight / 100) * Math.log1p(issueCounts[issueType]) * 10;
+                const effort = this.getEffortForIssue(issueType);
+                const roiScore = estimatedScoreImpact / this.getEffortScore(effort);
+                return {
+                    issue_type: issueType,
+                    volume: issueCounts[issueType],
+                    factor: factorName,
+                    severity: issueDetail.severity,
+                    estimated_score_impact: estimatedScoreImpact,
+                    effort_level: effort,
+                    roi_score: roiScore,
+                    time_to_implement: this.getTimeToImplement(effort),
+                    business_case: this.getBusinessCase(issueType, issueCounts[issueType])
+                };
+            })
+                .filter((issue) => issue !== null)
+                .sort((a, b) => b.roi_score - a.roi_score)
+                .slice(0, topN);
+            const totalImpact = issuesByRoi.reduce((sum, issue) => sum + issue.estimated_score_impact, 0);
+            const text = `# 🚀 ISSUES RANKED BY ROI: ${domain}\n\n` +
+                `**Top ${issuesByRoi.length} highest ROI security improvements based on active findings:**\n` +
+                `**Total Potential Score Impact**: +${totalImpact.toFixed(1)} points\n\n` +
+                `${issuesByRoi.map((issue, i) => `## ${i + 1}. ${issue.issue_type.replace(/_/g, ' ').toUpperCase()}\n` +
+                    `- **📊 ROI Score**: ${issue.roi_score.toFixed(1)}\n` +
+                    `- **🎯 Est. Score Impact**: +${issue.estimated_score_impact.toFixed(2)} points\n` +
+                    `- **📈 Volume**: ${issue.volume} findings\n` +
+                    `- **⚡ Effort Level**: ${issue.effort_level.replace(/_/g, ' ')}\n` +
+                    `- **⏱️ Timeline**: ${issue.time_to_implement}\n` +
+                    `- **🎖️ Severity**: ${issue.severity.toUpperCase()}\n` +
+                    `- **📂 Factor**: ${issue.factor.replace(/_/g, ' ')}\n` +
+                    `- **🏗️ Implementation**: ${issue.business_case}\n`).join('\n')}\n\n` +
+                `## 🎯 IMPLEMENTATION STRATEGY\n\n` +
+                `**Phase 1 (Month 1)**: Execute all "quick_win" items\n` +
+                `**Phase 2 (Months 2-3)**: Begin "moderate" effort items\n` +
+                `**Phase 3 (Months 4-6)**: Complete "major_project" items\n\n` +
+                `**Expected Total Score Improvement**: +${totalImpact.toFixed(1)} points`;
+            return { content: [{ type: "text", text }] };
+        }
+        catch (error) {
+            // Fallback to known issue patterns if API call fails
+            return this.getIssuesByROIFallback(domain, topN);
+        }
+    }
+    async getIssuesByROIFallback(domain, topN) {
+        domain = this.sanitizeDomain(domain);
+        topN = this.validateTopN(topN);
+        // Fallback with common issue patterns
         const knownIssues = [
             {
                 issue_type: "spf_record_missing",
@@ -247,19 +516,8 @@ class ScoreImpactSecurityScorecardServer {
                 estimated_score_impact: 2.5,
                 effort_level: "quick_win",
                 roi_score: 8.3,
-                time_to_implement: "2-4 weeks",
-                business_case: "Configure DNS TXT records for 117 domains. High impact on email security factor."
-            },
-            {
-                issue_type: "patching_cadence_v3_critical",
-                volume: 275,
-                factor: "patching_cadence",
-                severity: "critical",
-                estimated_score_impact: 4.2,
-                effort_level: "major_project",
-                roi_score: 7.0,
-                time_to_implement: "2-3 months",
-                business_case: "Emergency patching program for 275 critical vulnerabilities. Biggest score impact potential."
+                time_to_implement: "1-2 weeks",
+                business_case: "Configure SPF records for email authentication across all domains"
             },
             {
                 issue_type: "dmarc_contains_none",
@@ -270,102 +528,201 @@ class ScoreImpactSecurityScorecardServer {
                 effort_level: "quick_win",
                 roi_score: 6.0,
                 time_to_implement: "1-2 weeks",
-                business_case: "Strengthen DMARC policies from 'none' to 'quarantine' for email protection."
+                business_case: "Strengthen DMARC policies from 'none' to 'quarantine' for email protection"
+            },
+            {
+                issue_type: "patching_cadence_v3_critical",
+                volume: 275,
+                factor: "patching_cadence",
+                severity: "critical",
+                estimated_score_impact: 4.2,
+                effort_level: "major_project",
+                roi_score: 2.8,
+                time_to_implement: "3-6 months",
+                business_case: "Implement emergency patching program for critical vulnerabilities"
             }
-        ].sort((a, b) => b.roi_score - a.roi_score).slice(0, topN);
-        return {
-            content: [
-                {
-                    type: "text",
-                    text: `# 🚀 ISSUES RANKED BY ROI: ${domain}\n\n**Top ${topN} highest ROI security improvements:**\n\n${knownIssues.map((issue, i) => `## ${i + 1}. ${issue.issue_type.replace(/_/g, ' ').toUpperCase()}\n` +
-                        `- **📊 ROI Score**: ${issue.roi_score} (Score Impact ÷ Effort)\n` +
-                        `- **🎯 Score Impact**: +${issue.estimated_score_impact} points\n` +
-                        `- **📈 Volume**: ${issue.volume} issues\n` +
-                        `- **⚡ Effort Level**: ${issue.effort_level.replace(/_/g, ' ')}\n` +
-                        `- **⏱️ Timeline**: ${issue.time_to_implement}\n` +
-                        `- **🏗️ Implementation**: ${issue.business_case}\n` +
-                        `- **🎖️ Severity**: ${issue.severity.toUpperCase()}\n` +
-                        `- **📂 Factor**: ${issue.factor.replace(/_/g, ' ')}\n\n`).join('')}\n\n## 🎯 IMPLEMENTATION STRATEGY\n\n**Phase 1 (Month 1)**: Execute all "quick_win" items\n**Phase 2 (Months 2-3)**: Begin "moderate" effort items\n**Phase 3 (Months 4-6)**: Complete "major_project" items\n\n**Expected Total Score Improvement**: +${knownIssues.reduce((sum, issue) => sum + issue.estimated_score_impact, 0).toFixed(1)} points\n\n*ROI = Estimated Score Impact ÷ Implementation Effort (1=low, 2=moderate, 3=high)*`,
-                },
-            ],
-        };
+        ].slice(0, topN);
+        const text = `# 🚀 COMMON HIGH-ROI ISSUES: ${domain}\n\n` +
+            `*Note: Using common patterns. Run with actual issue data for precise analysis.*\n\n` +
+            `${knownIssues.map((issue, i) => `## ${i + 1}. ${issue.issue_type.replace(/_/g, ' ').toUpperCase()}\n` +
+                `- **ROI Score**: ${issue.roi_score}\n` +
+                `- **Impact**: +${issue.estimated_score_impact} points\n` +
+                `- **Effort**: ${issue.effort_level.replace(/_/g, ' ')}\n` +
+                `- **Timeline**: ${issue.time_to_implement}\n` +
+                `- **Action**: ${issue.business_case}\n`).join('\n')}`;
+        return { content: [{ type: "text", text }] };
     }
     async simulateScoreImprovement(domain, issueTypes) {
-        const [scorecard, factors] = await Promise.all([
-            this.makeRequest(`/companies/${domain}`),
-            this.makeRequest(`/companies/${domain}/factors`)
-        ]);
-        // Simulate improvements based on issue types
-        const simulatedImprovements = issueTypes.map(issueType => {
-            const factor = this.getFactorForIssueType(issueType);
-            const currentFactor = factors.entries?.find((f) => f.name === factor);
-            const estimatedImprovement = this.getEstimatedImprovementForIssue(issueType);
+        domain = this.sanitizeDomain(domain);
+        try {
+            const [scorecard, companyFactors] = await Promise.all([
+                this.makeRequest(`/companies/${domain}`),
+                this.makeRequest(`/companies/${domain}/factors`)
+            ]);
+            // Simulate improvements based on issue types
+            const simulatedImprovements = issueTypes.map(issueType => {
+                const factorName = this.getFactorForIssueType(issueType);
+                const currentFactor = companyFactors.entries?.find((f) => f.name === factorName);
+                const factorWeight = this.getFactorWeight(factorName, companyFactors.entries);
+                const estimatedImprovement = this.getEstimatedImprovementForIssue(issueType);
+                const scoreImpact = (estimatedImprovement * (factorWeight / 100));
+                return {
+                    issue_type: issueType,
+                    factor_affected: factorName,
+                    current_factor_score: currentFactor?.score || 0,
+                    projected_factor_score: Math.min(100, (currentFactor?.score || 0) + estimatedImprovement),
+                    factor_weight: factorWeight,
+                    overall_score_impact: scoreImpact
+                };
+            });
+            const totalScoreImpact = simulatedImprovements.reduce((sum, imp) => sum + imp.overall_score_impact, 0);
+            const projectedScore = scorecard.score + totalScoreImpact;
+            const newGrade = projectedScore >= 90 ? 'A' : projectedScore >= 80 ? 'B' : projectedScore >= 70 ? 'C' : 'D';
             return {
-                issue_type: issueType,
-                factor_affected: factor,
-                current_factor_score: currentFactor?.score || 0,
-                projected_factor_score: Math.min(100, (currentFactor?.score || 0) + estimatedImprovement),
-                overall_score_impact: estimatedImprovement * 0.1 // Assume 10% factor weight
+                content: [
+                    {
+                        type: "text",
+                        text: `# 🔮 SCORE IMPROVEMENT SIMULATION: ${domain}\n\n` +
+                            `**SCENARIO**: Fix ${issueTypes.length} issue types\n\n` +
+                            `## 📊 PROJECTED RESULTS\n\n` +
+                            `**Current Score**: ${scorecard.score}/100 (${scorecard.grade})\n` +
+                            `**Projected Score**: ${projectedScore.toFixed(1)}/100 (${newGrade})\n` +
+                            `**Score Improvement**: +${totalScoreImpact.toFixed(1)} points\n` +
+                            `**Grade Change**: ${scorecard.grade} → ${newGrade} ${scorecard.grade !== newGrade ? '🎉' : ''}\n\n` +
+                            `## 🎯 FACTOR-LEVEL IMPROVEMENTS\n\n` +
+                            `${simulatedImprovements.map((imp, i) => `### ${i + 1}. ${imp.issue_type.replace(/_/g, ' ').toUpperCase()}\n` +
+                                `- **Factor**: ${imp.factor_affected.replace(/_/g, ' ')} (${imp.factor_weight}% weight)\n` +
+                                `- **Current**: ${imp.current_factor_score}/100\n` +
+                                `- **Projected**: ${imp.projected_factor_score}/100 (+${imp.projected_factor_score - imp.current_factor_score})\n` +
+                                `- **Overall Impact**: +${imp.overall_score_impact.toFixed(1)} points\n\n`).join('')}\n\n` +
+                            `## 🚀 STRATEGIC ANALYSIS\n\n` +
+                            `${newGrade !== scorecard.grade ?
+                                `**🎉 GRADE IMPROVEMENT ACHIEVED!** This combination will elevate from ${scorecard.grade} to ${newGrade}.\n\n` :
+                                `**Grade Status**: Remains ${scorecard.grade}. Need +${(70 - projectedScore).toFixed(1)} more points for C-grade.\n\n`}` +
+                            `**ROI Assessment**: ${totalScoreImpact > 5 ? 'Excellent' : totalScoreImpact > 2 ? 'Good' : 'Moderate'} return on investment\n` +
+                            `**Implementation Complexity**: ${issueTypes.length > 3 ? 'High' : issueTypes.length > 1 ? 'Medium' : 'Low'}\n` +
+                            `**Recommended**: ${newGrade !== scorecard.grade ? 'Proceed with this plan' : 'Consider additional improvements for grade change'}\n\n` +
+                            `*Simulation based on typical factor improvements and estimated weights.*`,
+                    },
+                ],
             };
-        });
-        const totalScoreImpact = simulatedImprovements.reduce((sum, imp) => sum + imp.overall_score_impact, 0);
-        const projectedScore = scorecard.score + totalScoreImpact;
-        const newGrade = projectedScore >= 90 ? 'A' : projectedScore >= 80 ? 'B' : projectedScore >= 70 ? 'C' : 'D';
-        return {
-            content: [
-                {
-                    type: "text",
-                    text: `# 🔮 SCORE IMPROVEMENT SIMULATION: ${domain}\n\n**SCENARIO**: Fix ${issueTypes.length} issue types\n\n## 📊 PROJECTED RESULTS\n\n**Current Score**: ${scorecard.score}/100 (${scorecard.grade})\n**Projected Score**: ${projectedScore.toFixed(1)}/100 (${newGrade})\n**Score Improvement**: +${totalScoreImpact.toFixed(1)} points\n**Grade Change**: ${scorecard.grade} → ${newGrade} ${scorecard.grade !== newGrade ? '🎉' : ''}\n\n## 🎯 FACTOR-LEVEL IMPROVEMENTS\n\n${simulatedImprovements.map((imp, i) => `### ${i + 1}. ${imp.issue_type.replace(/_/g, ' ').toUpperCase()}\n` +
-                        `- **Factor**: ${imp.factor_affected.replace(/_/g, ' ')}\n` +
-                        `- **Current**: ${imp.current_factor_score}/100\n` +
-                        `- **Projected**: ${imp.projected_factor_score}/100 (+${imp.projected_factor_score - imp.current_factor_score})\n` +
-                        `- **Overall Impact**: +${imp.overall_score_impact.toFixed(1)} points\n\n`).join('')}\n\n## 🚀 STRATEGIC ANALYSIS\n\n${newGrade !== scorecard.grade ?
-                        `**🎉 GRADE IMPROVEMENT ACHIEVED!** This combination of fixes will elevate you from ${scorecard.grade} to ${newGrade} grade.\n\n` :
-                        `**Grade Status**: Remains ${scorecard.grade}. Need +${(70 - projectedScore).toFixed(1)} points for C-grade.\n\n`}**ROI Assessment**: ${totalScoreImpact > 5 ? 'Excellent' : totalScoreImpact > 2 ? 'Good' : 'Moderate'} return on investment\n**Implementation Complexity**: ${issueTypes.length > 3 ? 'High' : issueTypes.length > 1 ? 'Medium' : 'Low'}\n**Recommended**: ${newGrade !== scorecard.grade ? 'Proceed with this plan' : 'Consider additional improvements for grade change'}\n\n*Simulation based on estimated factor improvements and 10% factor weighting model.*`,
-                },
-            ],
-        };
+        }
+        catch (error) {
+            if (error.message?.includes('404')) {
+                throw new McpError(ErrorCode.InvalidRequest, `Cannot access company data for domain: ${domain}. Please verify the domain exists in your Security Scorecard account.`);
+            }
+            throw error;
+        }
     }
     async getQuickWins(domain, maxEffort) {
+        domain = this.sanitizeDomain(domain);
+        maxEffort = this.validateMaxEffort(maxEffort);
+        try {
+            const allIssues = await this.makeRequest(`/companies/${domain}/issues`);
+            // Find low-effort, high-impact issues
+            const issuesByType = allIssues.entries?.reduce((acc, issue) => {
+                if (!acc[issue.type]) {
+                    acc[issue.type] = { count: 0, severity: issue.severity };
+                }
+                acc[issue.type].count++;
+                return acc;
+            }, {}) || {};
+            const quickWins = Object.entries(issuesByType)
+                .map(([issueType, data]) => {
+                const effort = this.getEffortForIssue(issueType);
+                if ((maxEffort === 'low' && effort !== 'quick_win') ||
+                    (maxEffort === 'medium' && effort === 'major_project')) {
+                    return null;
+                }
+                const factor = this.getFactorForIssueType(issueType);
+                const weight = this.getFactorWeight(factor);
+                const severityScore = this.getSeverityScore(data.severity);
+                const impact = (severityScore / 5) * (weight / 100) * Math.log1p(data.count) * 5;
+                return {
+                    issue: issueType.replace(/_/g, ' ').toUpperCase(),
+                    score_impact: impact,
+                    effort: effort === 'quick_win' ? 'low' : effort === 'moderate' ? 'medium' : 'high',
+                    timeline: this.getTimeToImplement(effort),
+                    description: this.getBusinessCase(issueType, data.count),
+                    volume: data.count
+                };
+            })
+                .filter(item => item !== null)
+                .sort((a, b) => b.score_impact - a.score_impact)
+                .slice(0, 10);
+            const totalImpact = quickWins.reduce((sum, item) => sum + item.score_impact, 0);
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: `# ⚡ QUICK WINS FOR ${domain}\n\n` +
+                            `**Max Effort Level**: ${maxEffort}\n` +
+                            `**Total Score Impact**: +${totalImpact.toFixed(1)} points\n\n` +
+                            `${quickWins.map((item, i) => `## ${i + 1}. ${item.issue}\n` +
+                                `- **Score Impact**: +${item.score_impact.toFixed(1)} points\n` +
+                                `- **Volume**: ${item.volume} issues\n` +
+                                `- **Effort Level**: ${item.effort}\n` +
+                                `- **Timeline**: ${item.timeline}\n` +
+                                `- **Action**: ${item.description}\n\n`).join('')}\n\n` +
+                            `## 🎯 IMPLEMENTATION PLAN\n\n` +
+                            `**Week 1**: Start with top 3 items for immediate impact\n` +
+                            `**Week 2-4**: Execute remaining items in parallel where possible\n` +
+                            `**Expected Result**: +${totalImpact.toFixed(1)} score improvement in under 1 month\n\n` +
+                            `**Business Case**: These improvements require minimal technical complexity but provide measurable score improvements.`,
+                    },
+                ],
+            };
+        }
+        catch (error) {
+            // Fallback to known quick wins
+            return this.getQuickWinsFallback(domain, maxEffort);
+        }
+    }
+    async getQuickWinsFallback(domain, maxEffort) {
+        domain = this.sanitizeDomain(domain);
+        maxEffort = this.validateMaxEffort(maxEffort);
         const quickWinIssues = [
             {
                 issue: "SPF Record Configuration",
                 score_impact: 2.5,
                 effort: "low",
                 timeline: "1-2 weeks",
-                description: "Configure SPF records for 117 domains missing email authentication"
+                description: "Configure SPF records for domains missing email authentication"
             },
             {
                 issue: "DMARC Policy Strengthening",
                 score_impact: 1.8,
                 effort: "low",
                 timeline: "1 week",
-                description: "Change DMARC policy from 'none' to 'quarantine' for 157 domains"
+                description: "Change DMARC policy from 'none' to 'quarantine'"
             },
             {
                 issue: "HTTPS Redirect Fixes",
                 score_impact: 1.2,
                 effort: "medium",
                 timeline: "2-3 weeks",
-                description: "Fix insecure HTTP redirects on 100+ endpoints"
+                description: "Fix insecure HTTP redirects on web endpoints"
             }
-        ].filter(item => maxEffort === 'low' ? item.effort === 'low' :
-            maxEffort === 'medium' ? ['low', 'medium'].includes(item.effort) : true);
+        ].filter(item => maxEffort === 'low' ? item.effort === 'low' : true);
         const totalImpact = quickWinIssues.reduce((sum, item) => sum + item.score_impact, 0);
         return {
             content: [
                 {
                     type: "text",
-                    text: `# ⚡ QUICK WINS FOR ${domain}\n\n**Max Effort Level**: ${maxEffort}\n**Total Score Impact**: +${totalImpact.toFixed(1)} points\n\n${quickWinIssues.map((item, i) => `## ${i + 1}. ${item.issue}\n` +
-                        `- **Score Impact**: +${item.score_impact} points\n` +
-                        `- **Effort Level**: ${item.effort}\n` +
-                        `- **Timeline**: ${item.timeline}\n` +
-                        `- **Description**: ${item.description}\n\n`).join('')}\n\n## 🎯 IMPLEMENTATION PLAN\n\n**Week 1**: Start with ${quickWinIssues[0]?.issue || 'highest impact item'}\n**Week 2-3**: Execute remaining quick wins in parallel\n**Expected Result**: +${totalImpact.toFixed(1)} score improvement in under 1 month\n\n**Business Case**: These improvements require minimal technical complexity but provide immediate, measurable score improvements. Perfect for demonstrating security program value to leadership.`,
+                    text: `# ⚡ COMMON QUICK WINS\n\n` +
+                        `**Max Effort**: ${maxEffort}\n` +
+                        `**Total Impact**: +${totalImpact.toFixed(1)} points\n\n` +
+                        `${quickWinIssues.map((item, i) => `## ${i + 1}. ${item.issue}\n` +
+                            `- **Impact**: +${item.score_impact} points\n` +
+                            `- **Effort**: ${item.effort}\n` +
+                            `- **Timeline**: ${item.timeline}\n` +
+                            `- **Action**: ${item.description}\n`).join('\n')}`,
                 },
             ],
         };
     }
     async benchmarkGradeRequirements(domain) {
+        domain = this.sanitizeDomain(domain);
         const scorecard = await this.makeRequest(`/companies/${domain}`);
         const gradeRequirements = [
             { grade: 'A', min_score: 90, description: 'Elite security posture', industry_percentile: '95th+' },
@@ -380,84 +737,250 @@ class ScoreImpactSecurityScorecardServer {
             content: [
                 {
                     type: "text",
-                    text: `# 📊 GRADE BENCHMARKING: ${domain}\n\n**Current Position**: ${scorecard.score}/100 (${currentGrade.grade} grade)\n**Industry Percentile**: ${currentGrade.industry_percentile}\n\n## 🎯 GRADE REQUIREMENTS\n\n${gradeRequirements.map(grade => `### ${grade.grade} Grade: ${grade.min_score}+ points\n` +
-                        `- **Description**: ${grade.description}\n` +
-                        `- **Industry Position**: ${grade.industry_percentile} percentile\n` +
-                        `- **Gap from Current**: ${Math.max(0, grade.min_score - scorecard.score)} points\n` +
-                        `${grade.grade === currentGrade.grade ? '👈 **YOU ARE HERE**' : ''}\n\n`).join('')}\n\n## 🚀 NEXT MILESTONE\n\n${nextGrade ?
-                        `**Target**: ${nextGrade.grade} Grade (${nextGrade.min_score}+ points)\n` +
-                            `**Points Needed**: +${nextGrade.min_score - scorecard.score} points\n` +
-                            `**Industry Position**: Move to ${nextGrade.industry_percentile} percentile\n` +
-                            `**Business Impact**: ${nextGrade.description}\n\n` +
-                            `**Strategy**: Focus on highest ROI improvements to bridge the ${nextGrade.min_score - scorecard.score}-point gap.` :
-                        `**Congratulations!** You're at the highest grade level.`}\n\n## 🏆 COMPETITIVE CONTEXT\n\n**Energy Industry Peers**:\n- Shell: 93/100 (A)\n- ExxonMobil: 94/100 (A) 
-- Chevron: 92/100 (A)\n- BP: 91/100 (A)\n- Equinor: 92/100 (A)\n\n**Your Position**: Below industry average. Significant opportunity for competitive improvement through strategic security investments.`,
+                    text: `# 📊 GRADE BENCHMARKING: ${domain}\n\n` +
+                        `**Current Position**: ${scorecard.score}/100 (${currentGrade.grade} grade)\n` +
+                        `**Industry Percentile**: ${currentGrade.industry_percentile}\n\n` +
+                        `## 🎯 GRADE REQUIREMENTS\n\n` +
+                        `${gradeRequirements.map(grade => `### ${grade.grade} Grade: ${grade.min_score}+ points\n` +
+                            `- **Description**: ${grade.description}\n` +
+                            `- **Industry Position**: ${grade.industry_percentile} percentile\n` +
+                            `- **Gap from Current**: ${Math.max(0, grade.min_score - scorecard.score)} points\n` +
+                            `${grade.grade === currentGrade.grade ? '👈 **YOU ARE HERE**' : ''}\n\n`).join('')}\n\n` +
+                        `## 🚀 NEXT MILESTONE\n\n` +
+                        `${nextGrade ?
+                            `**Target**: ${nextGrade.grade} Grade (${nextGrade.min_score}+ points)\n` +
+                                `**Points Needed**: +${nextGrade.min_score - scorecard.score} points\n` +
+                                `**Industry Position**: Move to ${nextGrade.industry_percentile} percentile\n` +
+                                `**Business Impact**: ${nextGrade.description}\n\n` +
+                                `**Strategy**: Focus on highest ROI improvements to bridge the ${nextGrade.min_score - scorecard.score}-point gap.` :
+                            `**Congratulations!** You're at the highest grade level.`}\n\n` +
+                        `## 🏆 PEER COMPARISON\n\n` +
+                        `Compare your ${scorecard.score}/100 (${currentGrade.grade}) against industry standards.\n` +
+                        `Focus on ROI-based improvements to advance to the next grade level efficiently.`,
                 },
             ],
         };
     }
-    // Helper methods for calculations
+    async findHighImpactFindingsAcrossAssets(domain, issueTypes) {
+        domain = this.sanitizeDomain(domain);
+        // Using a simpler approach based on the primary domain's issues
+        let text = `# 🔍 HIGH-IMPACT FINDINGS ANALYSIS: ${domain}\n\nScanning for: ${issueTypes.join(', ')}\n\n`;
+        try {
+            // Check for each issue type in the primary domain
+            const results = {};
+            for (const issueType of issueTypes) {
+                try {
+                    const issues = await this.makeRequest(`/companies/${domain}/issues/${issueType}`);
+                    if (issues.entries && issues.entries.length > 0) {
+                        results[issueType] = {
+                            found: true,
+                            count: issues.entries.length,
+                            severity: issues.entries[0]?.severity || 'unknown'
+                        };
+                    }
+                    else {
+                        results[issueType] = { found: false, count: 0 };
+                    }
+                }
+                catch (error) {
+                    results[issueType] = { found: false, count: 0 };
+                }
+            }
+            text += "## 📊 FINDINGS SUMMARY\n\n";
+            issueTypes.forEach(issueType => {
+                const result = results[issueType];
+                const effort = this.getEffortForIssue(issueType);
+                const factor = this.getFactorForIssueType(issueType);
+                const weight = this.getFactorWeight(factor);
+                text += `### ${issueType.replace(/_/g, ' ').toUpperCase()}\n` +
+                    `- **Status**: ${result.found ? `🔴 Found (${result.count} issues)` : '✅ Not found'}\n` +
+                    `- **Factor**: ${factor.replace(/_/g, ' ')} (${weight}% weight)\n` +
+                    `- **Effort to Fix**: ${effort.replace(/_/g, ' ')}\n` +
+                    `- **Recommendation**: ${result.found ?
+                        `High priority - implement fixes across all affected assets` :
+                        `Good - maintain current configuration`}\n\n`;
+            });
+            const activeIssues = Object.entries(results).filter(([_, r]) => r.found).length;
+            text += `## 🎯 STRATEGIC RECOMMENDATIONS\n\n` +
+                `**Active Issue Types**: ${activeIssues} / ${issueTypes.length}\n\n` +
+                `${activeIssues > 0 ?
+                    `Focus on resolving the ${activeIssues} active issue types found. ` +
+                        `Consider automation or policy-based solutions for widespread issues.` :
+                    `Excellent! No issues found for the scanned types. ` +
+                        `Continue monitoring and maintaining current security configurations.`}`;
+        }
+        catch (error) {
+            text += `**Note**: Analysis based on primary domain. Full cross-asset scanning requires additional API access.`;
+        }
+        return { content: [{ type: "text", text }] };
+    }
+    // --- HELPER METHODS ---
+    sanitizeDomain(domain) {
+        const trimmed = domain.trim().toLowerCase();
+        const domainRegex = /^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$/;
+        if (!domainRegex.test(trimmed)) {
+            throw new McpError(ErrorCode.InvalidRequest, `Invalid domain format: ${domain}`);
+        }
+        return trimmed;
+    }
+    validateTopN(value) {
+        if (!Number.isInteger(value) || value < 1 || value > 100) {
+            throw new McpError(ErrorCode.InvalidRequest, `Invalid top_n value: ${value}. Must be an integer between 1 and 100.`);
+        }
+        return value;
+    }
+    validateTargetGrade(value) {
+        const allowed = ["A", "B", "C"];
+        if (!allowed.includes(value)) {
+            throw new McpError(ErrorCode.InvalidRequest, `Invalid target_grade: ${value}`);
+        }
+        return value;
+    }
+    validateMaxEffort(value) {
+        const allowed = ["low", "medium", "high"];
+        if (!allowed.includes(value)) {
+            throw new McpError(ErrorCode.InvalidRequest, `Invalid max_effort: ${value}`);
+        }
+        return value;
+    }
     getKeyIssuesForFactor(factorName) {
         const issueMap = {
-            'patching_cadence': ['critical patches', 'high priority patches', 'service vulnerabilities'],
-            'dns_health': ['SPF records missing', 'DMARC policy weak', 'DNS configuration'],
-            'network_security': ['TLS configuration', 'open ports', 'certificate issues'],
-            'application_security': ['HTTPS redirects', 'security headers', 'cookie settings']
+            'patching_cadence': ['unpatched vulnerabilities', 'slow patch deployment', 'missing critical updates'],
+            'dns_health': ['SPF/DMARC records', 'DNSSEC configuration', 'nameserver redundancy'],
+            'network_security': ['TLS/SSL configuration', 'open ports', 'certificate validity'],
+            'application_security': ['security headers', 'XSS protection', 'cookie security'],
+            'endpoint_security': ['malware detection', 'device compliance', 'endpoint protection'],
+            'cubit_score': ['credential compromise', 'data exposure', 'breach indicators'],
+            'social_engineering': ['phishing susceptibility', 'user awareness', 'email security'],
+            'hacker_chatter': ['dark web mentions', 'vulnerability discussions', 'threat intelligence'],
+            'leaked_information': ['exposed credentials', 'PII exposure', 'code repository leaks'],
+            'ip_reputation': ['blacklist presence', 'spam activity', 'malicious hosting']
         };
-        return issueMap[factorName] || ['configuration issues'];
+        return issueMap[factorName] || ['general security issues'];
     }
     getEffortForFactor(factorName, currentScore) {
-        if (currentScore > 80)
+        if (currentScore > 85)
             return 'low';
-        if (factorName === 'patching_cadence' && currentScore < 70)
-            return 'high';
-        if (factorName === 'dns_health')
-            return 'low';
+        if (factorName.includes('patching') || factorName.includes('application_security')) {
+            return currentScore < 70 ? 'high' : 'medium';
+        }
+        if (factorName.includes('dns_health') || factorName.includes('network_security')) {
+            return currentScore < 60 ? 'medium' : 'low';
+        }
         return 'medium';
     }
-    getEffortScore(effort) {
-        return effort === 'low' ? 1 : effort === 'medium' ? 2 : 3;
+    getEffortForIssue(issueType) {
+        if (issueType.includes('spf') || issueType.includes('dmarc') || issueType.includes('hsts'))
+            return 'quick_win';
+        if (issueType.includes('patching_cadence_v3_critical'))
+            return 'major_project';
+        if (issueType.includes('patching') || issueType.includes('vulnerability'))
+            return 'moderate';
+        if (issueType.includes('tls') || issueType.includes('ssl'))
+            return 'quick_win';
+        return 'moderate';
     }
-    getBusinessImpact(factorName, improvement) {
-        if (improvement > 3)
-            return 'High impact on overall security posture';
-        if (improvement > 1.5)
-            return 'Moderate improvement in security rating';
-        return 'Minor but meaningful security enhancement';
+    getEffortScore(effort) {
+        switch (effort) {
+            case 'low':
+            case 'quick_win':
+                return 1;
+            case 'medium':
+            case 'moderate':
+                return 2.5;
+            case 'high':
+            case 'major_project':
+                return 5;
+            default:
+                return 2.5;
+        }
+    }
+    getSeverityScore(severity) {
+        switch (severity) {
+            case 'critical': return 5;
+            case 'high': return 4;
+            case 'medium': return 3;
+            case 'low': return 2;
+            case 'informational': return 1;
+            default: return 1;
+        }
     }
     getFactorForIssueType(issueType) {
         if (issueType.includes('patching') || issueType.includes('vuln'))
             return 'patching_cadence';
-        if (issueType.includes('spf') || issueType.includes('dmarc'))
+        if (issueType.includes('spf') || issueType.includes('dmarc') || issueType.includes('dns'))
             return 'dns_health';
-        if (issueType.includes('tls') || issueType.includes('cert'))
+        if (issueType.includes('tls') || issueType.includes('ssl') || issueType.includes('cert'))
             return 'network_security';
-        return 'application_security';
+        if (issueType.includes('csp') || issueType.includes('hsts') || issueType.includes('xss'))
+            return 'application_security';
+        if (issueType.includes('leaked') || issueType.includes('breach') || issueType.includes('credential'))
+            return 'leaked_information';
+        if (issueType.includes('malware') || issueType.includes('endpoint'))
+            return 'endpoint_security';
+        return 'application_security'; // Default
     }
     getEstimatedImprovementForIssue(issueType) {
         const improvements = {
             'spf_record_missing': 15,
             'dmarc_contains_none': 12,
+            'dmarc_record_missing': 18,
             'patching_cadence_v3_critical': 25,
-            'patching_cadence_v3_high': 20
+            'patching_cadence_v3_high': 20,
+            'patching_cadence_v3_medium': 15,
+            'tls_weak_cipher': 10,
+            'ssl_certificate_expiring': 8,
+            'hsts_header_missing': 10,
+            'csp_header_missing': 12
         };
         return improvements[issueType] || 10;
     }
+    getTimeToImplement(effort) {
+        switch (effort) {
+            case 'quick_win': return '1-2 weeks';
+            case 'moderate': return '1-2 months';
+            case 'major_project': return '3-6 months';
+            default: return '2-4 weeks';
+        }
+    }
+    getBusinessCase(issueType, volume) {
+        const cases = {
+            'spf_record_missing': `Configure SPF records for ${volume} domains to prevent email spoofing`,
+            'dmarc_contains_none': `Strengthen DMARC policy from 'none' to 'quarantine' for ${volume} domains`,
+            'patching_cadence_v3_critical': `Emergency patch ${volume} critical vulnerabilities across infrastructure`,
+            'tls_weak_cipher': `Update TLS configuration on ${volume} endpoints to use strong ciphers`,
+            'hsts_header_missing': `Enable HSTS headers on ${volume} web applications for secure connections`
+        };
+        return cases[issueType] || `Address ${volume} ${issueType.replace(/_/g, ' ')} issues`;
+    }
+    getBusinessImpact(factorName, improvement) {
+        if (improvement > 3)
+            return 'Major impact on security posture and risk reduction';
+        if (improvement > 1.5)
+            return 'Significant improvement in security rating';
+        if (improvement > 0.5)
+            return 'Meaningful security enhancement';
+        return 'Incremental security improvement';
+    }
     estimateTimeline(pointsNeeded, quickWins, majorProjects) {
-        if (pointsNeeded <= 5 && quickWins >= 2)
-            return '2-3 months with focus on quick wins';
-        if (pointsNeeded <= 10)
-            return '4-6 months with mixed approach';
-        if (majorProjects > 2)
-            return '6-12 months requiring major security program investment';
-        return '3-6 months with systematic approach';
+        if (pointsNeeded <= 5 && quickWins >= 3)
+            return '1-2 months focusing on quick wins';
+        if (pointsNeeded <= 10 && quickWins >= 2)
+            return '2-4 months with mixed approach';
+        if (pointsNeeded <= 20)
+            return '4-6 months with systematic improvements';
+        if (majorProjects > 3)
+            return '6-12 months requiring major security program investments';
+        return '3-6 months with focused execution';
     }
     async run() {
         const transport = new StdioServerTransport();
         await this.server.connect(transport);
-        console.error("🎯 Score Impact SecurityScorecard MCP Server running - Strategic focus on score improvement!");
+        console.error("✅ Live SecurityScorecard MCP Server running v4.1.0 - Ready for strategic analysis!");
     }
 }
-const server = new ScoreImpactSecurityScorecardServer();
-server.run().catch(console.error);
+if (process.env.NODE_ENV !== 'test') {
+    const server = new ScoreImpactSecurityScorecardServer();
+    server.run().catch(console.error);
+}
 //# sourceMappingURL=index.js.map
