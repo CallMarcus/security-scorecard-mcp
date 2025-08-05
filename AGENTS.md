@@ -35,3 +35,8 @@ to fetch the most recent development build instead.
 - Add helper tools to query findings by asset and by category.
 - Expose a function that collects all findings for a domain and outputs remediation recommendations grouped by factor.
 - Document new capabilities in `README.md` and provide examples for Windows&nbsp;11 users.
+
+## Testing and debugging
+- Coordinate testing with Claude Desktop using `live-scorecard-server/test-plan.md`.
+- Before testing, rebuild the server with `npm run build` and start it via `node build/index.js`.
+- Claude should follow the test plan and produce a markdown report summarizing pass/fail results for each tool.

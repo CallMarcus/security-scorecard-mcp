@@ -455,3 +455,6 @@ Raw JSON from the API rendered in a code block.
 **Edge cases**
 - The endpoint must be relative; full URLs are rejected.
 
+## Claude Desktop Test Plan
+For end-to-end validation with Claude Desktop, follow `live-scorecard-server/test-plan.md`. Rebuild the server (`npm run build`) and start it (`node build/index.js`) before running the plan. Claude should execute the listed tool calls and return a markdown report noting pass/fail for each.
+

@@ -29,6 +29,10 @@ get detailed findings for neste.com
 analyze findings priority for neste.com
 ```
 
+## 🧪 Testing with Claude Desktop
+
+Use `test-plan.md` to coordinate debugging and validation. Rebuild the server with `npm run build` and start it with `node build/index.js` before running tests. Claude Desktop should execute the steps in the plan and return a markdown report summarizing each tool's results.
+
 ## 🛠️ New Enhanced Tools
 
 ### **1. `debug_api_access`** - Troubleshoot API Issues
