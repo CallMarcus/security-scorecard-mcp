@@ -13,7 +13,7 @@ $api = if ($Dev) {
 
 $token = $env:GITHUB_TOKEN
 $headers = @{}
-if ($token) { $headers['Authorization'] = "Bearer $token" }
+if ($token) { $headers['Authorization'] = "token $token" }
 
 $release = $null
 try {

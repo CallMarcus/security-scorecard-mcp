@@ -12,7 +12,7 @@ fi
 TOKEN=${GITHUB_TOKEN:-}
 CURL_ARGS=("-fsSL")
 if [[ -n "$TOKEN" ]]; then
-  CURL_ARGS+=("-H" "Authorization: Bearer $TOKEN")
+  CURL_ARGS+=("-H" "Authorization: token $TOKEN")
 fi
 
 if ! info=$(curl "${CURL_ARGS[@]}" "$API"); then

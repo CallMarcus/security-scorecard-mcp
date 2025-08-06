@@ -32,8 +32,6 @@ if (-not $gh) {
     }
 }
 
-gh auth status 1>$null 2>$null
-if ($LASTEXITCODE -ne 0) {
     gh auth login --web --scopes "repo"
 }
 
