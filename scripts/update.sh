@@ -12,7 +12,7 @@ fi
 TOKEN=${GITHUB_TOKEN:-}
 CURL_ARGS=("-fsSL")
 if [[ -n "$TOKEN" ]]; then
-  CURL_ARGS+=("-H" "Authorization: Bearer $TOKEN")
+  CURL_ARGS+=("-H" "Authorization: token $TOKEN")
 fi
 
 if ! info=$(curl "${CURL_ARGS[@]}" "$API"); then
@@ -25,7 +25,7 @@ ZIP=$(echo "$info" | jq -r .zipball_url)
 
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
-curl -fsSL "$ZIP" -o "$TMP/src.zip"
+curl "${CURL_ARGS[@]}" "$ZIP" -o "$TMP/src.zip"
 unzip -q "$TMP/src.zip" -d "$TMP"
 DIR=$(find "$TMP" -maxdepth 1 -mindepth 1 -type d | head -n 1)
 
