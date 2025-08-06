@@ -20,8 +20,16 @@ if ($major -lt 18) {
 # Ensure GitHub CLI is installed and authenticated
 $gh = Get-Command gh -ErrorAction SilentlyContinue
 if (-not $gh) {
-    Write-Error 'GitHub CLI (gh) is required but was not found. Install it from https://cli.github.com/.'
-    exit 1
+    $winget = Get-Command winget -ErrorAction SilentlyContinue
+    if ($winget) {
+        Write-Host 'Installing GitHub CLI via winget...'
+        winget install --id GitHub.cli -e --source winget --silent --accept-package-agreements --accept-source-agreements 1>$null 2>$null
+        $gh = Get-Command gh -ErrorAction SilentlyContinue
+    }
+    if (-not $gh) {
+        Write-Error 'GitHub CLI (gh) is required but was not found. Install it from https://cli.github.com/.'
+        exit 1
+    }
 }
 
 gh auth status 1>$null 2>$null
