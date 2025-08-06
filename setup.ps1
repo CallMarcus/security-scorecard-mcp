@@ -17,6 +17,20 @@ if ($major -lt 18) {
     exit 1
 }
 
+# Ensure GitHub CLI is installed and authenticated
+$gh = Get-Command gh -ErrorAction SilentlyContinue
+if (-not $gh) {
+    Write-Error 'GitHub CLI (gh) is required but was not found. Install it from https://cli.github.com/.'
+    exit 1
+}
+
+gh auth status 1>$null 2>$null
+if ($LASTEXITCODE -ne 0) {
+    gh auth login --web --scopes "repo"
+}
+
+$env:GITHUB_TOKEN = (gh auth token).Trim()
+
 # Determine release channel and update files
 if ($Dev) {
     .\scripts\update.ps1 -Dev
