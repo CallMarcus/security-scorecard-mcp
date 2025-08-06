@@ -12,7 +12,7 @@ $api = if ($Dev) {
 }
 
 $token = $env:GITHUB_TOKEN
-$headers = @{}
+$headers = @{'User-Agent' = 'security-scorecard-mcp'}
 if ($token) { $headers['Authorization'] = "token $token" }
 
 $release = $null
@@ -20,7 +20,11 @@ try {
     $release = Invoke-RestMethod -Uri $api -Headers $headers
 } catch {
     Write-Error "Failed to retrieve release info from $api."
-    Write-Error "Check your network connection or verify that the repository has published releases."
+    if ($_.Exception.Response.StatusCode.value__ -eq 404) {
+        Write-Error "No release was found. Publish a release or run with -Dev for development builds."
+    } else {
+        Write-Error "Check your network connection or verify that the repository has published releases."
+    }
     exit 1
 }
 $tag = $release.tag_name
