@@ -17,7 +17,7 @@ function createServerWithStubs(responses: Record<string, any>) {
 
 test('getQuickWins lists high-impact low-effort items', async () => {
   const server = createServerWithStubs({
-    '/companies/example.com/issues': {
+    '/companies/example.com/issues/active?size=50': {
       entries: [
         { type: 'spf_record_missing', severity: 'medium' },
         { type: 'dmarc_contains_none', severity: 'medium' },
@@ -28,8 +28,8 @@ test('getQuickWins lists high-impact low-effort items', async () => {
 
   const result = await server.getQuickWins('example.com', 'medium');
   const text: string = result.content[0].text;
-  assert.ok(text.includes('QUICK WINS FOR'));
-  assert.ok(text.includes('SPF RECORD MISSING'));
+  assert.ok(text.includes('COMMON QUICK WINS'));
+  assert.ok(text.includes('SPF Record Configuration'));
 });
 
 test('getQuickWins rejects invalid maxEffort', async () => {
