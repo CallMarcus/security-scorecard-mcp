@@ -17,7 +17,7 @@ function createServerWithStubs(responses: Record<string, any>) {
 
 test('getIssuesByROI ranks issues with highest ROI', async () => {
   const server = createServerWithStubs({
-    '/companies/example.com/issues': {
+    '/companies/example.com/issues/active?size=50': {
       entries: [
         { type: 'spf_record_missing', severity: 'medium' },
         { type: 'spf_record_missing', severity: 'medium' },
@@ -28,13 +28,13 @@ test('getIssuesByROI ranks issues with highest ROI', async () => {
 
   const result = await server.getIssuesByROI('example.com', 5);
   const text: string = result.content[0].text;
-  assert.ok(text.includes('ISSUES RANKED BY ROI'));
+  assert.ok(text.includes('COMMON HIGH-ROI ISSUES'));
   assert.ok(text.includes('SPF RECORD MISSING'));
 });
 
 test('getIssuesByROI rejects invalid topN', async () => {
   const server = createServerWithStubs({
-    '/companies/example.com/issues': { entries: [] }
+    '/companies/example.com/issues/active?size=50': { entries: [] }
   });
 
   await assert.rejects(

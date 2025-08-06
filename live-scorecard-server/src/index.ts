@@ -101,6 +101,7 @@ export class ScoreImpactSecurityScorecardServer {
     defaultDomain: string;
     debugMode: boolean;
   };
+  private pageSize: number;
 
   constructor() {
     this.server = new Server(
@@ -122,6 +123,8 @@ export class ScoreImpactSecurityScorecardServer {
       ),
       debugMode: process.env.DEBUG_MODE === "true",
     };
+
+    this.pageSize = parseInt(process.env.SCORECARD_PAGE_SIZE || "50", 10);
 
     this.setupToolHandlers();
   }
@@ -190,12 +193,17 @@ export class ScoreImpactSecurityScorecardServer {
 
     let allEntries: any[] = [];
     let nextUrl: string | null = `${API_BASE_URL}${endpoint}`;
+    if (method === 'GET' && !endpoint.includes('size=') && this.pageSize) {
+      const url: URL = new URL(nextUrl!);
+      url.searchParams.set('size', String(this.pageSize));
+      nextUrl = url.toString();
+    }
 
     while (nextUrl) {
       if (this.config.debugMode) {
         console.error(`[API Call] Fetching: ${nextUrl}`);
       }
-      
+
       const response = await fetch(nextUrl, {
         method,
         headers: {
@@ -223,22 +231,46 @@ export class ScoreImpactSecurityScorecardServer {
         }
       }
 
-      const pageJson = await response.json();
-      if (pageJson.entries) {
-        allEntries = allEntries.concat(pageJson.entries);
-      } else {
-        // For non-paginated endpoints, return the whole response
-        return pageJson;
+      const jsonResponse = await response.json();
+
+      if (jsonResponse.data !== undefined) {
+        const entries = Array.isArray(jsonResponse.data) ? jsonResponse.data : [jsonResponse.data];
+        allEntries = allEntries.concat(entries);
+
+        if (jsonResponse.pagination?.has_next) {
+          const url: URL = new URL(nextUrl!);
+          const currentPage = jsonResponse.pagination.page ?? 1;
+          url.searchParams.set('page', String(currentPage + 1));
+          url.searchParams.set('size', String(jsonResponse.pagination.size ?? this.pageSize));
+          nextUrl = url.toString();
+          continue;
+        }
+
+        if (jsonResponse.next_cursor) {
+          const url: URL = new URL(nextUrl!);
+          url.searchParams.set('cursor', jsonResponse.next_cursor);
+          nextUrl = url.toString();
+          continue;
+        }
+
+        nextUrl = null;
+        continue;
       }
 
-      // Check for cursor-based pagination
-      if (pageJson.next_cursor) {
-        const url: URL = new URL(nextUrl!);
-        url.searchParams.set('cursor', pageJson.next_cursor);
-        nextUrl = url.toString();
-      } else {
-        nextUrl = null;
+      if (jsonResponse.entries) {
+        allEntries = allEntries.concat(jsonResponse.entries);
+
+        if (jsonResponse.next_cursor) {
+          const url: URL = new URL(nextUrl!);
+          url.searchParams.set('cursor', jsonResponse.next_cursor);
+          nextUrl = url.toString();
+        } else {
+          nextUrl = null;
+        }
+        continue;
       }
+
+      return jsonResponse;
     }
 
     return { entries: allEntries };
@@ -290,12 +322,13 @@ export class ScoreImpactSecurityScorecardServer {
           },
           {
             name: "get_issues_by_roi",
-            description: "🚀 PRIORITY: Get active issues ranked by ROI (Score Impact / Implementation Effort)",
+            description: "🚀 PRIORITY: Get issues ranked by ROI (Score Impact / Implementation Effort)",
             inputSchema: {
               type: "object",
               properties: {
                 domain: { type: "string", description: "The company domain to analyze.", default: this.config.defaultDomain },
                 top_n: { type: "number", default: 10, description: "Number of top ROI issues to return" },
+                status: { type: "string", enum: ["active", "historical"], default: "active", description: "Issue status to query" },
               },
               required: ["domain"],
             },
@@ -313,6 +346,7 @@ export class ScoreImpactSecurityScorecardServer {
                   description: "List of issue types to simulate fixing",
                   default: ["spf_record_missing", "dmarc_contains_none", "patching_cadence_v3_critical"]
                 },
+                status: { type: "string", enum: ["active", "historical"], default: "active", description: "Issue status to query" },
               },
               required: ["domain"],
             },
@@ -357,7 +391,8 @@ export class ScoreImpactSecurityScorecardServer {
                   items: { type: "string" },
                   description: "List of issue types to scan for",
                   default: ["spf_record_missing", "dmarc_contains_none", "patching_cadence_v3_critical"]
-                }
+                },
+                status: { type: "string", enum: ["active", "historical"], default: "active", description: "Issue status to scan" }
               },
               required: ["domain"]
             }
@@ -394,8 +429,11 @@ export class ScoreImpactSecurityScorecardServer {
           const topNArg = request.params.arguments?.top_n;
           const topN =
             topNArg !== undefined ? this.validateTopN(Number(topNArg)) : 10;
+          const status = this.validateIssueStatus(
+            (request.params.arguments?.status as string) || "active"
+          );
           return await this.executeTool("get_issues_by_roi", () =>
-            this.getIssuesByROI(domain, topN)
+            this.getIssuesByROI(domain, topN, status)
           );
         }
 
@@ -418,8 +456,11 @@ export class ScoreImpactSecurityScorecardServer {
           const maxEffort = this.validateMaxEffort(
             (request.params.arguments?.max_effort as string) || "medium"
           );
+          const status = this.validateIssueStatus(
+            (request.params.arguments?.status as string) || "active"
+          );
           return await this.executeTool("get_quick_wins", () =>
-            this.getQuickWins(domain, maxEffort)
+            this.getQuickWins(domain, maxEffort, status)
           );
         }
 
@@ -441,7 +482,10 @@ export class ScoreImpactSecurityScorecardServer {
                   "spf_record_missing",
                   "dmarc_contains_none",
                   "patching_cadence_v3_critical",
-                ]
+                ],
+                this.validateIssueStatus(
+                  (request.params.arguments?.status as string) || "active"
+                )
               )
           );
         }
@@ -600,14 +644,18 @@ export class ScoreImpactSecurityScorecardServer {
     }
   }
   
-  private async getIssuesByROI(domain: string, topN: number): Promise<any> {
+  private async getIssuesByROI(
+    domain: string,
+    topN: number,
+    status: 'active' | 'historical' = 'active'
+  ): Promise<any> {
     domain = this.sanitizeDomain(domain);
     topN = this.validateTopN(topN);
     try {
-      const allIssues = await this.makeRequest(`/companies/${domain}/issues`);
+      const allIssues = await this.makeRequest(`/companies/${domain}/issues/${status}`);
 
       if (!allIssues.entries || allIssues.entries.length === 0) {
-        return { content: [{ type: "text", text: `✅ No active issues found for ${domain}.` }] };
+        return { content: [{ type: "text", text: `✅ No ${status} issues found for ${domain}.` }] };
       }
 
       // Count issues by type
@@ -654,7 +702,7 @@ export class ScoreImpactSecurityScorecardServer {
       const totalImpact = issuesByRoi.reduce((sum, issue) => sum + issue.estimated_score_impact, 0);
 
       const text = `# 🚀 ISSUES RANKED BY ROI: ${domain}\n\n` +
-                   `**Top ${issuesByRoi.length} highest ROI security improvements based on active findings:**\n` +
+                   `**Top ${issuesByRoi.length} highest ROI security improvements based on ${status} findings:**\n` +
                    `**Total Potential Score Impact**: +${totalImpact.toFixed(1)} points\n\n` +
                    `${issuesByRoi.map((issue: IssueROI, i: number) =>
                        `## ${i + 1}. ${issue.issue_type.replace(/_/g, ' ').toUpperCase()}\n` +
@@ -807,11 +855,15 @@ export class ScoreImpactSecurityScorecardServer {
     }
   }
 
-  private async getQuickWins(domain: string, maxEffort: string): Promise<any> {
+  private async getQuickWins(
+    domain: string,
+    maxEffort: string,
+    status: 'active' | 'historical' = 'active'
+  ): Promise<any> {
     domain = this.sanitizeDomain(domain);
     maxEffort = this.validateMaxEffort(maxEffort);
     try {
-      const allIssues = await this.makeRequest(`/companies/${domain}/issues`);
+      const allIssues = await this.makeRequest(`/companies/${domain}/issues/${status}`);
 
       // Find low-effort, high-impact issues
       const issuesByType = allIssues.entries?.reduce((acc: any, issue: Issue) => {
@@ -976,10 +1028,14 @@ export class ScoreImpactSecurityScorecardServer {
     };
   }
 
-  private async findHighImpactFindingsAcrossAssets(domain: string, issueTypes: string[]): Promise<any> {
+  private async findHighImpactFindingsAcrossAssets(
+    domain: string,
+    issueTypes: string[],
+    status: 'active' | 'historical' = 'active'
+  ): Promise<any> {
     domain = this.sanitizeDomain(domain);
     // Using a simpler approach based on the primary domain's issues
-    let text = `# 🔍 HIGH-IMPACT FINDINGS ANALYSIS: ${domain}\n\nScanning for: ${issueTypes.join(', ')}\n\n`;
+    let text = `# 🔍 HIGH-IMPACT FINDINGS ANALYSIS: ${domain}\n\nScanning for: ${issueTypes.join(', ')} (${status})\n\n`;
     
     try {
       // Check for each issue type in the primary domain
@@ -987,7 +1043,7 @@ export class ScoreImpactSecurityScorecardServer {
       
       for (const issueType of issueTypes) {
         try {
-          const issues = await this.makeRequest(`/companies/${domain}/issues/${issueType}`);
+          const issues = await this.makeRequest(`/companies/${domain}/issues/${status}/${issueType}`);
           if (issues.entries && issues.entries.length > 0) {
             results[issueType] = {
               found: true,
@@ -1020,13 +1076,14 @@ export class ScoreImpactSecurityScorecardServer {
 
       const activeIssues = Object.entries(results).filter(([_, r]) => r.found).length;
       
+      const statusLabel = status.charAt(0).toUpperCase() + status.slice(1);
       text += `## 🎯 STRATEGIC RECOMMENDATIONS\n\n` +
-              `**Active Issue Types**: ${activeIssues} / ${issueTypes.length}\n\n` +
-              `${activeIssues > 0 ? 
-                `Focus on resolving the ${activeIssues} active issue types found. ` +
-                `Consider automation or policy-based solutions for widespread issues.` :
-                `Excellent! No issues found for the scanned types. ` +
-                `Continue monitoring and maintaining current security configurations.`}`;
+                `**${statusLabel} Issue Types**: ${activeIssues} / ${issueTypes.length}\n\n` +
+                `${activeIssues > 0 ?
+                  `Focus on resolving the ${activeIssues} ${status} issue types found. ` +
+                  `Consider automation or policy-based solutions for widespread issues.` :
+                  `Excellent! No issues found for the scanned types. ` +
+                  `Continue monitoring and maintaining current security configurations.`}`;
 
     } catch (error: any) {
       text += `**Note**: Analysis based on primary domain. Full cross-asset scanning requires additional API access.`;
@@ -1079,6 +1136,17 @@ export class ScoreImpactSecurityScorecardServer {
       );
     }
     return value as "low" | "medium" | "high";
+  }
+
+  private validateIssueStatus(value: string): 'active' | 'historical' {
+    const allowed = ['active', 'historical'];
+    if (!allowed.includes(value)) {
+      throw new McpError(
+        ErrorCode.InvalidRequest,
+        `Invalid status: ${value}`
+      );
+    }
+    return value as 'active' | 'historical';
   }
 
   private getKeyIssuesForFactor(factorName: string): string[] {
