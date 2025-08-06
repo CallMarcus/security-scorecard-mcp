@@ -31,7 +31,9 @@ if (-not $gh) {
         exit 1
     }
 }
-
+try {
+    gh auth status 1>$null 2>$null
+} catch {
     gh auth login --web --scopes "repo"
 }
 
