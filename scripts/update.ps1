@@ -28,7 +28,7 @@ $zipUrl = $release.zipball_url
 
 $temp = New-Item -ItemType Directory -Path ([System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), [System.Guid]::NewGuid().ToString()))
 $zipPath = Join-Path $temp 'src.zip'
-Invoke-WebRequest -Uri $zipUrl -OutFile $zipPath
+Invoke-WebRequest -Uri $zipUrl -Headers $headers -OutFile $zipPath
 Expand-Archive -Path $zipPath -DestinationPath $temp -Force
 $dir = Get-ChildItem -Path $temp -Directory | Select-Object -First 1
 
