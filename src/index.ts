@@ -4,6 +4,7 @@ import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { getFindingsByCategory } from "./get_findings_by_category.js";
 import { getEndpointDetails } from "./api_reference.js";
+import { getAssetInventory, getAssetFindings, compareAssets } from "./asset_management.js";
 import {
   CallToolRequestSchema,
   ErrorCode,
@@ -438,6 +439,46 @@ export class ScoreImpactSecurityScorecardServer {
           }
         },
         {
+          name: "get_asset_inventory",
+          description: "📋 ASSET INVENTORY: Get comprehensive inventory of all domains and IPs with security scores and issue counts.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              domain: { type: "string", description: "Parent domain to analyze assets for.", default: this.config.defaultDomain }
+            },
+            required: ["domain"]
+          }
+        },
+        {
+          name: "get_asset_findings",
+          description: "🔍 ASSET DETAILS: Get detailed security findings and remediation priorities for specific asset.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              asset_name: { type: "string", description: "Specific domain or IP to analyze." },
+              asset_type: { type: "string", enum: ["domain", "ip_address"], default: "domain", description: "Type of asset." }
+            },
+            required: ["asset_name"]
+          }
+        },
+        {
+          name: "compare_assets",
+          description: "⚖️ ASSET COMPARISON: Compare security posture across multiple assets with recommendations.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              asset_names: { 
+                type: "array", 
+                items: { type: "string" },
+                description: "List of domain names to compare.",
+                minItems: 2,
+                maxItems: 10
+              }
+            },
+            required: ["asset_names"]
+          }
+        },
+        {
           name: "call_api_endpoint",
           description: "🔧 Low-level helper to query any SecurityScorecard API endpoint.",
           inputSchema: {
@@ -524,6 +565,36 @@ export class ScoreImpactSecurityScorecardServer {
           const domain = this.sanitizeDomain(rawDomain);
           return await this.executeTool("generate_remediation_report", () =>
             this.generateRemediationReport(domain)
+          );
+        }
+
+        case "get_asset_inventory": {
+          const domain = this.sanitizeDomain(rawDomain);
+          return await this.executeTool("get_asset_inventory", () =>
+            this.getAssetInventoryTool(domain)
+          );
+        }
+
+        case "get_asset_findings": {
+          const assetName = request.params.arguments?.asset_name as string;
+          if (!assetName) {
+            throw new McpError(ErrorCode.InvalidRequest, "asset_name is required");
+          }
+          const assetType = this.validateAssetType(
+            (request.params.arguments?.asset_type as string) || "domain"
+          );
+          return await this.executeTool("get_asset_findings", () =>
+            this.getAssetFindingsTool(assetName, assetType)
+          );
+        }
+
+        case "compare_assets": {
+          const assetNames = request.params.arguments?.asset_names as string[];
+          if (!Array.isArray(assetNames) || assetNames.length < 2) {
+            throw new McpError(ErrorCode.InvalidRequest, "At least 2 asset names required for comparison");
+          }
+          return await this.executeTool("compare_assets", () =>
+            this.compareAssetsTool(assetNames)
           );
         }
 
@@ -944,6 +1015,75 @@ export class ScoreImpactSecurityScorecardServer {
       ? `${httpMethod} ${details.url} - ${details.description || ''}`
       : `Response from \`${endpoint}\``;
     const text = `${summary}\n\n\`\`\`json\n${JSON.stringify(json, null, 2)}\n\`\`\``;
+    return { content: [{ type: "text", text }] };
+  }
+
+  private async getAssetInventoryTool(domain: string): Promise<any> {
+    domain = this.sanitizeDomain(domain);
+    const inventory = await getAssetInventory(this.makeRequest.bind(this), domain);
+    
+    const text = `# 📋 ASSET INVENTORY: ${domain}\n\n` +
+                 `**Total Assets**: ${inventory.total_assets} (${inventory.domains.length} domains, ${inventory.ip_addresses.length} IPs)\n` +
+                 `**Total Issues**: ${inventory.summary.total_issues}\n\n` +
+                 `## 🔴 Highest Risk Assets\n` +
+                 `${inventory.summary.worst_performers.slice(0, 5).map((asset, i) =>
+                     `${i + 1}. **${asset.asset_name}** (${asset.asset_type})\n` +
+                     `   - Issues: ${asset.issues_count} (${asset.critical_issues} critical, ${asset.high_issues} high)\n`
+                 ).join('')}\n` +
+                 `## 🟢 Best Performing Assets\n` +
+                 `${inventory.summary.best_performers.slice(0, 3).map((asset, i) =>
+                     `${i + 1}. **${asset.asset_name}** - ${asset.issues_count} issues\n`
+                 ).join('')}\n\n` +
+                 `\`\`\`json\n${JSON.stringify(inventory, null, 2)}\n\`\`\``;
+    
+    return { content: [{ type: "text", text }] };
+  }
+
+  private async getAssetFindingsTool(assetName: string, assetType: string): Promise<any> {
+    const findings = await getAssetFindings(this.makeRequest.bind(this), assetName, assetType as 'domain' | 'ip_address');
+    
+    const totalFindings = Object.values(findings.findings).reduce((sum: number, f: any) => sum + f.count, 0);
+    const quickWins = findings.remediation_priority.filter(p => p.quick_win);
+    
+    const text = `# 🔍 ASSET SECURITY FINDINGS: ${assetName}\n\n` +
+                 `**Asset Type**: ${assetType}\n` +
+                 `**Total Findings**: ${totalFindings}\n` +
+                 `**Quick Win Opportunities**: ${quickWins.length}\n\n` +
+                 `## 🎯 Remediation Priorities (Top 10)\n` +
+                 `${findings.remediation_priority.slice(0, 10).map((item, i) =>
+                     `${i + 1}. **${item.issue_type.replace(/_/g, ' ').toUpperCase()}** ${item.quick_win ? '⚡ Quick Win' : ''}\n` +
+                     `   - Priority Score: ${item.priority_score.toFixed(1)}\n` +
+                     `   - Count: ${findings.findings[item.issue_type]?.count || 0}\n` +
+                     `   - Severity: ${findings.findings[item.issue_type]?.severity || 'unknown'}\n` +
+                     `   - Effort: ${findings.findings[item.issue_type]?.remediation_effort || 'unknown'}\n`
+                 ).join('\n')}\n\n` +
+                 `## ⚡ Quick Wins\n` +
+                 `${quickWins.length > 0 
+                     ? quickWins.map(qw => `- ${qw.issue_type.replace(/_/g, ' ')}`).join('\n')
+                     : 'No quick wins identified.'}\n\n` +
+                 `\`\`\`json\n${JSON.stringify(findings, null, 2)}\n\`\`\``;
+    
+    return { content: [{ type: "text", text }] };
+  }
+
+  private async compareAssetsTool(assetNames: string[]): Promise<any> {
+    const comparison = await compareAssets(this.makeRequest.bind(this), assetNames);
+    
+    const text = `# ⚖️ ASSET SECURITY COMPARISON\n\n` +
+                 `**Assets Compared**: ${assetNames.length}\n\n` +
+                 `## 📊 Risk Ranking (Highest to Lowest)\n` +
+                 `${comparison.comparison.map((asset, i) =>
+                     `### ${i + 1}. ${asset.asset_name}\n` +
+                     `- **Risk Score**: ${asset.security_risk_score}\n` +
+                     `- **Total Issues**: ${asset.total_issues} (${asset.critical_issues} critical, ${asset.high_issues} high)\n` +
+                     `- **Top Issue Types**: ${asset.top_issue_types.join(', ') || 'None'}\n`
+                 ).join('\n')}\n\n` +
+                 `## 💡 Recommendations\n` +
+                 `${comparison.recommendations.length > 0 
+                     ? comparison.recommendations.map(rec => `- ${rec}`).join('\n')
+                     : 'No specific recommendations at this time.'}\n\n` +
+                 `\`\`\`json\n${JSON.stringify(comparison, null, 2)}\n\`\`\``;
+    
     return { content: [{ type: "text", text }] };
   }
 
