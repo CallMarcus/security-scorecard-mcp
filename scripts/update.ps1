@@ -12,32 +12,47 @@ $api = if ($Dev) {
 }
 
 $token = $env:GITHUB_TOKEN
-$headers = @{'User-Agent' = 'security-scorecard-mcp'}
+$headers = @{
+    'User-Agent' = 'security-scorecard-mcp'
+    'Accept'     = 'application/vnd.github+json'
+}
 if ($token) { $headers['Authorization'] = "token $token" }
 
-$release = $null
+$origTls = [System.Net.ServicePointManager]::SecurityProtocol
 try {
-    $release = Invoke-RestMethod -Uri $api -Headers $headers
-} catch {
-    Write-Error "Failed to retrieve release info from $api."
-    if ($_.Exception.Response.StatusCode.value__ -eq 404) {
-        Write-Error "No release was found. Publish a release or run with -Dev for development builds."
-    } else {
-        Write-Error "Check your network connection or verify that the repository has published releases."
+    [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12
+
+    $release = $null
+    try {
+        $release = Invoke-RestMethod -Uri $api -Headers $headers
+    } catch {
+        Write-Error "Failed to retrieve release info from $api: $($_.Exception.Message)"
+        if ($_.Exception.Response -and $_.Exception.Response.StatusCode.value__ -eq 404) {
+            Write-Error "No release was found. Publish a release or run with -Dev for development builds."
+        } else {
+            Write-Error "Check your network connection or verify that the repository has published releases."
+        }
+        exit 1
     }
-    exit 1
+    $tag = $release.tag_name
+    $zipUrl = $release.zipball_url
+
+    $temp = New-Item -ItemType Directory -Path ([System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), [System.Guid]::NewGuid().ToString()))
+    $zipPath = Join-Path $temp 'src.zip'
+    try {
+        Invoke-WebRequest -Uri $zipUrl -Headers $headers -OutFile $zipPath
+    } catch {
+        Write-Error "Failed to download release archive from $zipUrl: $($_.Exception.Message)"
+        exit 1
+    }
+    Expand-Archive -Path $zipPath -DestinationPath $temp -Force
+    $dir = Get-ChildItem -Path $temp -Directory | Select-Object -First 1
+
+    Remove-Item -Recurse -Force build, build_docs
+    Copy-Item -Recurse -Force (Join-Path $dir.FullName 'build') .
+    Copy-Item -Recurse -Force (Join-Path $dir.FullName 'build_docs') .
+
+    Write-Host "Updated MCP to $tag"
+} finally {
+    [System.Net.ServicePointManager]::SecurityProtocol = $origTls
 }
-$tag = $release.tag_name
-$zipUrl = $release.zipball_url
-
-$temp = New-Item -ItemType Directory -Path ([System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), [System.Guid]::NewGuid().ToString()))
-$zipPath = Join-Path $temp 'src.zip'
-Invoke-WebRequest -Uri $zipUrl -Headers $headers -OutFile $zipPath
-Expand-Archive -Path $zipPath -DestinationPath $temp -Force
-$dir = Get-ChildItem -Path $temp -Directory | Select-Object -First 1
-
-Remove-Item -Recurse -Force build, build_docs
-Copy-Item -Recurse -Force (Join-Path $dir.FullName 'build') .
-Copy-Item -Recurse -Force (Join-Path $dir.FullName 'build_docs') .
-
-Write-Host "Updated MCP to $tag"
