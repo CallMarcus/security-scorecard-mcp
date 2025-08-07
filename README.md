@@ -91,6 +91,7 @@ Add `--dev`/`-Dev` to either command to pull the most recent development build.
    export REQUESTS_PER_INTERVAL="5"          # requests added per interval
    export REQUEST_INTERVAL_MS="1000"         # interval length in ms
    export REQUEST_BURST_LIMIT="5"            # max burst size
+   export SCORECARD_PAGE_SIZE="50"           # items per page for paginated endpoints (max 50)
    ```
 3. Start the MCP server:
    ```bash
@@ -214,11 +215,12 @@ Markdown list ranking factors by ROI.
 - If all factors are already at 100, the list may be empty.
 
 ### get_issues_by_roi
-**Description:** Return active issue types ranked by ROI.
+**Description:** Return issue types ranked by ROI. Supports querying either active or historical issues.
 
 **Parameters**
 - `domain` (string, required)
 - `top_n` (number, optional, default 10) – Number of issues to return.
+- `status` (string, optional, default `"active"`) – Choose `"active"` or `"historical"` issues.
 
 **Response**
 Markdown list of issues with ROI scores and estimated impact.
@@ -229,7 +231,7 @@ Markdown list of issues with ROI scores and estimated impact.
 
 **Sample request**
 ```json
-{ "name": "get_issues_by_roi", "arguments": {"domain": "example.com", "top_n": 5} }
+{ "name": "get_issues_by_roi", "arguments": {"domain": "example.com", "top_n": 5, "status": "active"} }
 ```
 
 **Sample response**
@@ -327,6 +329,7 @@ Markdown summary of current score, grade requirements and next milestone.
 **Parameters**
 - `domain` (string, required)
 - `issue_types` (array of strings, optional) – Issue types to search for.
+- `status` (string, optional, default `"active"`) – Choose `"active"` or `"historical"` issues.
 
 **Response**
 Markdown summary listing assets where each issue type appears.
@@ -337,7 +340,7 @@ Markdown summary listing assets where each issue type appears.
 
 **Sample request**
 ```json
-{ "name": "find_high_impact_findings_across_assets", "arguments": {"domain": "example.com", "issue_types": ["spf_record_missing"]} }
+{ "name": "find_high_impact_findings_across_assets", "arguments": {"domain": "example.com", "issue_types": ["spf_record_missing"], "status": "active"} }
 ```
 
 **Sample response**
@@ -454,4 +457,7 @@ Raw JSON from the API rendered in a code block.
 
 **Edge cases**
 - The endpoint must be relative; full URLs are rejected.
+
+## Claude Desktop Test Plan
+For end-to-end validation with Claude Desktop, follow `live-scorecard-server/test-plan.md`. Rebuild the server (`npm run build`) and start it (`node build/index.js`) before running the plan. Claude should execute the listed tool calls and return a markdown report noting pass/fail for each.
 

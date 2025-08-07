@@ -2,6 +2,7 @@
 export declare class ScoreImpactSecurityScorecardServer {
     private server;
     private config;
+    private pageSize;
     constructor();
     /**
      * Simple logging helper for troubleshooting. Outputs only when DEBUG_MODE is enabled.
@@ -37,6 +38,7 @@ export declare class ScoreImpactSecurityScorecardServer {
     private validateTopN;
     private validateTargetGrade;
     private validateMaxEffort;
+    private validateIssueStatus;
     private getKeyIssuesForFactor;
     private getEffortForFactor;
     private getEffortForIssue;

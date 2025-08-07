@@ -35,3 +35,14 @@ to fetch the most recent development build instead.
 - Add helper tools to query findings by asset and by category.
 - Expose a function that collects all findings for a domain and outputs remediation recommendations grouped by factor.
 - Document new capabilities in `README.md` and provide examples for Windows&nbsp;11 users.
+
+## Current priorities
+- **Fix API endpoint paths** so all tools call the documented `/companies/{scorecard_identifier}/issues/active` and `/historical` routes.
+- **Parse API responses using the `data` + `pagination` structure** while keeping backward compatibility with legacy `entries` responses.
+- **Implement robust pagination** that follows `pagination.has_next` for page-based and `next_cursor` for cursor-based endpoints.
+- Update tests and documentation to reflect these changes and emphasize the new `status` parameter for active vs. historical issues.
+
+## Testing and debugging
+- Coordinate testing with Claude Desktop using `live-scorecard-server/test-plan.md`.
+- Before testing, rebuild the server with `npm run build` and start it via `node build/index.js`.
+- Claude should follow the test plan and produce a markdown report summarizing pass/fail results for each tool.

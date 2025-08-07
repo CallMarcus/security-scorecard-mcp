@@ -16,10 +16,10 @@ function createServerWithStubs(responses: Record<string, any>) {
 
 test('findHighImpactFindingsAcrossAssets summarizes results', async () => {
   const server = createServerWithStubs({
-    '/companies/example.com/issues/spf_record_missing': {
+    '/companies/example.com/issues/active/spf_record_missing?size=50': {
       entries: [{ severity: 'medium' }, { severity: 'medium' }]
     },
-    '/companies/example.com/issues/patching_cadence_v3_critical': new Error('404 Not Found')
+    '/companies/example.com/issues/active/patching_cadence_v3_critical?size=50': new Error('404 Not Found')
   });
 
   const result = await server.findHighImpactFindingsAcrossAssets('example.com', ['spf_record_missing', 'patching_cadence_v3_critical']);
@@ -31,7 +31,7 @@ test('findHighImpactFindingsAcrossAssets summarizes results', async () => {
 
 test('findHighImpactFindingsAcrossAssets handles domains with no issues', async () => {
   const server = createServerWithStubs({
-    '/companies/empty.com/issues/spf_record_missing': new Error('404 Not Found')
+    '/companies/empty.com/issues/active/spf_record_missing?size=50': new Error('404 Not Found')
   });
 
   const result = await server.findHighImpactFindingsAcrossAssets('empty.com', ['spf_record_missing']);

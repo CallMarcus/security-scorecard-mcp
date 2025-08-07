@@ -76,6 +76,7 @@ export class ScoreImpactSecurityScorecardServer {
   private burstLimit: number;
   private tokens: number;
   private lastRefill: number;
+  private pageSize: number;
 
   constructor() {
     this.server = new Server(
@@ -114,6 +115,7 @@ export class ScoreImpactSecurityScorecardServer {
     );
     this.tokens = this.burstLimit;
     this.lastRefill = Date.now();
+    this.pageSize = parseInt(process.env.SCORECARD_PAGE_SIZE || "50", 10);
 
     this.setupToolHandlers();
   }
@@ -195,6 +197,11 @@ export class ScoreImpactSecurityScorecardServer {
 
     let allEntries: any[] = [];
     let nextUrl: string | null = `${API_BASE_URL}${endpoint}`;
+    if (method === "GET" && !endpoint.includes("size=") && this.pageSize) {
+      const url = new URL(nextUrl);
+      url.searchParams.set("size", String(this.pageSize));
+      nextUrl = url.toString();
+    }
     let result: any = null;
 
     while (nextUrl) {
@@ -245,24 +252,54 @@ export class ScoreImpactSecurityScorecardServer {
         }
       }
 
-      const pageJson = await response.json();
-      if (pageJson.entries) {
-        allEntries = allEntries.concat(pageJson.entries);
+      const jsonResponse = await response.json();
+
+      if (jsonResponse.data !== undefined) {
+        const entries = Array.isArray(jsonResponse.data)
+          ? jsonResponse.data
+          : [jsonResponse.data];
+        allEntries = allEntries.concat(entries);
         result = { entries: allEntries };
-      } else {
-        result = pageJson;
+
+        if (jsonResponse.pagination?.has_next) {
+          const url = new URL(nextUrl);
+          const currentPage = jsonResponse.pagination.page ?? 1;
+          url.searchParams.set("page", String(currentPage + 1));
+          url.searchParams.set(
+            "size",
+            String(jsonResponse.pagination.size ?? this.pageSize)
+          );
+          nextUrl = url.toString();
+          continue;
+        }
+
+        if (jsonResponse.next_cursor) {
+          const url = new URL(nextUrl);
+          url.searchParams.set("cursor", jsonResponse.next_cursor);
+          nextUrl = url.toString();
+          continue;
+        }
+
         nextUrl = null;
         continue;
       }
 
-      // Check for cursor-based pagination
-      if (pageJson.next_cursor) {
-        const url: URL = new URL(nextUrl!);
-        url.searchParams.set("cursor", pageJson.next_cursor);
-        nextUrl = url.toString();
-      } else {
-        nextUrl = null;
+      if (jsonResponse.entries) {
+        allEntries = allEntries.concat(jsonResponse.entries);
+        result = { entries: allEntries };
+
+        if (jsonResponse.next_cursor) {
+          const url = new URL(nextUrl);
+          url.searchParams.set("cursor", jsonResponse.next_cursor);
+          nextUrl = url.toString();
+        } else {
+          nextUrl = null;
+        }
+        continue;
       }
+
+      result = jsonResponse;
+      nextUrl = null;
     }
 
     if (method === "GET" && result) {
@@ -339,12 +376,13 @@ export class ScoreImpactSecurityScorecardServer {
           },
           {
             name: "get_issues_by_roi",
-            description: "🚀 PRIORITY: Get a list of active issue types ranked by ROI (Score Impact vs. Implementation Effort).",
+            description: "🚀 PRIORITY: Get a list of issue types ranked by ROI (Score Impact vs. Implementation Effort).",
             inputSchema: {
               type: "object",
               properties: {
                 domain: { type: "string", description: "The company domain to analyze.", default: this.config.defaultDomain },
                 top_n: { type: "number", default: 10, description: "Number of top ROI issues to return." },
+                status: { type: "string", enum: ["active", "historical"], default: "active", description: "Issue status to query." },
               },
                required: ["domain"],
             },
@@ -360,7 +398,8 @@ export class ScoreImpactSecurityScorecardServer {
                 items: { type: "string" },
                 description: "Comma-separated list of issue types to scan for.",
                 default: this.config.defaultIssueTypes
-              }
+              },
+              status: { type: "string", enum: ["active", "historical"], default: "active", description: "Issue status to scan." }
             }
           }
         },
@@ -443,8 +482,11 @@ export class ScoreImpactSecurityScorecardServer {
           const topNArg = request.params.arguments?.top_n;
           const topN =
             topNArg !== undefined ? this.validateTopN(Number(topNArg)) : 10;
+          const status = this.validateIssueStatus(
+            (request.params.arguments?.status as string) || "active"
+          );
           return await this.executeTool("get_issues_by_roi", () =>
-            this.getIssuesByROI(domain, topN)
+            this.getIssuesByROI(domain, topN, status)
           );
         }
 
@@ -454,7 +496,10 @@ export class ScoreImpactSecurityScorecardServer {
             () =>
               this.findHighImpactFindingsAcrossAssets(
                 (request.params.arguments?.issue_types as string[]) ||
-                  this.config.defaultIssueTypes
+                  this.config.defaultIssueTypes,
+                this.validateIssueStatus(
+                  (request.params.arguments?.status as string) || "active"
+                )
               )
           );
 
@@ -669,16 +714,20 @@ export class ScoreImpactSecurityScorecardServer {
     return { content: [{ type: "text", text }] };
   }
   
-  private async getIssuesByROI(domain: string, topN: number): Promise<any> {
+  private async getIssuesByROI(
+    domain: string,
+    topN: number,
+    status: 'active' | 'historical' = 'active'
+  ): Promise<any> {
       domain = this.sanitizeDomain(domain);
       topN = this.validateTopN(topN);
       const [allIssues, allFactors] = await Promise.all([
-          this.makeRequest(`/companies/${domain}/issues`),
+          this.makeRequest(`/companies/${domain}/issues/${status}`),
           this.getFactors()
       ]);
 
       if (!allIssues.entries || allIssues.entries.length === 0) {
-          return { content: [{ type: "text", text: `✅ No active issues found for ${domain}.` }] };
+          return { content: [{ type: "text", text: `✅ No ${status} issues found for ${domain}.` }] };
       }
       
       const factorMap = new Map(allFactors.map(f => [f.name, f]));
@@ -726,7 +775,7 @@ export class ScoreImpactSecurityScorecardServer {
         .slice(0, topN);
 
       const text = `# 🚀 ISSUES RANKED BY ROI: ${domain}\n\n` +
-                   `**Top ${issuesByRoi.length} highest ROI security improvements based on active findings:**\n\n` +
+                   `**Top ${issuesByRoi.length} highest ROI security improvements based on ${status} findings:**\n\n` +
                    `${issuesByRoi.map((issue: IssueROI, i: number) =>
                        `## ${i + 1}. ${issue.issue_type.replace(/_/g, ' ').toUpperCase()}\n` +
                        `- **📊 ROI Score**: ${issue.roi_score.toFixed(1)}\n` +
@@ -740,12 +789,15 @@ export class ScoreImpactSecurityScorecardServer {
       return { content: [{ type: "text", text }] };
   }
 
-  private async findHighImpactFindingsAcrossAssets(issueTypes: string[]): Promise<any> {
+  private async findHighImpactFindingsAcrossAssets(
+    issueTypes: string[],
+    status: 'active' | 'historical' = 'active'
+  ): Promise<any> {
     if (!issueTypes || issueTypes.length === 0) {
       return { content: [{ type: "text", text: "No issue types specified." }] };
     }
 
-    let text = `# 🔍 TACTICAL FINDINGS ACROSS ALL ASSETS\n\nScanning for: ${issueTypes.join(', ')}\n\n`;
+    let text = `# 🔍 TACTICAL FINDINGS ACROSS ALL ASSETS\n\nScanning for: ${issueTypes.join(', ')} (${status})\n\n`;
     
     try {
         const assetsResponse = await this.makeRequest('/esi/assets?type=domain');
@@ -763,7 +815,7 @@ export class ScoreImpactSecurityScorecardServer {
         const promises = domains.flatMap(domain =>
             issueTypes.map(async issueType => {
                 try {
-                    const issues = await this.makeRequest(`/companies/${domain.name}/issues/${issueType}`);
+                    const issues = await this.makeRequest(`/companies/${domain.name}/issues/${status}/${issueType}`);
                     if (issues.entries && issues.entries.length > 0) {
                         results[issueType].push(domain.name);
                     }
@@ -839,7 +891,7 @@ export class ScoreImpactSecurityScorecardServer {
     let text = `# 🛠️ REMEDIATION REPORT: ${domain}\n\n`;
     try {
       const [issuesInfo, factorsInfo] = await Promise.all([
-        getEndpointDetails('/companies/{domain}/issues'),
+        getEndpointDetails('/companies/{domain}/issues/active'),
         getEndpointDetails('/companies/{domain}/factors')
       ]);
       if (issuesInfo || factorsInfo) {
@@ -928,6 +980,17 @@ export class ScoreImpactSecurityScorecardServer {
       );
     }
     return value;
+  }
+
+  private validateIssueStatus(value: string): 'active' | 'historical' {
+    const allowed = ['active', 'historical'];
+    if (!allowed.includes(value)) {
+      throw new McpError(
+        ErrorCode.InvalidRequest,
+        `Invalid status: ${value}`
+      );
+    }
+    return value as 'active' | 'historical';
   }
 
   private validateTargetGrade(value: string): "A" | "B" | "C" {
