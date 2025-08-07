@@ -64,9 +64,17 @@ try {
     Expand-Archive -Path $zipPath -DestinationPath $temp -Force
     $dir = Get-ChildItem -Path $temp -Directory | Select-Object -First 1
 
-    Remove-Item -Recurse -Force build, build_docs
-    Copy-Item -Recurse -Force (Join-Path $dir.FullName 'build') .
-    Copy-Item -Recurse -Force (Join-Path $dir.FullName 'build_docs') .
+    # Resolve repository root so the script works regardless of invocation directory
+    $root       = Resolve-Path (Join-Path $PSScriptRoot '..') | Select-Object -ExpandProperty Path
+    $buildPath  = Join-Path $root 'build'
+    $docsPath   = Join-Path $root 'build_docs'
+    # Clean up any legacy build folders that may have been created under scripts
+    $legacyBuild = Join-Path $PSScriptRoot 'build'
+    $legacyDocs  = Join-Path $PSScriptRoot 'build_docs'
+
+    Remove-Item -Recurse -Force $buildPath, $docsPath, $legacyBuild, $legacyDocs -ErrorAction SilentlyContinue
+    Copy-Item -Recurse -Force (Join-Path $dir.FullName 'build') $root
+    Copy-Item -Recurse -Force (Join-Path $dir.FullName 'build_docs') $root
 
     Write-Host "Updated MCP to $tag"
 } finally {
