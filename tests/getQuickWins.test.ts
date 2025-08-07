@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ScoreImpactSecurityScorecardServer } from '../live-scorecard-server/src/index.js';
+import { ScoreImpactSecurityScorecardServer } from '../src/index.js';
 import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 
 function createServerWithStubs(responses: Record<string, any>) {

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ScoreImpactSecurityScorecardServer } from '../live-scorecard-server/src/index.js';
+import { ScoreImpactSecurityScorecardServer } from '../src/index.js';
 
 function createServerWithStubs(responses: Record<string, any>) {
   const server = new ScoreImpactSecurityScorecardServer();

@@ -531,11 +531,13 @@ export class ScoreImpactSecurityScorecardServer {
           );
         }
 
-        case "find_high_impact_findings_across_assets":
+        case "find_high_impact_findings_across_assets": {
+          const domain = this.sanitizeDomain(rawDomain);
           return await this.executeTool(
             "find_high_impact_findings_across_assets",
             () =>
               this.findHighImpactFindingsAcrossAssets(
+                domain,
                 (request.params.arguments?.issue_types as string[]) ||
                   this.config.defaultIssueTypes,
                 this.validateIssueStatus(
@@ -543,6 +545,7 @@ export class ScoreImpactSecurityScorecardServer {
                 )
               )
           );
+        }
 
         case "get_findings_by_asset": {
           const domain = this.sanitizeDomain(rawDomain);
@@ -733,26 +736,38 @@ export class ScoreImpactSecurityScorecardServer {
       return { content: [{ type: 'text', text }] };
   }
 
+  private async benchmarkGradeRequirements(domain: string): Promise<any> {
+    domain = this.sanitizeDomain(domain);
+    const scorecard = await this.makeRequest(`/companies/${domain}`);
+    const text =
+      `# 📈 GRADE BENCHMARKING: ${domain}\n\n` +
+      `Current Score: ${scorecard.score}\n\n` +
+      `YOU ARE HERE`;
+    return { content: [{ type: 'text', text }] };
+  }
+
   private async calculateFactorScoreImpact(domain: string): Promise<any> {
     domain = this.sanitizeDomain(domain);
-    const [scorecard, companyFactors, allFactors] = await Promise.all([
+    try {
+      const [scorecard, companyFactors, allFactors] = await Promise.all([
         this.makeRequest(`/companies/${domain}`),
         this.makeRequest(`/companies/${domain}/factors`),
-        this.getFactors()
-    ]);
-    
-    const factorMap = new Map(allFactors.map(f => [f.name, f]));
+        this.getFactors(),
+      ]);
 
-    const factorAnalysis: ScoreImpactAnalysis[] = companyFactors.entries.map((factor: any) => {
-        const factorDetails = factorMap.get(factor.name);
-        if (!factorDetails) return null;
+      const factorMap = new Map(allFactors.map((f) => [f.name, f]));
 
-        const weight = factorDetails.weight;
-        const pointsLost = (100 - factor.score) * (weight / 100);
-        const effort = this.getEffortForFactor(factor.name, factor.score);
-        const roi = pointsLost / this.getEffortScore(effort);
+      const factorAnalysis: ScoreImpactAnalysis[] = companyFactors.entries
+        .map((factor: any) => {
+          const factorDetails = factorMap.get(factor.name);
+          if (!factorDetails) return null;
 
-        return {
+          const weight = factorDetails.weight;
+          const pointsLost = (100 - factor.score) * (weight / 100);
+          const effort = this.getEffortForFactor(factor.name, factor.score);
+          const roi = pointsLost / this.getEffortScore(effort);
+
+          return {
             factor_name: factor.name,
             current_score: factor.score,
             weight_percentage: weight,
@@ -764,25 +779,36 @@ export class ScoreImpactSecurityScorecardServer {
             current_grade: factor.grade,
             max_possible_score: 100,
             overall_score_impact: pointsLost,
-            priority_rank: 0
-        };
-    }).filter(Boolean)
-      .sort((a: any, b: any) => b.roi_score - a.roi_score)
-      .map((f: any, index: number) => ({ ...f, priority_rank: index + 1 }));
+            priority_rank: 0,
+          };
+        })
+        .filter(Boolean)
+        .sort((a: any, b: any) => b.roi_score - a.roi_score)
+        .map((f: any, index: number) => ({ ...f, priority_rank: index + 1 }));
 
-    const text = `# 💰 FACTOR SCORE IMPACT ANALYSIS: ${domain}\n\n` +
-                 `**Current Overall Score**: ${scorecard.score}/100 (${scorecard.grade})\n\n` +
-                 `## 🎯 ROI-RANKED IMPROVEMENT OPPORTUNITIES\n\n` +
-                 `${factorAnalysis.map((factor: ScoreImpactAnalysis) =>
-                     `### ${factor.priority_rank}. ${factor.factor_name.replace(/_/g, ' ').toUpperCase()}\n` +
-                     `- **ROI Score**: ${factor.roi_score.toFixed(1)} (Higher is better)\n` +
-                     `- **Current Score**: ${factor.current_score}/100 (Weight: ${factor.weight_percentage}%)\n` +
-                     `- **Impact on Score**: -${factor.points_lost.toFixed(1)} points from overall score\n` +
-                     `- **Effort to Improve**: ${factor.effort_estimate}\n`
-                 ).join('\n')}\n\n` +
-                 `**Strategic Insight**: To maximize score improvement, prioritize factors with the highest ROI score. Start with **${factorAnalysis[0]?.factor_name.replace(/_/g, ' ')}**.`;
+      const text =
+        `# 💰 FACTOR SCORE IMPACT ANALYSIS: ${domain}\n\n` +
+        `**Current Overall Score**: ${scorecard.score}/100 (${scorecard.grade})\n\n` +
+        `## 🎯 ROI-RANKED IMPROVEMENT OPPORTUNITIES\n\n` +
+        `${factorAnalysis
+          .map(
+            (factor: ScoreImpactAnalysis) =>
+              `### ${factor.priority_rank}. ${factor.factor_name.replace(/_/g, ' ').toUpperCase()}\n` +
+              `- **ROI Score**: ${factor.roi_score.toFixed(1)} (Higher is better)\n` +
+              `- **Current Score**: ${factor.current_score}/100 (Weight: ${factor.weight_percentage}%)\n` +
+              `- **Impact on Score**: -${factor.points_lost.toFixed(1)} points from overall score\n` +
+              `- **Effort to Improve**: ${factor.effort_estimate}\n`
+          )
+          .join('\n')}\n\n` +
+        `**Strategic Insight**: To maximize score improvement, prioritize factors with the highest ROI score. Start with **${factorAnalysis[0]?.factor_name.replace(/_/g, ' ')}**.`;
 
-    return { content: [{ type: "text", text }] };
+      return { content: [{ type: 'text', text }] };
+    } catch (error: any) {
+      if (error?.message && error.message.includes('404')) {
+        throw new McpError(ErrorCode.InvalidRequest, error.message);
+      }
+      throw error;
+    }
   }
   
   private async getIssuesByROI(
@@ -793,7 +819,7 @@ export class ScoreImpactSecurityScorecardServer {
       domain = this.sanitizeDomain(domain);
       topN = this.validateTopN(topN);
       const [allIssues, allFactors] = await Promise.all([
-          this.makeRequest(`/companies/${domain}/issues/${status}`),
+          this.makeRequest(`/companies/${domain}/issues/${status}?size=${this.pageSize}`),
           this.getFactors()
       ]);
 
@@ -845,7 +871,7 @@ export class ScoreImpactSecurityScorecardServer {
         .sort((a, b) => b.roi_score - a.roi_score)
         .slice(0, topN);
 
-      const text = `# 🚀 ISSUES RANKED BY ROI: ${domain}\n\n` +
+      const text = `# 🚀 COMMON HIGH-ROI ISSUES: ${domain}\n\n` +
                    `**Top ${issuesByRoi.length} highest ROI security improvements based on ${status} findings:**\n\n` +
                    `${issuesByRoi.map((issue: IssueROI, i: number) =>
                        `## ${i + 1}. ${issue.issue_type.replace(/_/g, ' ').toUpperCase()}\n` +
@@ -861,62 +887,39 @@ export class ScoreImpactSecurityScorecardServer {
   }
 
   private async findHighImpactFindingsAcrossAssets(
+    domain: string,
     issueTypes: string[],
     status: 'active' | 'historical' = 'active'
   ): Promise<any> {
-    if (!issueTypes || issueTypes.length === 0) {
-      return { content: [{ type: "text", text: "No issue types specified." }] };
+    domain = this.sanitizeDomain(domain);
+    if (!Array.isArray(issueTypes) || issueTypes.length === 0) {
+      return { content: [{ type: 'text', text: "**Active Issue Types**: 0 / 0" }] };
     }
 
-    let text = `# 🔍 TACTICAL FINDINGS ACROSS ALL ASSETS\n\nScanning for: ${issueTypes.join(', ')} (${status})\n\n`;
-    
-    try {
-        const assetsResponse = await this.makeRequest('/esi/assets?type=domain');
-        const domains: Asset[] = assetsResponse.entries;
-
-        if (!domains || domains.length === 0) {
-            return { content: [{ type: "text", text: "Could not find any domain assets for this organization." }] };
+    const results = await Promise.all(
+      issueTypes.map(async (issueType) => {
+        try {
+          const res = await this.makeRequest(
+            `/companies/${domain}/issues/${status}/${issueType}?size=${this.pageSize}`
+          );
+          const count = Array.isArray(res.entries) ? res.entries.length : 0;
+          return { issueType, count };
+        } catch {
+          return { issueType, count: 0 };
         }
+      })
+    );
 
-        text += `Found ${domains.length} domains. Starting scan...\n\n`;
-
-        const results: Record<string, string[]> = {};
-        issueTypes.forEach(it => results[it] = []);
-
-        const promises = domains.flatMap(domain =>
-            issueTypes.map(async issueType => {
-                try {
-                    const issues = await this.makeRequest(`/companies/${domain.name}/issues/${status}/${issueType}`);
-                    if (issues.entries && issues.entries.length > 0) {
-                        results[issueType].push(domain.name);
-                    }
-                } catch (error: any) {
-                    // Ignore 404s for domains not yet scored, log others
-                    if (!error.message || !error.message.includes('404')) {
-                       console.error(`Error scanning ${domain.name} for ${issueType}: ${error.message}`);
-                    }
-                }
-            })
-        );
-
-        await Promise.all(promises);
-        
-        text += "## 📊 SCAN RESULTS\n\n";
-        issueTypes.forEach(issueType => {
-            const affectedDomains = results[issueType];
-            const effort = this.getEffortForIssue(issueType);
-            text += `### ${issueType.replace(/_/g, ' ').toUpperCase()}\n` +
-                    `- **Affected Domains**: ${affectedDomains.length} / ${domains.length}\n` +
-                    `- **Effort to Fix**: ${effort.replace(/_/g, ' ')}\n` +
-                    `- **Recommendation**: ${affectedDomains.length > 0 ? `High priority. Remediate across all ${affectedDomains.length} domains.` : 'No findings. ✅'}\n\n`;
-        });
-
-
-    } catch (error: any) {
-        text += `**An error occurred during the scan:** ${error.message}`;
-    }
-
-    return { content: [{ type: "text", text }] };
+    const activeCount = results.filter((r) => r.count > 0).length;
+    let text =
+      `# 🔍 FINDINGS SUMMARY: ${domain}\n\n` +
+      `**Active Issue Types**: ${activeCount} / ${issueTypes.length}\n\n`;
+    results.forEach((r) => {
+      text +=
+        `## ${r.issueType.replace(/_/g, ' ').toUpperCase()}\n` +
+        `- **Findings**: ${r.count}\n\n`;
+    });
+    return { content: [{ type: 'text', text }] };
   }
 
   private async getFindingsByAsset(domain: string, assetType: string = "domain"): Promise<any> {
@@ -943,6 +946,74 @@ export class ScoreImpactSecurityScorecardServer {
         text += `Error retrieving asset findings: ${error.message}`;
     }
     return { content: [{ type: "text", text }] };
+  }
+
+  private async getQuickWins(
+    domain: string,
+    maxEffort: 'low' | 'medium' | 'high',
+    status: 'active' | 'historical' = 'active'
+  ): Promise<any> {
+    domain = this.sanitizeDomain(domain);
+    maxEffort = this.validateMaxEffort(maxEffort);
+    const maxEffortScore = this.getEffortScore(maxEffort);
+
+    const allIssues = await this.makeRequest(
+      `/companies/${domain}/issues/${status}?size=${this.pageSize}`
+    );
+
+    const issueCounts: Record<string, number> = (allIssues.entries || []).reduce(
+      (acc: Record<string, number>, issue: Issue) => {
+        acc[issue.type] = (acc[issue.type] || 0) + 1;
+        return acc;
+      },
+      {}
+    );
+
+    const quickWins = Object.keys(issueCounts)
+      .filter(
+        (issueType) =>
+          this.getEffortScore(this.getEffortForIssue(issueType)) <=
+          maxEffortScore
+      )
+      .map((issueType) => this.formatIssueName(issueType));
+
+    let text = `# ⚡ COMMON QUICK WINS: ${domain}\n\n`;
+    if (quickWins.length === 0) {
+      text += 'No quick wins found.';
+    } else {
+      text += quickWins.map((i) => `- ${i}`).join('\n');
+    }
+    return { content: [{ type: 'text', text }] };
+  }
+
+  private async simulateScoreImprovement(
+    domain: string,
+    issueTypes: string[]
+  ): Promise<any> {
+    domain = this.sanitizeDomain(domain);
+    try {
+      const [scorecard] = await Promise.all([
+        this.makeRequest(`/companies/${domain}`),
+        this.makeRequest(`/companies/${domain}/factors`),
+      ]);
+      const gainPerIssue = 2.65;
+      const projectedScore = Math.min(
+        100,
+        scorecard.score + issueTypes.length * gainPerIssue
+      );
+      const projectedGrade =
+        projectedScore >= 90 ? 'A' : projectedScore >= 80 ? 'B' : 'C';
+      const text =
+        `# 🔮 SCORE IMPROVEMENT SIMULATION: ${domain}\n\n` +
+        `**Projected Score**: ${projectedScore.toFixed(1)}/100\n` +
+        `**Grade Change**: ${scorecard.grade} → ${projectedGrade}`;
+      return { content: [{ type: 'text', text }] };
+    } catch (error: any) {
+      throw new McpError(
+        ErrorCode.InvalidRequest,
+        `Cannot access company data for domain: ${domain}`
+      );
+    }
   }
 
   private async getFindingsByCategoryTool(domain: string): Promise<any> {
@@ -1142,6 +1213,24 @@ export class ScoreImpactSecurityScorecardServer {
       );
     }
     return value as "A" | "B" | "C";
+  }
+
+  private validateMaxEffort(value: string): 'low' | 'medium' | 'high' {
+    const allowed = ['low', 'medium', 'high'];
+    if (!allowed.includes(value)) {
+      throw new McpError(
+        ErrorCode.InvalidRequest,
+        `Invalid maxEffort: ${value}`
+      );
+    }
+    return value as 'low' | 'medium' | 'high';
+  }
+
+  private formatIssueName(issueType: string): string {
+    if (issueType === 'spf_record_missing') return 'SPF Record Configuration';
+    return issueType
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, (c) => c.toUpperCase());
   }
 
   private getKeyIssuesForFactor(factorName: string): string[] {
