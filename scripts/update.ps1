@@ -26,7 +26,7 @@ try {
     try {
         $release = Invoke-RestMethod -Uri $api -Headers $headers
     } catch {
-        Write-Error "Failed to retrieve release info from $api: $($_.Exception.Message)"
+        Write-Error "Failed to retrieve release info from ${api}: $($_.Exception.Message)"
         if ($_.Exception.Response -and $_.Exception.Response.StatusCode.value__ -eq 404) {
             Write-Error "No release was found. Publish a release or run with -Dev for development builds."
         } else {
@@ -42,7 +42,7 @@ try {
     try {
         Invoke-WebRequest -Uri $zipUrl -Headers $headers -OutFile $zipPath
     } catch {
-        Write-Error "Failed to download release archive from $zipUrl: $($_.Exception.Message)"
+        Write-Error "Failed to download release archive from ${zipUrl}: $($_.Exception.Message)"
         exit 1
     }
     Expand-Archive -Path $zipPath -DestinationPath $temp -Force
