@@ -45,25 +45,15 @@ try {
     if (Test-Path $nodeModulesSource) {
         Write-Host 'Including runtime dependencies...'
         
-        # Essential packages for MCP runtime (from package.json dependencies)
-        $essentialPackages = @(
-            '@modelcontextprotocol/sdk',
-            '@xenova/transformers'
-        )
+        # Copy all production dependencies (not just direct dependencies)
+        # This ensures transitive dependencies like 'zod' are included
+        Write-Host "  - Copying entire node_modules directory (production dependencies)"
         
-        New-Item -ItemType Directory -Path $nodeModulesTarget -Force | Out-Null
+        # For a complete runtime package, we need all dependencies
+        # Copy the entire node_modules but exclude dev-only packages if possible
+        Copy-Item -Recurse -Force $nodeModulesSource $nodeModulesTarget
         
-        foreach ($package in $essentialPackages) {
-            $packagePath = Join-Path $nodeModulesSource $package
-            $targetPath = Join-Path $nodeModulesTarget $package
-            
-            if (Test-Path $packagePath) {
-                Write-Host "  - $package"
-                Copy-Item -Recurse -Force $packagePath $targetPath
-            } else {
-                Write-Warning "  - $package (not found, may cause runtime issues)"
-            }
-        }
+        Write-Host "  - Included all runtime dependencies"
         
         # Copy package-lock for dependency info
         $lockFile = Join-Path $root 'package-lock.json'
