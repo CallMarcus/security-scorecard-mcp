@@ -98,22 +98,36 @@ try {
             $coreZip = Join-Path $temp 'mcp-core.zip'
             try {
                 Invoke-WebRequest -Uri $coreAsset.browser_download_url -Headers $downloadHeaders -OutFile $coreZip
+                Expand-Archive -Path $coreZip -DestinationPath $longTemp -Force
             } catch {
-                Write-Error "Failed to download core archive: $($_.Exception.Message)" -ErrorAction Continue
-                exit 1
+                Write-Warning "Failed to download core archive: $($_.Exception.Message). Falling back to source archive."
+                $useZipball = $true
             }
-            Expand-Archive -Path $coreZip -DestinationPath $longTemp -Force
         }
-        if ($IncludeDocs -and $docsAsset) {
+        if ($IncludeDocs -and $docsAsset -and -not $useZipball) {
             $docsZip = Join-Path $temp 'mcp-docs.zip'
             try {
                 Invoke-WebRequest -Uri $docsAsset.browser_download_url -Headers $downloadHeaders -OutFile $docsZip
+                Expand-Archive -Path $docsZip -DestinationPath $longTemp -Force
             } catch {
-                Write-Error "Failed to download docs archive: $($_.Exception.Message)" -ErrorAction Continue
-                exit 1
+                Write-Warning "Failed to download docs archive: $($_.Exception.Message). Falling back to source archive."
+                $useZipball = $true
             }
-            Expand-Archive -Path $docsZip -DestinationPath $longTemp -Force
         }
+    }
+
+    if ($useZipball -and -not $srcRoot) {
+        Remove-Item -Recurse -Force $longTemp -ErrorAction SilentlyContinue
+        New-Item -ItemType Directory -Path $temp | Out-Null
+        $srcZip = Join-Path $temp 'src.zip'
+        try {
+            Invoke-WebRequest -Uri $release.zipball_url -Headers $downloadHeaders -OutFile $srcZip
+        } catch {
+            Write-Error "Failed to download source archive: $($_.Exception.Message)" -ErrorAction Continue
+            exit 1
+        }
+        Expand-Archive -Path $srcZip -DestinationPath $longTemp -Force
+        $srcRoot = Get-ChildItem -Path $longTemp -Directory | Select-Object -First 1
     }
 
     # Resolve repository root so the script works regardless of invocation directory
