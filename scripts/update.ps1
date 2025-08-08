@@ -100,7 +100,9 @@ try {
         if (-not $DocsOnly) {
             $coreZip = Join-Path $temp 'mcp-core.zip'
             try {
-                Invoke-WebRequest -Uri $coreAsset.browser_download_url -Headers $downloadHeaders -OutFile $coreZip
+                # Use API download URL instead of browser_download_url for authentication
+                $downloadHeaders['Accept'] = 'application/octet-stream'
+                Invoke-WebRequest -Uri $coreAsset.url -Headers $downloadHeaders -OutFile $coreZip
                 Expand-Archive -Path $coreZip -DestinationPath $longTemp -Force
             } catch {
                 Write-Warning "Failed to download core archive: $($_.Exception.Message). Falling back to source archive."
@@ -110,7 +112,9 @@ try {
         if ($IncludeDocs -and $docsAsset -and -not $useZipball) {
             $docsZip = Join-Path $temp 'mcp-docs.zip'
             try {
-                Invoke-WebRequest -Uri $docsAsset.browser_download_url -Headers $downloadHeaders -OutFile $docsZip
+                # Use API download URL instead of browser_download_url for authentication
+                $downloadHeaders['Accept'] = 'application/octet-stream'  
+                Invoke-WebRequest -Uri $docsAsset.url -Headers $downloadHeaders -OutFile $docsZip
                 Expand-Archive -Path $docsZip -DestinationPath $longTemp -Force
             } catch {
                 Write-Warning "Failed to download docs archive: $($_.Exception.Message). Falling back to source archive."
