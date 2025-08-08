@@ -26,9 +26,63 @@ if (-not (Test-Path $docsDir)) {
     & (Join-Path $PSScriptRoot 'fetch-docs.ps1') @PSBoundParameters
 }
 
-# Archive build outputs
+# Archive build outputs with dependencies
 Remove-Item -Force -ErrorAction SilentlyContinue $coreZip, $docsZip
-Compress-Archive -Path (Join-Path $root 'build') -DestinationPath $coreZip -Force
+
+# Create temporary staging directory for core package
+$tempCore = Join-Path ([System.IO.Path]::GetTempPath()) ([System.Guid]::NewGuid().ToString())
+New-Item -ItemType Directory -Path $tempCore -Force | Out-Null
+
+try {
+    # Copy essential runtime files to staging
+    Copy-Item -Recurse -Force (Join-Path $root 'build') $tempCore
+    Copy-Item -Force (Join-Path $root 'package.json') $tempCore
+    
+    # Copy only production node_modules (essential dependencies)
+    $nodeModulesSource = Join-Path $root 'node_modules'
+    $nodeModulesTarget = Join-Path $tempCore 'node_modules'
+    
+    if (Test-Path $nodeModulesSource) {
+        Write-Host 'Including runtime dependencies...'
+        
+        # Essential packages for MCP runtime (from package.json dependencies)
+        $essentialPackages = @(
+            '@modelcontextprotocol/sdk',
+            '@xenova/transformers'
+        )
+        
+        New-Item -ItemType Directory -Path $nodeModulesTarget -Force | Out-Null
+        
+        foreach ($package in $essentialPackages) {
+            $packagePath = Join-Path $nodeModulesSource $package
+            $targetPath = Join-Path $nodeModulesTarget $package
+            
+            if (Test-Path $packagePath) {
+                Write-Host "  - $package"
+                Copy-Item -Recurse -Force $packagePath $targetPath
+            } else {
+                Write-Warning "  - $package (not found, may cause runtime issues)"
+            }
+        }
+        
+        # Copy package-lock for dependency info
+        $lockFile = Join-Path $root 'package-lock.json'
+        if (Test-Path $lockFile) {
+            Copy-Item -Force $lockFile $tempCore
+        }
+    }
+    
+    # Create the core archive
+    Compress-Archive -Path (Join-Path $tempCore '*') -DestinationPath $coreZip -Force
+    
+} finally {
+    # Clean up staging directory
+    if (Test-Path $tempCore) {
+        Remove-Item -Recurse -Force $tempCore -ErrorAction SilentlyContinue
+    }
+}
+
+# Create docs archive
 Compress-Archive -Path $docsDir -DestinationPath $docsZip -Force
 
 Write-Host "Created $coreZip and $docsZip"
