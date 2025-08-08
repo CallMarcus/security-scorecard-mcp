@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ScoreImpactSecurityScorecardServer } from '../live-scorecard-server/src/index.js';
+import { ScoreImpactSecurityScorecardServer } from '../src/index.js';
 import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 
 function createServerWithStubs(responses: Record<string, any>) {
@@ -23,7 +23,8 @@ test('getIssuesByROI ranks issues with highest ROI', async () => {
         { type: 'spf_record_missing', severity: 'medium' },
         { type: 'patching_cadence_v3_critical', severity: 'critical' }
       ]
-    }
+    },
+    '/factors': { entries: [ { name: 'dns_health', weight: 10 }, { name: 'patching_cadence', weight: 15 } ] }
   });
 
   const result = await server.getIssuesByROI('example.com', 5);
@@ -34,7 +35,8 @@ test('getIssuesByROI ranks issues with highest ROI', async () => {
 
 test('getIssuesByROI rejects invalid topN', async () => {
   const server = createServerWithStubs({
-    '/companies/example.com/issues/active?size=50': { entries: [] }
+    '/companies/example.com/issues/active?size=50': { entries: [] },
+    '/factors': { entries: [] }
   });
 
   await assert.rejects(
