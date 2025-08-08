@@ -2,7 +2,7 @@
 
 This repository contains a compiled Model Context Protocol (MCP) server that integrates with the [SecurityScorecard REST API](https://securityscorecard.readme.io/). It exposes a set of MCP tools for retrieving company scorecards, analyzing findings and generating remediation plans.
 
-The `build` directory ships with the compiled JavaScript server (`build/index.js`). Documentation, debugging helpers and architecture references are in `build_docs/`.
+The `build` directory ships with the compiled JavaScript server (`build/index.js`). Documentation, debugging helpers and architecture references live in `build_docs/`, but this folder isn't installed by default. Fetch it on demand with `scripts/update.ps1 -IncludeDocs` or `scripts/fetch-docs.ps1`.
 
 ## Branch workflow
 
@@ -28,6 +28,8 @@ continuing. You'll be prompted for:
 1. The company domain used in most queries
 2. Your SecurityScorecard API token
 3. (Optional) default issue types to scan across assets
+
+The setup script installs only the core runtime. Retrieve the documentation bundle later with `scripts/update.ps1 -IncludeDocs` or `scripts/fetch-docs.ps1` on Windows.
 
 ## Release Channels
 
@@ -74,7 +76,7 @@ On Windows 11 run:
 .\scripts\update.ps1
 ```
 
-Add `--dev`/`-Dev` to either command to pull the most recent development build.
+Add `--dev`/`-Dev` to either command to pull the most recent development build. To download the optional documentation bundle, run `scripts/update.ps1 -IncludeDocs` or `scripts/fetch-docs.ps1`.
 
 ## Running the server manually
 
@@ -102,7 +104,7 @@ Add `--dev`/`-Dev` to either command to pull the most recent development build.
 
 The server communicates over stdio and is typically used by clients such as Claude Desktop or other MCP-compatible tools.
 
-Refer to the files in `build_docs/` for API references, debugging instructions and the architecture overview.
+Refer to the files in `build_docs/` for API references, debugging instructions and the architecture overview. If this folder is missing, fetch it with `scripts/update.ps1 -IncludeDocs` or `scripts/fetch-docs.ps1`.
 
 ## Testing API Endpoints
 
