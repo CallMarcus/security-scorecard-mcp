@@ -157,11 +157,27 @@ try {
         if (-not $DocsOnly) { $sourceBuild = Join-Path $srcRoot.FullName 'build' }
         if ($IncludeDocs)  { $sourceDocs  = Join-Path $srcRoot.FullName 'build_docs' }
     } else {
-        if (-not $DocsOnly) { $sourceBuild = Join-Path $temp 'build' }
+        # For pre-built packages, copy all contents (build, node_modules, package.json, etc.)
+        if (-not $DocsOnly) { 
+            # Copy all package contents, not just build directory
+            Get-ChildItem -Path $temp | ForEach-Object {
+                $destPath = Join-Path $root $_.Name
+                if ($_.PSIsContainer) {
+                    # Remove existing directory first to avoid conflicts
+                    if (Test-Path $destPath) {
+                        Remove-Item -Recurse -Force $destPath -ErrorAction SilentlyContinue
+                    }
+                    Copy-Item -Recurse -Force $_.FullName $destPath
+                } else {
+                    Copy-Item -Force $_.FullName $destPath
+                }
+            }
+        }
         if ($IncludeDocs -and $docsAsset) { $sourceDocs = Join-Path $temp 'build_docs' }
     }
 
-    if (-not $DocsOnly -and $sourceBuild) {
+    # Only copy build directory for source packages (zipball)
+    if ($useZipball -and -not $DocsOnly -and $sourceBuild) {
         Copy-Item -Recurse -Force $sourceBuild $root
     }
     if ($IncludeDocs -and $sourceDocs) {
