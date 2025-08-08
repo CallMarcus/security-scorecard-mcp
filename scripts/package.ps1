@@ -52,15 +52,45 @@ try {
     if (Test-Path $nodeModulesSource) {
         Write-Host 'Including runtime dependencies...'
         
-        # Copy all production dependencies (not just direct dependencies)
-        # This ensures transitive dependencies like 'zod' are included
-        Write-Host "  - Copying entire node_modules directory (production dependencies)"
+        # Use npm to create a production-only node_modules in a temp location
+        Write-Host "  - Creating production-only dependency package..."
         
-        # For a complete runtime package, we need all dependencies
-        # Copy the entire node_modules but exclude dev-only packages if possible
-        Copy-Item -Recurse -Force $nodeModulesSource $nodeModulesTarget
+        $tempProd = Join-Path ([System.IO.Path]::GetTempPath()) "npm-prod-$(Get-Random)"
+        New-Item -ItemType Directory -Path $tempProd -Force | Out-Null
         
-        Write-Host "  - Included all runtime dependencies"
+        try {
+            # Copy package files to temp location
+            Copy-Item -Force (Join-Path $root 'package.json') $tempProd
+            if (Test-Path (Join-Path $root 'package-lock.json')) {
+                Copy-Item -Force (Join-Path $root 'package-lock.json') $tempProd
+            }
+            
+            # Install only production dependencies in temp location
+            Push-Location $tempProd
+            Write-Host "  - Installing production dependencies..."
+            npm ci --only=production --silent 2>$null
+            Pop-Location
+            
+            # Copy the resulting node_modules
+            $tempNodeModules = Join-Path $tempProd 'node_modules'
+            if (Test-Path $tempNodeModules) {
+                Copy-Item -Recurse -Force $tempNodeModules $nodeModulesTarget
+                Write-Host "  - Included production dependencies only"
+            } else {
+                Write-Warning "Failed to create production dependencies, falling back to full copy"
+                Copy-Item -Recurse -Force $nodeModulesSource $nodeModulesTarget
+            }
+            
+        } catch {
+            Write-Warning "Production dependency creation failed: $($_.Exception.Message)"
+            Write-Host "  - Falling back to full node_modules copy"
+            Copy-Item -Recurse -Force $nodeModulesSource $nodeModulesTarget
+        } finally {
+            # Clean up temp directory
+            if (Test-Path $tempProd) {
+                Remove-Item -Recurse -Force $tempProd -ErrorAction SilentlyContinue
+            }
+        }
         
         # Copy package-lock for dependency info
         $lockFile = Join-Path $root 'package-lock.json'
