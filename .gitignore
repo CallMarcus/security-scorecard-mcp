@@ -1,4 +1,9 @@
 # dependencies
 node_modules/
-#varaibles
+
+# variables
 .env
+
+# build artifacts
+build/
+scripts/build*
