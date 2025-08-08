@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "start": "node build/index.js",
-    "test": "NODE_ENV=test node --loader ts-node/esm --test tests/*.test.ts"
+    "test": "NODE_ENV=test node --loader ts-node/esm --test tests/*.test.ts",
+    "build": "tsc"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^0.6.0",

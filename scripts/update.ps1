@@ -59,12 +59,14 @@ try {
     $coreAsset = $release.assets | Where-Object { $_.name -eq 'mcp-core.zip' } | Select-Object -First 1
     $docsAsset = $release.assets | Where-Object { $_.name -eq 'mcp-docs.zip' } | Select-Object -First 1
 
+    $useZipball = $false
     if (-not $DocsOnly -and -not $coreAsset) {
-        Write-Error "Release does not contain mcp-core.zip asset." -ErrorAction Continue
-        exit 1
+        Write-Warning "Release does not contain mcp-core.zip asset. Falling back to source archive."
+        $useZipball = $true
     }
     if ($IncludeDocs -and -not $docsAsset) {
-        Write-Warning "Release does not contain mcp-docs.zip asset."
+        Write-Warning "Release does not contain mcp-docs.zip asset. Falling back to source archive."
+        $useZipball = $true
     }
 
     $guid     = [System.Guid]::NewGuid().ToString('N').Substring(0,8)
@@ -72,26 +74,38 @@ try {
     New-Item -ItemType Directory -Path $temp | Out-Null
     $longTemp = "\\?\$temp"
 
-    if (-not $DocsOnly) {
-        $coreZip = Join-Path $temp 'mcp-core.zip'
+    $srcRoot = $null
+    if ($useZipball) {
+        $srcZip = Join-Path $temp 'src.zip'
         try {
-            Invoke-WebRequest -Uri $coreAsset.browser_download_url -Headers $headers -OutFile $coreZip
+            Invoke-WebRequest -Uri $release.zipball_url -Headers $headers -OutFile $srcZip
         } catch {
-            Write-Error "Failed to download core archive: $($_.Exception.Message)" -ErrorAction Continue
+            Write-Error "Failed to download source archive: $($_.Exception.Message)" -ErrorAction Continue
             exit 1
         }
-        Expand-Archive -Path $coreZip -DestinationPath $longTemp -Force
-    }
-
-    if ($IncludeDocs -and $docsAsset) {
-        $docsZip = Join-Path $temp 'mcp-docs.zip'
-        try {
-            Invoke-WebRequest -Uri $docsAsset.browser_download_url -Headers $headers -OutFile $docsZip
-        } catch {
-            Write-Error "Failed to download docs archive: $($_.Exception.Message)" -ErrorAction Continue
-            exit 1
+        Expand-Archive -Path $srcZip -DestinationPath $longTemp -Force
+        $srcRoot = Get-ChildItem -Path $longTemp -Directory | Select-Object -First 1
+    } else {
+        if (-not $DocsOnly) {
+            $coreZip = Join-Path $temp 'mcp-core.zip'
+            try {
+                Invoke-WebRequest -Uri $coreAsset.browser_download_url -Headers $headers -OutFile $coreZip
+            } catch {
+                Write-Error "Failed to download core archive: $($_.Exception.Message)" -ErrorAction Continue
+                exit 1
+            }
+            Expand-Archive -Path $coreZip -DestinationPath $longTemp -Force
         }
-        Expand-Archive -Path $docsZip -DestinationPath $longTemp -Force
+        if ($IncludeDocs -and $docsAsset) {
+            $docsZip = Join-Path $temp 'mcp-docs.zip'
+            try {
+                Invoke-WebRequest -Uri $docsAsset.browser_download_url -Headers $headers -OutFile $docsZip
+            } catch {
+                Write-Error "Failed to download docs archive: $($_.Exception.Message)" -ErrorAction Continue
+                exit 1
+            }
+            Expand-Archive -Path $docsZip -DestinationPath $longTemp -Force
+        }
     }
 
     # Resolve repository root so the script works regardless of invocation directory
@@ -108,16 +122,26 @@ try {
         Remove-Item -Recurse -Force $buildPath, $docsPath, $legacyBuild, $legacyDocs -ErrorAction SilentlyContinue
     }
 
-    if (-not $DocsOnly) {
-        Copy-Item -Recurse -Force (Join-Path $temp 'build') $root
+    $sourceBuild = $null
+    $sourceDocs  = $null
+    if ($useZipball) {
+        if (-not $DocsOnly) { $sourceBuild = Join-Path $srcRoot.FullName 'build' }
+        if ($IncludeDocs)  { $sourceDocs  = Join-Path $srcRoot.FullName 'build_docs' }
+    } else {
+        if (-not $DocsOnly) { $sourceBuild = Join-Path $temp 'build' }
+        if ($IncludeDocs -and $docsAsset) { $sourceDocs = Join-Path $temp 'build_docs' }
     }
-    if ($IncludeDocs -and $docsAsset) {
-        Copy-Item -Recurse -Force (Join-Path $temp 'build_docs') $root
+
+    if (-not $DocsOnly -and $sourceBuild) {
+        Copy-Item -Recurse -Force $sourceBuild $root
+    }
+    if ($IncludeDocs -and $sourceDocs) {
+        Copy-Item -Recurse -Force $sourceDocs $root
     }
 
     if ($DocsOnly) {
         Write-Host "Documentation updated to $tag"
-    } elseif ($IncludeDocs -and $docsAsset) {
+    } elseif ($IncludeDocs) {
         Write-Host "Updated MCP and documentation to $tag"
     } else {
         Write-Host "Updated MCP to $tag"

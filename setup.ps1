@@ -43,8 +43,14 @@ $env:GITHUB_TOKEN = (gh auth token).Trim()
 $updateScript = ".\scripts\update.ps1"
 if (-not (Test-Path $updateScript)) {
     New-Item -ItemType Directory -Path ".\scripts" -Force | Out-Null
-    $rawUrl = "https://raw.githubusercontent.com/CallMarcus/security-scorecard-mcp/main/scripts/update.ps1"
-    Invoke-WebRequest -Uri $rawUrl -OutFile $updateScript
+    $owner = 'CallMarcus'
+    $repo  = 'security-scorecard-mcp'
+    try {
+        gh api "repos/$owner/$repo/contents/scripts/update.ps1?ref=main" --header "Accept: application/vnd.github.raw" --output $updateScript
+    } catch {
+        $rawUrl = "https://raw.githubusercontent.com/$owner/$repo/main/scripts/update.ps1"
+        Invoke-WebRequest -Uri $rawUrl -OutFile $updateScript
+    }
 }
 
 # Determine release channel and update files
