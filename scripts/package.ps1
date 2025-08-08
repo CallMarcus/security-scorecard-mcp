@@ -12,7 +12,11 @@ $docsDir = Join-Path $root 'build_docs'
 if (-not (Test-Path (Join-Path $root 'build'))) {
     Write-Host 'Compiling TypeScript sources'
     Push-Location $root
-    npm run build | Out-Null
+    if (-not (Test-Path (Join-Path $root 'node_modules/.bin/tsc'))) {
+        Write-Host 'Installing npm dependencies'
+        npm install | Out-Null
+    }
+    npx tsc | Out-Null
     Pop-Location
 }
 
