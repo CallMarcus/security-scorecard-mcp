@@ -23,7 +23,14 @@ if (-not (Test-Path (Join-Path $root 'build'))) {
 # Fetch API docs if missing
 if (-not (Test-Path $docsDir)) {
     Write-Host 'Fetching API reference docs'
-    & (Join-Path $PSScriptRoot 'fetch-docs.ps1') @PSBoundParameters
+    try {
+        & (Join-Path $PSScriptRoot 'fetch-docs.ps1') @PSBoundParameters
+    } catch {
+        Write-Warning "Failed to fetch API docs: $($_.Exception.Message)"
+        Write-Host "Creating empty docs directory for packaging"
+        New-Item -ItemType Directory -Path $docsDir -Force | Out-Null
+        "API documentation not available" | Set-Content -Path (Join-Path $docsDir "README.txt")
+    }
 }
 
 # Archive build outputs with dependencies
@@ -73,6 +80,10 @@ try {
 }
 
 # Create docs archive
-Compress-Archive -Path $docsDir -DestinationPath $docsZip -Force
-
-Write-Host "Created $coreZip and $docsZip"
+if (Test-Path $docsDir) {
+    Compress-Archive -Path $docsDir -DestinationPath $docsZip -Force
+    Write-Host "Created $coreZip and $docsZip"
+} else {
+    Write-Warning "Docs directory not found, creating core package only"
+    Write-Host "Created $coreZip (docs package skipped)"
+}
