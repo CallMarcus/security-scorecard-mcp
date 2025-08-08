@@ -21,7 +21,9 @@ setting a comma-separated list of default issue types used by some tools:
 ```
 
 On Windows use `setup.ps1` instead. The script writes the entered values to a
-`.env` file so subsequent runs can reuse them. You'll be prompted for:
+`.env` file so subsequent runs can reuse them. If the update script is missing,
+`setup.ps1` bootstraps itself by downloading `scripts/update.ps1` before
+continuing. You'll be prompted for:
 
 1. The company domain used in most queries
 2. Your SecurityScorecard API token

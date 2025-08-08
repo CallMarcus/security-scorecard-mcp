@@ -39,11 +39,19 @@ try {
 
 $env:GITHUB_TOKEN = (gh auth token).Trim()
 
+# Ensure update script exists; download latest if missing
+$updateScript = ".\scripts\update.ps1"
+if (-not (Test-Path $updateScript)) {
+    New-Item -ItemType Directory -Path ".\scripts" -Force | Out-Null
+    $rawUrl = "https://raw.githubusercontent.com/CallMarcus/security-scorecard-mcp/main/scripts/update.ps1"
+    Invoke-WebRequest -Uri $rawUrl -OutFile $updateScript
+}
+
 # Determine release channel and update files
 if ($Dev) {
-    .\scripts\update.ps1 -Dev
+    & $updateScript -Dev
 } else {
-    .\scripts\update.ps1
+    & $updateScript
 }
 
 $COMPANY_DOMAIN = Read-Host 'Enter company domain'
