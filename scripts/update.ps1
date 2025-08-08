@@ -53,15 +53,18 @@ try {
     $tag = $release.tag_name
     $zipUrl = $release.zipball_url
 
-    $temp = New-Item -ItemType Directory -Path ([System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), [System.Guid]::NewGuid().ToString()))
-    $zipPath = Join-Path $temp 'src.zip'
+    $guid     = [System.Guid]::NewGuid().ToString('N').Substring(0,8)
+    $temp     = Join-Path ([System.IO.Path]::GetTempPath()) ("upd-$guid")
+    New-Item -ItemType Directory -Path $temp | Out-Null
+    $longTemp = "\\?\$temp"
+    $zipPath  = Join-Path $temp 'src.zip'
     try {
         Invoke-WebRequest -Uri $zipUrl -Headers $headers -OutFile $zipPath
     } catch {
         Write-Error "Failed to download release archive from ${zipUrl}: $($_.Exception.Message)" -ErrorAction Continue
         exit 1
     }
-    Expand-Archive -Path $zipPath -DestinationPath $temp -Force
+    Expand-Archive -Path $zipPath -DestinationPath $longTemp -Force
     $dir = Get-ChildItem -Path $temp -Directory | Select-Object -First 1
 
     # Resolve repository root so the script works regardless of invocation directory
@@ -78,5 +81,8 @@ try {
 
     Write-Host "Updated MCP to $tag"
 } finally {
+    if ($longTemp) {
+        Remove-Item -Recurse -Force $longTemp -ErrorAction SilentlyContinue
+    }
     [System.Net.ServicePointManager]::SecurityProtocol = $origTls
 }
