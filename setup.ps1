@@ -45,11 +45,29 @@ if (-not (Test-Path $updateScript)) {
     New-Item -ItemType Directory -Path ".\scripts" -Force | Out-Null
     $owner = 'CallMarcus'
     $repo  = 'security-scorecard-mcp'
+    
+    Write-Host "Downloading update script..."
+    
+    # Try direct download first (more reliable)
     try {
-        gh api "repos/$owner/$repo/contents/scripts/update.ps1?ref=main" --header "Accept: application/vnd.github.raw" --output $updateScript
-    } catch {
         $rawUrl = "https://raw.githubusercontent.com/$owner/$repo/main/scripts/update.ps1"
-        Invoke-WebRequest -Uri $rawUrl -OutFile $updateScript
+        $headers = @{ 'User-Agent' = 'security-scorecard-mcp-setup' }
+        if ($env:GITHUB_TOKEN) {
+            $headers['Authorization'] = "token $env:GITHUB_TOKEN"
+        }
+        Invoke-WebRequest -Uri $rawUrl -OutFile $updateScript -Headers $headers
+        Write-Host "Update script downloaded successfully"
+    } catch {
+        Write-Host "Direct download failed, trying GitHub CLI..."
+        try {
+            # Fallback to GitHub CLI (without --output flag for compatibility)  
+            $content = gh api "repos/$owner/$repo/contents/scripts/update.ps1" --jq '.content' | ForEach-Object { [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($_)) }
+            $content | Set-Content -Path $updateScript -Encoding UTF8
+            Write-Host "Update script downloaded via GitHub CLI"
+        } catch {
+            Write-Error "Failed to download update script. Please ensure you have internet connectivity and try again."
+            exit 1
+        }
     }
 }
 
