@@ -14,11 +14,19 @@ $devApi    = "https://api.github.com/repos/$owner/$repo/releases/tags/dev"
 $api       = if ($Dev) { $devApi } else { $stableApi }
 
 $token = $env:GITHUB_TOKEN
-$headers = @{
+# Headers for GitHub API requests
+$apiHeaders = @{
     'User-Agent' = 'security-scorecard-mcp'
     'Accept'     = 'application/vnd.github+json'
 }
-if ($token) { $headers['Authorization'] = "token $token" }
+# Headers for downloading release assets (no JSON accept header)
+$downloadHeaders = @{
+    'User-Agent' = 'security-scorecard-mcp'
+}
+if ($token) {
+    $apiHeaders['Authorization'] = "token $token"
+    $downloadHeaders['Authorization'] = "token $token"
+}
 
 $origTls = [System.Net.ServicePointManager]::SecurityProtocol
 try {
@@ -26,13 +34,13 @@ try {
 
     $release = $null
     try {
-        $release = Invoke-RestMethod -Uri $api -Headers $headers
+        $release = Invoke-RestMethod -Uri $api -Headers $apiHeaders
     } catch {
         $status = $_.Exception.Response.StatusCode.value__
         if (-not $Dev -and $status -eq 404) {
             Write-Warning "No stable release found. Falling back to development build."
             try {
-                $release = Invoke-RestMethod -Uri $devApi -Headers $headers
+                $release = Invoke-RestMethod -Uri $devApi -Headers $apiHeaders
             } catch {
                 $message = "Failed to retrieve release info from ${devApi}: $($_.Exception.Message)"
                 if ($_.Exception.Response -and $_.Exception.Response.StatusCode.value__ -eq 404) {
@@ -78,7 +86,7 @@ try {
     if ($useZipball) {
         $srcZip = Join-Path $temp 'src.zip'
         try {
-            Invoke-WebRequest -Uri $release.zipball_url -Headers $headers -OutFile $srcZip
+            Invoke-WebRequest -Uri $release.zipball_url -Headers $downloadHeaders -OutFile $srcZip
         } catch {
             Write-Error "Failed to download source archive: $($_.Exception.Message)" -ErrorAction Continue
             exit 1
@@ -89,7 +97,7 @@ try {
         if (-not $DocsOnly) {
             $coreZip = Join-Path $temp 'mcp-core.zip'
             try {
-                Invoke-WebRequest -Uri $coreAsset.browser_download_url -Headers $headers -OutFile $coreZip
+                Invoke-WebRequest -Uri $coreAsset.browser_download_url -Headers $downloadHeaders -OutFile $coreZip
             } catch {
                 Write-Error "Failed to download core archive: $($_.Exception.Message)" -ErrorAction Continue
                 exit 1
@@ -99,7 +107,7 @@ try {
         if ($IncludeDocs -and $docsAsset) {
             $docsZip = Join-Path $temp 'mcp-docs.zip'
             try {
-                Invoke-WebRequest -Uri $docsAsset.browser_download_url -Headers $headers -OutFile $docsZip
+                Invoke-WebRequest -Uri $docsAsset.browser_download_url -Headers $downloadHeaders -OutFile $docsZip
             } catch {
                 Write-Error "Failed to download docs archive: $($_.Exception.Message)" -ErrorAction Continue
                 exit 1
