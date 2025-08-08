@@ -80,7 +80,10 @@ try {
     $guid     = [System.Guid]::NewGuid().ToString('N').Substring(0,8)
     $temp     = Join-Path ([System.IO.Path]::GetTempPath()) ("upd-$guid")
     New-Item -ItemType Directory -Path $temp | Out-Null
-    $longTemp = "\\?\$temp"
+    # Avoid using the long-path prefix (\\?\) because Expand-Archive doesn't
+    # handle those paths and throws "drive is null" errors on Windows. The
+    # regular temp path is sufficient here.
+    $longTemp = $temp
 
     $srcRoot = $null
     if ($useZipball) {
