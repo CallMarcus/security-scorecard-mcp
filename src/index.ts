@@ -204,6 +204,8 @@ export class ScoreImpactSecurityScorecardServer {
       nextUrl = url.toString();
     }
     let result: any = null;
+    let pagination: any = undefined;
+    let meta: any = undefined;
 
     while (nextUrl) {
       await this.throttleRequest();
@@ -260,7 +262,12 @@ export class ScoreImpactSecurityScorecardServer {
           ? jsonResponse.data
           : [jsonResponse.data];
         allEntries = allEntries.concat(entries);
-        result = { entries: allEntries };
+        if (jsonResponse.pagination !== undefined) {
+          pagination = jsonResponse.pagination;
+        }
+        if (jsonResponse.meta !== undefined) {
+          meta = jsonResponse.meta;
+        }
 
         if (jsonResponse.pagination?.has_next) {
           const url = new URL(nextUrl);
@@ -287,7 +294,12 @@ export class ScoreImpactSecurityScorecardServer {
 
       if (jsonResponse.entries) {
         allEntries = allEntries.concat(jsonResponse.entries);
-        result = { entries: allEntries };
+        if (jsonResponse.pagination !== undefined) {
+          pagination = jsonResponse.pagination;
+        }
+        if (jsonResponse.meta !== undefined) {
+          meta = jsonResponse.meta;
+        }
 
         if (jsonResponse.next_cursor) {
           const url = new URL(nextUrl);
@@ -301,6 +313,12 @@ export class ScoreImpactSecurityScorecardServer {
 
       result = jsonResponse;
       nextUrl = null;
+    }
+
+    if (allEntries.length > 0) {
+      result = { entries: allEntries };
+      if (pagination !== undefined) result.pagination = pagination;
+      if (meta !== undefined) result.meta = meta;
     }
 
     if (method === "GET" && result) {
