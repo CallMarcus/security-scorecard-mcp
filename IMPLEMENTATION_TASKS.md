@@ -4,8 +4,12 @@
 **GitHub Repository**: https://github.com/CallMarcus/security-scorecard-mcp.git  
 **Main Implementation File**: `/src/index.ts` (TypeScript source)  
 **Built File**: `/build/index.js` (Compiled JavaScript)  
-**API Documentation**: `/build_docs/Security Scorecard API Reference for Coding Assistants.md`  
-**Objective**: Fix API endpoint mismatches and enhance the Security Scorecard MCP server with missing features based on official API documentation.
+**Strategy Documents**: 
+- [OPERATIONAL-REFOCUS-STRATEGY.md](./OPERATIONAL-REFOCUS-STRATEGY.md) - Vision and approach
+- [OPERATIONAL-TOOLS-SPEC.md](./OPERATIONAL-TOOLS-SPEC.md) - Detailed specifications
+- [CURRENT-TOOL-STATUS.md](./CURRENT-TOOL-STATUS.md) - Tool status report
+- [ROADMAP.md](./ROADMAP.md) - Development timeline
+**Objective**: Transform MCP from executive reporting to operational security team support with daily remediation workflows.
 
 ## Getting Started
 
@@ -20,409 +24,184 @@ npm install
 # Build the project
 npm run build
 
+# Run tests
+npm test
+
 # The main source code to modify is in /src/index.ts
 # After modifications, rebuild with: npm run build
 ```
 
-## Critical Fixes Required
+## Current Status
+- **Tool Functionality**: 33% (4/12 tools working)
+- **Working**: Strategic planning tools
+- **Broken**: Operational data processing tools
+- **Missing**: Quick wins and simulation tools
 
-### Task 1: Fix API Endpoint Paths 🔴 CRITICAL
-**Priority**: IMMEDIATE  
-**Estimated Effort**: 30 minutes  
+## Phase 1: Critical Fixes (Week 1)
 
-#### Current Issue
-The implementation uses incorrect API endpoints that don't exist in the Security Scorecard API.
+### Task 1: Fix get_issues_by_roi 🔴 CRITICAL
+**File**: `/src/index.ts`  
+**Priority**: HIGHEST  
+**Effort**: 4-6 hours
 
-#### Changes Required
-Replace all instances of incorrect endpoints:
+#### Problem
+Returns "0 issues" despite 1000+ findings available in API
 
-```javascript
-// INCORRECT (Current):
-`/companies/${domain}/issues`
-`/companies/${domain}/issues/${issue_type}`
+#### Solution
+```typescript
+// Add comprehensive logging
+console.log('[getIssuesByROI] Raw data:', JSON.stringify(issuesData));
 
-// CORRECT (Should be):
-`/companies/${scorecard_identifier}/issues/active`
-`/companies/${scorecard_identifier}/issues/active/${issue_type}`
-`/companies/${scorecard_identifier}/issues/historical`
-`/companies/${scorecard_identifier}/issues/historical/${issue_type}`
-```
+// Fix data extraction
+const issues = Array.isArray(issuesData?.entries) ? issuesData.entries : [];
 
-#### Implementation Instructions
-1. Update the `getIssuesByROI` method to use `/companies/${domain}/issues/active`
-2. Update the `getQuickWins` method to use `/companies/${domain}/issues/active`
-3. Add a parameter to specify whether to fetch active or historical issues
-4. Update any other methods using the incorrect endpoints
-
-#### Validation
-- Test with actual API calls to verify endpoints return data
-- Ensure backward compatibility by handling both response formats temporarily
-
----
-
-### Task 2: Fix API Response Structure Parsing 🔴 CRITICAL
-**Priority**: IMMEDIATE  
-**Estimated Effort**: 45 minutes
-
-#### Current Issue
-The implementation expects `entries` directly in the response, but the API returns a structured response with `data`, `pagination`, and `meta` fields.
-
-#### Changes Required
-Update the `makeRequest` method to properly handle the documented response structure:
-
-```javascript
-// Expected API Response Structure:
-{
-  "data": [...],      // Main data array
-  "pagination": {     // Pagination info
-    "page": 1,
-    "size": 50,
-    "total": 150,
-    "has_next": true
-  },
-  "meta": {          // Metadata
-    "request_id": "uuid",
-    "timestamp": "2024-01-01T00:00:00Z"
-  }
-}
-```
-
-#### Implementation Instructions
-1. Modify `makeRequest` method to check for `data` field first
-2. Handle both paginated and non-paginated responses
-3. Update pagination logic to use `pagination.has_next` field
-4. Preserve backward compatibility for any legacy response formats
-
-```javascript
-async makeRequest(endpoint, method = "GET", body) {
-    // ... existing code ...
-    
-    const jsonResponse = await response.json();
-    
-    // Handle documented response structure
-    if (jsonResponse.data !== undefined) {
-        // Handle pagination if present
-        if (jsonResponse.pagination?.has_next) {
-            // Continue fetching next pages
-        }
-        return { entries: jsonResponse.data };
-    }
-    
-    // Fallback for direct responses (like summary endpoints)
-    return jsonResponse;
-}
-```
-
----
-
-### Task 3: Fix Pagination Implementation 🟡 IMPORTANT
-**Priority**: HIGH  
-**Estimated Effort**: 1 hour
-
-#### Current Issue
-Pagination implementation doesn't match the two documented methods: page-based and cursor-based.
-
-#### Changes Required
-Implement both pagination methods as documented:
-
-```javascript
-// Page-based pagination (default, max 50 items)
-?page=1&size=50
-
-// Cursor-based pagination (for large collections)  
-?cursor={cursor_value}&limit=100
-```
-
-#### Implementation Instructions
-1. Detect which pagination method is used based on response
-2. Handle `pagination.has_next` for page-based pagination
-3. Handle `next_cursor` for cursor-based pagination
-4. Implement proper page increment for page-based method
-5. Add configuration for page size (default 50, max 50)
-
----
-
-## Feature Enhancements
-
-### Task 4: Add Summary-Factors Endpoint Integration 🟢 ENHANCEMENT
-**Priority**: MEDIUM  
-**Estimated Effort**: 1 hour
-
-#### Description
-Use the more efficient `/companies/{scorecard_identifier}/summary-factors` endpoint to get comprehensive data in a single call.
-
-#### Implementation Instructions
-1. Add new method `getCompanySummaryFactors(domain)`
-2. Use this endpoint in place of multiple separate calls in:
-   - `getScoreImprovementRoadmap`
-   - `calculateFactorScoreImpact`
-   - `simulateScoreImprovement`
-3. Parse the response to extract:
-   - Overall score and grade
-   - Factor scores with actual weights
-   - Issue counts by severity
-
-#### Benefits
-- Reduces API calls from 2-3 to 1 for most operations
-- Gets actual factor weights from API instead of using defaults
-- More accurate score calculations
-
----
-
-### Task 5: Add Issue Filtering Parameters 🟢 ENHANCEMENT
-**Priority**: MEDIUM  
-**Estimated Effort**: 2 hours
-
-#### Description
-Implement the powerful filtering parameters available in the API for more precise issue queries.
-
-#### New Parameters to Support
-```javascript
-const filterParams = {
-    issue_id: "uuid",                    // Specific issue
-    issue_id_in: "uuid1,uuid2",         // Multiple issues
-    first_seen_time_from: "2024-01-01", // Time range start
-    first_seen_time_to: "2024-12-31",   // Time range end
-    last_seen_time_from: "2024-01-01",  // Last seen start
-    last_seen_time_to: "2024-12-31",    // Last seen end
-    ip_range: "192.168.1.0/24",         // IP filtering
-    severity: "high",                    // Single severity
-    severity_in: "high,medium"          // Multiple severities
+// Fix ROI calculation
+const calculateROI = (issue) => {
+  const impact = this.estimateImpact(issue) || 0;
+  const effort = this.estimateEffort(issue) || 1;
+  return impact / effort;
 };
 ```
 
-#### Implementation Instructions
-1. Add optional filter parameter to issue-related methods
-2. Build query string dynamically based on provided filters
-3. Create helper method `buildFilterQuery(filters)`
-4. Update existing tools to accept filter options
-5. Add new tool specifically for filtered issue searches
+### Task 2: Implement get_quick_wins 🔴 CRITICAL
+**File**: `/src/index.ts`  
+**Priority**: HIGHEST  
+**Effort**: 6-8 hours
 
----
-
-### Task 6: Implement Historical Data Analysis 🟢 ENHANCEMENT
-**Priority**: LOW  
-**Estimated Effort**: 2 hours
-
-#### Description
-Add capability to analyze historical trends using the history endpoints.
-
-#### New Endpoints to Integrate
-- `/companies/{scorecard_identifier}/history` - Historical scores
-- `/companies/{scorecard_identifier}/history/events` - Historical events
-- `/companies/{scorecard_identifier}/history/breaches` - Breach events
-
-#### New Tool to Create
-```javascript
-{
-    name: "analyze_score_trends",
-    description: "📈 TRENDS: Analyze historical score changes and identify patterns",
-    parameters: {
-        domain: "string",
-        period: "enum: [30days, 90days, 1year]",
-        include_events: "boolean"
-    }
+#### Implementation
+```typescript
+async getQuickWins(domain: string, maxEffort: string = 'medium') {
+  const effortLevels = {
+    'low': 2,
+    'medium': 8,
+    'high': 40
+  };
+  
+  // Implementation per OPERATIONAL-TOOLS-SPEC.md
 }
 ```
 
----
+### Task 3: Fix generate_remediation_report
+**File**: `/src/index.ts`  
+**Priority**: HIGH  
+**Effort**: 4-6 hours
 
-### Task 7: Add Vendor Risk Assessment 🟢 NEW FEATURE
+#### Problem
+Returns empty array despite rich finding data
+
+#### Solution
+- Fix finding aggregation logic
+- Add proper error handling
+- Format output for operational use
+
+### Task 4: Fix category and asset filtering
+**Files**: `/src/index.ts`, `/src/get_findings_by_category.ts`  
+**Priority**: HIGH  
+**Effort**: 4-6 hours
+
+## Phase 2: Operational Enhancements (Week 2)
+
+### Task 5: Add Fix Procedure Library
+**File**: New file `/src/fix_procedures.ts`  
+**Priority**: MEDIUM  
+**Effort**: 8-10 hours
+
+Create library of fix procedures for common issues:
+- SPF record configuration
+- DMARC policy updates
+- TLS certificate renewal
+- Patching procedures
+
+### Task 6: Implement Effort Estimation
+**File**: `/src/index.ts`  
+**Priority**: MEDIUM  
+**Effort**: 4-6 hours
+
+Add effort estimation logic to all findings
+
+### Task 7: Add Progress Tracking
+**File**: New file `/src/progress_tracking.ts`  
+**Priority**: MEDIUM  
+**Effort**: 6-8 hours
+
+## Phase 3: Integration (Weeks 3-4)
+
+### Task 8: JIRA Export
+**File**: New file `/src/integrations/jira.ts`  
+**Priority**: MEDIUM  
+**Effort**: 8-10 hours
+
+### Task 9: ServiceNow Export
+**File**: New file `/src/integrations/servicenow.ts`  
+**Priority**: MEDIUM  
+**Effort**: 8-10 hours
+
+### Task 10: Automation Scripts
+**File**: New file `/src/automation/index.ts`  
 **Priority**: LOW  
-**Estimated Effort**: 3 hours
-
-#### Description
-Implement vendor detection and risk assessment capabilities.
-
-#### New Endpoints to Integrate
-- `/vendor-detection/{domain}/risk` - Risk scores
-- `/vendor-detection/{domain}/third-party` - Third-party vendors
-- `/vendor-detection/{domain}/fourth-party` - Fourth-party vendors
-
-#### New Tool to Create
-```javascript
-{
-    name: "assess_vendor_risk",
-    description: "🔍 VENDOR RISK: Analyze third and fourth-party vendor security risks",
-    parameters: {
-        domain: "string",
-        include_fourth_party: "boolean",
-        risk_threshold: "enum: [high, medium, low]"
-    }
-}
-```
-
----
-
-## Implementation Order
-
-### Phase 1: Critical Fixes (Day 1)
-1. ✅ Task 1: Fix API endpoint paths
-2. ✅ Task 2: Fix response structure parsing
-3. ✅ Task 3: Fix pagination implementation
-
-### Phase 2: Core Enhancements (Day 2-3)
-4. ✅ Task 4: Add summary-factors endpoint
-5. ✅ Task 5: Add issue filtering parameters
-
-### Phase 3: Advanced Features (Day 4-5)
-6. ✅ Task 6: Implement historical data analysis
-7. ✅ Task 7: Add vendor risk assessment
-
----
+**Effort**: 10-12 hours
 
 ## Testing Requirements
 
 ### Unit Tests
-- Test each endpoint with mock responses
-- Verify pagination works for both methods
-- Ensure filtering parameters are properly encoded
-- Validate error handling for all status codes
+Update test files in `/tests/` directory:
+- Fix broken test assertions
+- Add tests for new functionality
+- Ensure 100% coverage of critical paths
 
 ### Integration Tests
-- Test with real API token (use environment variable)
-- Verify response parsing for all endpoint types
-- Test rate limiting behavior (5000 req/hour limit)
-- Validate data aggregation across paginated responses
+- Test with real SecurityScorecard data
+- Validate all API endpoints
+- Performance testing with 1000+ findings
 
-### Manual Testing Checklist
-- [ ] All existing tools still work after changes
-- [ ] New endpoints return expected data
-- [ ] Pagination correctly fetches all pages
-- [ ] Filters properly limit returned results
-- [ ] Error messages are helpful and accurate
-- [ ] Performance is acceptable for large datasets
+### User Acceptance
+- Deploy to operational team
+- Gather feedback on workflows
+- Iterate based on usage patterns
 
----
+## Success Metrics
 
-## Code Quality Requirements
+### Week 1
+- [ ] 7/12 tools functional (58%)
+- [ ] Quick wins tool deployed
+- [ ] All data processing fixed
 
-### Error Handling
-- Implement specific error messages for each failure type
-- Add retry logic for rate limit errors (429)
-- Log detailed error information in debug mode
-- Provide fallback behavior where appropriate
+### Week 2
+- [ ] Operational context added
+- [ ] Fix procedures available
+- [ ] Progress tracking live
 
-### Documentation
-- Update JSDoc comments for all modified methods
-- Add examples for new filtering parameters
-- Document response structure changes
-- Update README with new tools and features
+### Week 4
+- [ ] 12/12 tools functional (100%)
+- [ ] ITSM integration complete
+- [ ] 50% faster remediation
 
-### Performance
-- Cache frequently accessed metadata endpoints
-- Minimize API calls through efficient endpoint usage
-- Implement request batching where possible
-- Add request timing in debug mode
+## Developer Notes
 
----
+### Common Pitfalls
+1. API returns data in `entries` array, not direct array
+2. Some endpoints use `data` wrapper, others don't
+3. Pagination uses `has_next` and `next_cursor`
+4. Rate limiting: Max 100 requests per minute
 
-## Configuration Updates
+### Debugging Tips
+1. Add console.log for all API responses
+2. Check data structure before processing
+3. Validate all calculations return numbers
+4. Test with domains having many findings
 
-### Environment Variables
-```bash
-# Existing
-SECURITY_SCORECARD_API_TOKEN=your_token
-COMPANY_DOMAIN=neste.com
-DEBUG_MODE=true
-
-# New (optional)
-SCORECARD_PAGE_SIZE=50           # Items per page (max 50)
-SCORECARD_CACHE_TTL=3600         # Cache TTL in seconds
-SCORECARD_RETRY_ATTEMPTS=3       # Retry attempts for failed requests
-SCORECARD_RETRY_DELAY=1000       # Retry delay in milliseconds
-```
-
----
-
-## Validation Criteria
-
-### Success Metrics
-- All API calls use correct endpoints from documentation
-- Response parsing handles all documented formats
-- Pagination retrieves 100% of available data
-- Filtering reduces API calls by 30-50%
-- New tools provide unique value to users
-- Error rate < 1% for valid requests
-- Average response time < 2 seconds
-
-### Acceptance Criteria
-- [ ] All critical fixes implemented and tested
-- [ ] At least 3 enhancement tasks completed
-- [ ] Documentation updated for all changes
-- [ ] Code passes linting and formatting checks
-- [ ] Manual testing completed successfully
-- [ ] No regression in existing functionality
-
----
-
-## Notes for Implementation
-
-### Important Reminders
-1. **API Token**: Never commit API tokens to version control
-2. **Rate Limiting**: Respect the 5000 requests/hour limit
-3. **Backward Compatibility**: Maintain support for existing tool interfaces
-4. **Error Messages**: Make them actionable for end users
-5. **Debug Mode**: Add comprehensive logging when DEBUG_MODE=true
-
-### Useful Code Patterns
-
-#### Dynamic Query Building
-```javascript
-function buildQueryString(params) {
-    const query = new URLSearchParams();
-    Object.entries(params).forEach(([key, value]) => {
-        if (value !== undefined && value !== null) {
-            query.append(key, value);
-        }
-    });
-    return query.toString() ? `?${query.toString()}` : '';
-}
-```
-
-#### Retry Logic Pattern
-```javascript
-async function retryRequest(fn, attempts = 3, delay = 1000) {
-    for (let i = 0; i < attempts; i++) {
-        try {
-            return await fn();
-        } catch (error) {
-            if (i === attempts - 1) throw error;
-            if (error.message.includes('429')) {
-                const retryAfter = parseInt(error.retryAfter) || delay;
-                await new Promise(resolve => setTimeout(resolve, retryAfter));
-            }
-        }
-    }
-}
-```
-
----
-
-## Questions for Clarification
-
-Before starting implementation, verify:
-1. Should we maintain backward compatibility with existing response formats?
-2. Is there a preference for page-based vs cursor-based pagination?
-3. Should we implement caching for metadata endpoints?
-4. Are there specific issue types that should be prioritized?
-5. Should vendor risk assessment be a separate tool or integrated?
-
----
+### Code Style
+- Use TypeScript for new code
+- Follow existing patterns in codebase
+- Add JSDoc comments for new methods
+- Keep functions under 50 lines
 
 ## Resources
+- [SecurityScorecard API Docs](https://securityscorecard.readme.io/)
+- [MCP SDK Documentation](https://modelcontextprotocol.io/)
+- [Test Domain]: Use neste.com for testing (has 1000+ findings)
 
-- **GitHub Repository**: https://github.com/CallMarcus/security-scorecard-mcp.git
-- **API Documentation**: `/build_docs/Security Scorecard API Reference for Coding Assistants.md`
-- **Source Implementation**: `/src/index.ts` (TypeScript)
-- **Built Implementation**: `/build/index.js` (Compiled JavaScript)
-- **Package.json**: `/package.json`
-- **API Base URL**: `https://api.securityscorecard.io`
-- **Auth Header Format**: `Authorization: Token YOUR_API_KEY`
-- **Rate Limit**: 5000 requests per hour
-
----
-
-*Last Updated: 2025-08-06*  
-*Version: 1.0*  
-*Status: Ready for Implementation*
+## Getting Help
+- GitHub Issues: Report bugs and feature requests
+- Slack Channel: #security-mcp-dev
+- Email: security-mcp@company.com

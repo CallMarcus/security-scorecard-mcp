@@ -1,15 +1,29 @@
 # Security Scorecard MCP
 
-A production-ready Model Context Protocol (MCP) server that integrates with the [SecurityScorecard REST API](https://securityscorecard.readme.io/). It provides comprehensive security analysis tools for Claude Desktop, enabling AI-powered security scorecard analysis, remediation planning, and risk assessment.
+A Model Context Protocol (MCP) server that integrates with the [SecurityScorecard REST API](https://securityscorecard.readme.io/). Originally designed for executive reporting, this MCP is being refocused to support operational security teams with daily remediation workflows.
 
-**✅ Production Ready:** All 12 MCP tools fully functional with complete dependency packaging and one-command installation.
+**⚠️ Operational Refocus in Progress:** Currently 33% functional (4/12 tools working). See [OPERATIONAL-REFOCUS-STRATEGY.md](./OPERATIONAL-REFOCUS-STRATEGY.md) for our transformation roadmap.
 
-The server exposes powerful MCP tools for:
-- **Security Score Analysis** - Analyze current scores and improvement opportunities  
-- **Remediation Planning** - Generate prioritized roadmaps to reach target grades
-- **Risk Assessment** - Identify high-impact findings across your infrastructure
-- **Asset Management** - Track security posture across domains and IP addresses
-- **ROI Analysis** - Optimize security investments with data-driven prioritization
+## 🎯 Target Use Cases (After Refocus)
+
+### For Operational Security Teams
+- **Daily Remediation Workflows** - Get actionable fix procedures for security findings
+- **Quick Wins Identification** - Find low-effort, high-impact improvements
+- **Asset-Based Tracking** - Monitor security issues by team ownership
+- **Progress Monitoring** - Track remediation status and blockers
+- **ITSM Integration** - Export findings to Jira, ServiceNow for ticketing
+
+### For IT Implementation Teams  
+- **Change Planning** - Assess impact before making security changes
+- **Automation Scripts** - Generate fix scripts for common issues
+- **Validation Testing** - Verify fixes are properly implemented
+- **Rollback Procedures** - Safe recovery if changes cause issues
+
+### Current Working Features
+- **Strategic Analysis** - ROI-based security roadmaps (executive focused)
+- **Factor Impact Assessment** - Understand which areas need attention
+- **Asset Discovery** - List all security findings by asset
+- **Direct API Access** - Build custom security tools
 
 ## Branch workflow
 
@@ -230,12 +244,13 @@ Replace the placeholder values with your installation path and credentials:
 
 ## 🛠️ MCP Tools Reference
 
-Each tool is invoked with the MCP `call_tool` request. Responses are returned in
-`content[0].text` as Markdown. Errors use the same structure and are prefixed
-with `Error running <tool>:` or return an MCP error code such as
-`InvalidRequest`. Examples below omit the outer MCP envelope for brevity.
+**⚠️ Important:** Only 4 of 12 tools are currently working. See [CURRENT-TOOL-STATUS.md](./CURRENT-TOOL-STATUS.md) for details.
 
-### get_score_improvement_roadmap
+### Working Tools (4/12) ✅
+
+These tools are fully functional and can be used immediately:
+
+#### 1. get_score_improvement_roadmap
 **Description:** Generate a prioritized roadmap to reach a target grade.
 
 **Parameters**
@@ -262,7 +277,7 @@ Markdown sections showing points needed, ROI‑ranked factors and quick wins.
 **Edge cases**
 - Returns a congratulatory message if the current score already meets the target.
 
-### calculate_factor_score_impact
+#### 2. calculate_factor_score_impact
 **Description:** Analyze ROI for each factor contributing to the score.
 
 **Parameters**
@@ -288,8 +303,21 @@ Markdown list ranking factors by ROI.
 **Edge cases**
 - If all factors are already at 100, the list may be empty.
 
-### get_issues_by_roi
-**Description:** Return issue types ranked by ROI. Supports querying either active or historical issues.
+#### 3. get_findings_by_asset
+**Description:** List all security findings organized by asset (domains and IPs).
+**Status:** ✅ Working - Returns comprehensive asset-level security data
+
+#### 4. call_api_endpoint  
+**Description:** Direct access to SecurityScorecard API for custom queries.
+**Status:** ✅ Working - Full API access available
+
+### Broken Tools (3/12) ❌
+
+These tools are currently non-functional but being fixed:
+
+#### 5. get_issues_by_roi
+**Description:** Return issue types ranked by ROI.
+**Status:** ❌ BROKEN - Returns 0 issues despite 1000+ findings available
 
 **Parameters**
 - `domain` (string, required)
@@ -317,7 +345,23 @@ Markdown list of issues with ROI scores and estimated impact.
 **Edge cases**
 - Large `top_n` values are capped at the number of available issues.
 
-### simulate_score_improvement
+#### 6. get_findings_by_category
+**Description:** Organize findings by SecurityScorecard factors.
+**Status:** ❌ BROKEN - Returns empty array
+
+#### 7. find_high_impact_findings_across_assets  
+**Description:** Scan for critical vulnerabilities across all assets.
+**Status:** ❌ BROKEN - Returns 0 findings
+
+#### 8. generate_remediation_report
+**Description:** Create comprehensive remediation plans.
+**Status:** ❌ BROKEN - Returns empty results
+
+### Not Implemented (5/12) 🚫
+
+These tools are planned but not yet built:
+
+#### 9. simulate_score_improvement
 **Description:** Forecast score impact of fixing specific issue types.
 
 **Parameters**
@@ -344,7 +388,7 @@ Markdown summary with projected overall score and factor‑level improvements.
 **Edge cases**
 - Unknown issue types are ignored, resulting in little or no improvement.
 
-### get_quick_wins
+#### 10. get_quick_wins
 **Description:** Find high‑impact, low‑effort improvements.
 
 **Parameters**
@@ -371,7 +415,7 @@ Markdown list of quick wins with estimated score impact and timelines.
 **Edge cases**
 - Using `low` filters out medium‑effort items.
 
-### benchmark_grade_requirements
+#### 11. benchmark_grade_requirements
 **Description:** Show score requirements and peer comparison for grade levels.
 
 **Parameters**
@@ -397,8 +441,16 @@ Markdown summary of current score, grade requirements and next milestone.
 **Edge cases**
 - If already at the highest grade, the "Next milestone" section notes this.
 
-### find_high_impact_findings_across_assets
-**Description:** Scan assets for common high‑impact issues.
+#### 12. Plus 2 others referenced in test suite
+
+---
+
+## Detailed Tool Documentation
+
+### Working Tools Details
+
+#### find_high_impact_findings_across_assets (Currently in broken section)
+**Note:** This documentation describes the intended functionality
 
 **Parameters**
 - `domain` (string, required)

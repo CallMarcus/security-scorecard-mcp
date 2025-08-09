@@ -2,13 +2,23 @@
 
 This document provides development guidance and architectural notes for the SecurityScorecard MCP server.
 
-## 🎯 Project Status
+## 🎯 Project Status & Strategic Refocus
 
-**✅ PRODUCTION READY** - All goals achieved:
-- ✅ **Rock solid setup experience** - One-command installation with complete dependency packaging
-- ✅ **Full MCP tool functionality** - All 12 tools working (100% success rate, up from 12.5%)  
-- ✅ **Comprehensive security analysis** - Complete remediation reports, ROI analysis, and asset management
-- ✅ **Enterprise-grade deployment** - Automated releases, dependency management, and error handling
+**⚠️ OPERATIONAL REFOCUS IN PROGRESS** - Shifting from executive to operational focus:
+- ✅ **Core infrastructure stable** - One-command installation with complete dependency packaging
+- ⚠️ **Tool functionality mixed** - 33% working (4/12 tools), critical operational tools need fixes
+- 🔧 **Refocusing for operations** - Moving from executive reporting to daily remediation support
+- 📋 **See strategy documents**: 
+  - [OPERATIONAL-REFOCUS-STRATEGY.md](./OPERATIONAL-REFOCUS-STRATEGY.md) - Strategic vision
+  - [OPERATIONAL-TOOLS-SPEC.md](./OPERATIONAL-TOOLS-SPEC.md) - Implementation specifications
+  - [CURRENT-TOOL-STATUS.md](./CURRENT-TOOL-STATUS.md) - Detailed tool status
+
+### Current Focus: Supporting Operational Security Teams
+The MCP is being refocused to support:
+- **Subject matter experts** doing daily monitoring and remediation
+- **IT teams** planning and implementing security changes
+- **Operations managers** tracking remediation progress
+- **DevOps teams** automating security fixes
 
 ## 🏗️ Architecture Overview
 
@@ -61,10 +71,25 @@ to fetch the most recent development build instead.
 4. Use `build_docs/api_test_tool.js` to validate API endpoints before adding them to the server.
 5. Keep `setup.ps1` in sync with any new environment variables or configuration settings so non-developers have a smooth experience.
 
-## Suggested next steps
-- Add helper tools to query findings by asset and by category.
-- Expose a function that collects all findings for a domain and outputs remediation recommendations grouped by factor.
-- Document new capabilities in `README.md` and provide examples for Windows&nbsp;11 users.
+## Development Priorities (Operational Refocus)
+
+### Phase 1: Fix Critical Operational Tools (Week 1)
+- **Fix `get_issues_by_roi`** - Currently returns 0 issues despite 1000+ findings
+- **Fix `generate_remediation_report`** - Returns empty results, critical for operations
+- **Implement `get_quick_wins`** - Most requested feature by operational teams
+- See [OPERATIONAL-TOOLS-SPEC.md](./OPERATIONAL-TOOLS-SPEC.md) for implementation details
+
+### Phase 2: Build Operational Workflows (Week 2)
+- **Asset ownership mapping** - Track which team owns which assets
+- **Progress tracking** - Monitor remediation status and blockers
+- **ITSM integration** - Export to Jira, ServiceNow, etc.
+- **Automation support** - Generate scripts for common fixes
+
+### Phase 3: Enterprise Features (Week 3-4)
+- **Team dashboards** - Operational command center views
+- **Bulk operations** - Handle multiple findings efficiently
+- **Change management** - Track approvals and maintenance windows
+- **Performance metrics** - Track team efficiency and progress
 
 ## 🎉 Completed Achievements
 
@@ -82,28 +107,35 @@ to fetch the most recent development build instead.
 - **Update mechanism** - Self-updating scripts with fallback strategies
 - **Documentation** - Complete user and developer guides
 
-### MCP Tool Suite ✅
-All 12 MCP tools fully functional:
-- `get_score_improvement_roadmap` - Grade improvement planning
-- `calculate_factor_score_impact` - ROI analysis for security factors  
-- `get_issues_by_roi` - Prioritized issue identification
-- `simulate_score_improvement` - Score projection and forecasting
-- `get_quick_wins` - High-impact, low-effort improvements
-- `benchmark_grade_requirements` - Peer comparison and targets
-- `find_high_impact_findings_across_assets` - Asset-wide vulnerability scanning
-- `get_findings_by_asset` - Asset-specific issue tracking
-- `get_findings_by_category` - Factor-based issue categorization  
-- `generate_remediation_report` - Comprehensive remediation planning
+### MCP Tool Suite Status (33% Functional)
+
+**✅ Working Tools (4/12)**
+- `get_score_improvement_roadmap` - Strategic roadmap generation
+- `calculate_factor_score_impact` - ROI analysis for security factors
+- `get_findings_by_asset` - Asset-specific issue tracking (181 findings found)
 - `call_api_endpoint` - Direct API access for custom queries
+
+**❌ Broken Tools (3/12) - PRIORITY FIXES**
+- `get_issues_by_roi` - Returns 0 issues (data extraction broken)
+- `get_findings_by_category` - Returns empty array (aggregation broken)
+- `find_high_impact_findings_across_assets` - Returns 0 findings (filtering broken)
+- `generate_remediation_report` - Returns empty results (generation broken)
+
+**🚫 Not Implemented (5/12)**
+- `get_quick_wins` - Most requested by operations teams
+- `simulate_score_improvement` - Score projection needed
+- `benchmark_grade_requirements` - Peer comparison
+- Plus 2 others referenced in test suite
 
 ## 🧪 Testing and Validation
 
 ### Production Testing
-The MCP server has been validated with:
-- **Clean machine installation** - Tested on fresh Windows installations
-- **All 12 MCP tools** - 100% success rate (up from 12.5% initial failure rate)
-- **Claude Desktop integration** - Full compatibility verified
-- **Dependency resolution** - Complete transitive dependency packaging
+Recent comprehensive testing reveals:
+- **Clean machine installation** - Working perfectly
+- **Tool functionality** - 33% success rate (4/12 tools working)
+- **Claude Desktop integration** - Compatible but limited by broken tools
+- **Dependency resolution** - Complete and working
+- **Test Report**: See [comprehensive-test-execution-report.md](./test-debug-logs/comprehensive-test-execution-report.md)
 
 ### Development Testing
 ```bash
