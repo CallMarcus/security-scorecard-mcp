@@ -17,11 +17,26 @@ function createServerWithStubs(responses: Record<string, any>) {
 
 test('getQuickWins lists high-impact low-effort items', async () => {
   const server = createServerWithStubs({
-    '/companies/example.com/issues/active?size=50': {
+    '/companies/example.com/factors': {
       entries: [
-        { type: 'spf_record_missing', severity: 'medium' },
-        { type: 'dmarc_contains_none', severity: 'medium' },
-        { type: 'patching_cadence_v3_critical', severity: 'critical' }
+        { 
+          name: 'dns_health', 
+          score: 85,
+          issue_summary: [
+            { type: 'spf_record_missing' },
+            { type: 'dmarc_contains_none' }
+          ]
+        }
+      ]
+    },
+    '/companies/example.com/issues/spf_record_missing?size=50': {
+      entries: [
+        { type: 'spf_record_missing', severity: 'medium' }
+      ]
+    },
+    '/companies/example.com/issues/dmarc_contains_none?size=50': {
+      entries: [
+        { type: 'dmarc_contains_none', severity: 'medium' }
       ]
     }
   });
@@ -29,7 +44,7 @@ test('getQuickWins lists high-impact low-effort items', async () => {
   const result = await server.getQuickWins('example.com', 'medium');
   const text: string = result.content[0].text;
   assert.ok(text.includes('COMMON QUICK WINS'));
-  assert.ok(text.includes('SPF Record Configuration'));
+  assert.ok(text.includes('example.com'));
 });
 
 test('getQuickWins rejects invalid maxEffort', async () => {

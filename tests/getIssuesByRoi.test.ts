@@ -17,14 +17,30 @@ function createServerWithStubs(responses: Record<string, any>) {
 
 test('getIssuesByROI ranks issues with highest ROI', async () => {
   const server = createServerWithStubs({
-    '/companies/example.com/issues/active?size=50': {
+    '/companies/example.com/factors': {
       entries: [
-        { type: 'spf_record_missing', severity: 'medium' },
-        { type: 'spf_record_missing', severity: 'medium' },
-        { type: 'patching_cadence_v3_critical', severity: 'critical' }
+        { 
+          name: 'dns_health', 
+          score: 85,
+          issue_summary: [
+            { type: 'spf_record_missing' },
+            { type: 'dmarc_contains_none' }
+          ]
+        }
       ]
     },
-    '/factors': { entries: [ { name: 'dns_health', weight: 10 }, { name: 'patching_cadence', weight: 15 } ] }
+    '/companies/example.com/issues/spf_record_missing?size=50': {
+      entries: [
+        { type: 'spf_record_missing', severity: 'medium' },
+        { type: 'spf_record_missing', severity: 'medium' }
+      ]
+    },
+    '/companies/example.com/issues/dmarc_contains_none?size=50': {
+      entries: [
+        { type: 'dmarc_contains_none', severity: 'medium' }
+      ]
+    },
+    '/factors': { entries: [ { name: 'dns_health', weight: 10 } ] }
   });
 
   const result = await server.getIssuesByROI('example.com', 5);

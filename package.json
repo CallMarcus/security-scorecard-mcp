@@ -7,8 +7,7 @@
   "scripts": {
     "build": "tsc",
     "start": "node build/index.js",
-    "test": "NODE_ENV=test node --loader ts-node/esm --test tests/*.test.ts",
-    "build": "tsc"
+    "test": "NODE_ENV=test node --import 'data:text/javascript,import { register } from \"node:module\"; import { pathToFileURL } from \"node:url\"; register(\"ts-node/esm\", pathToFileURL(\"./\"));' --test tests/*.test.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^0.6.0",
