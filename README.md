@@ -1,8 +1,15 @@
 # Security Scorecard MCP
 
-This repository contains a compiled Model Context Protocol (MCP) server that integrates with the [SecurityScorecard REST API](https://securityscorecard.readme.io/). It exposes a set of MCP tools for retrieving company scorecards, analyzing findings and generating remediation plans.
+A production-ready Model Context Protocol (MCP) server that integrates with the [SecurityScorecard REST API](https://securityscorecard.readme.io/). It provides comprehensive security analysis tools for Claude Desktop, enabling AI-powered security scorecard analysis, remediation planning, and risk assessment.
 
-The `build` directory ships with the compiled JavaScript server (`build/index.js`). Documentation, debugging helpers and architecture references live in `build_docs/`, but this folder isn't installed by default. Fetch it on demand with `scripts/update.ps1 -IncludeDocs` or `scripts/fetch-docs.ps1`.
+**✅ Production Ready:** All 12 MCP tools fully functional with complete dependency packaging and one-command installation.
+
+The server exposes powerful MCP tools for:
+- **Security Score Analysis** - Analyze current scores and improvement opportunities  
+- **Remediation Planning** - Generate prioritized roadmaps to reach target grades
+- **Risk Assessment** - Identify high-impact findings across your infrastructure
+- **Asset Management** - Track security posture across domains and IP addresses
+- **ROI Analysis** - Optimize security investments with data-driven prioritization
 
 ## Branch workflow
 
@@ -10,26 +17,40 @@ The `main` branch contains the stable, production-ready code. Active development
 happens on the `dev` branch where new features and fixes are tested before being
 merged back into `main`.
 
-## Quick setup
+## 🚀 One-Command Installation
 
-Run the provided setup script to verify your Node.js installation, collect the
-required configuration values and launch the server. The script now also allows
-setting a comma-separated list of default issue types used by some tools:
+The SecurityScorecard MCP features a streamlined installation process that works on any clean Windows machine:
 
-```bash
-./setup.sh
+### Prerequisites
+- **Node.js 18+** - [Download here](https://nodejs.org/)
+- **GitHub CLI** - [Download here](https://cli.github.com/) (or will be auto-installed via winget)
+- **SecurityScorecard API Token** - [Get from your SecurityScorecard dashboard](https://platform.securityscorecard.io/)
+
+### Quick Start
+```powershell
+# Download and run the setup script (Windows)
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/CallMarcus/security-scorecard-mcp/main/setup.ps1" -OutFile "setup.ps1"
+.\setup.ps1
 ```
 
-On Windows use `setup.ps1` instead. The script writes the entered values to a
-`.env` file so subsequent runs can reuse them. If the update script is missing,
-`setup.ps1` bootstraps itself by downloading `scripts/update.ps1` before
-continuing. You'll be prompted for:
+**That's it!** The setup script will:
+1. ✅ Verify Node.js installation
+2. ✅ Install/authenticate GitHub CLI if needed  
+3. ✅ Download the latest MCP release with all dependencies
+4. ✅ Configure your SecurityScorecard API credentials
+5. ✅ Launch the MCP server ready for Claude Desktop
 
-1. The company domain used in most queries
-2. Your SecurityScorecard API token
-3. (Optional) default issue types to scan across assets
+You'll be prompted for:
+- **Company domain** - The primary domain for your security analysis
+- **SecurityScorecard API token** - Your API credentials
+- **Default issue types** - (Optional) Comma-separated list for scanning
 
-The setup script installs only the core runtime. Retrieve the documentation bundle later with `scripts/update.ps1 -IncludeDocs` or `scripts/fetch-docs.ps1` on Windows.
+### Linux/macOS
+```bash
+curl -O https://raw.githubusercontent.com/CallMarcus/security-scorecard-mcp/main/setup.sh
+chmod +x setup.sh
+./setup.sh
+```
 
 ## Release Channels
 
@@ -57,9 +78,7 @@ On Windows 11 run:
 
 You can change channels later by running the update script with the same flag.
 
-If this repository is private, set a `GITHUB_TOKEN` environment variable with a
-personal access token before running the setup or update scripts. The token
-needs `repo` scope so the scripts can fetch release assets.
+**Authentication:** The setup script uses GitHub CLI authentication automatically. For private repositories, ensure you have `repo` scope when authenticating with `gh auth login`.
 
 ## Updating MCP
 
@@ -131,34 +150,85 @@ const issuesInfo = await getEndpointDetails("/companies/{domain}/issues");
 
 These utilities power the endpoint testing script and are used by the remediation report builder to note which API resources were queried.
 
-## Sample Claude Desktop configuration
+## ✅ Success Indicators
 
-Claude Desktop looks for its configuration file at `%APPDATA%/Claude/claude_desktop_config.json` on Windows. Below is a minimal example that references this MCP server. Replace the placeholder values with your own token and default domain.
+When the installation completes successfully, you should see:
+
+```
+✅ Live SecurityScorecard MCP Server running - Ready for analysis!
+```
+
+The server is now ready to integrate with Claude Desktop. If you see module errors or other issues, refer to the troubleshooting section below.
+
+## Claude Desktop Integration
+
+After running the setup script, configure Claude Desktop to connect to your MCP server:
+
+### Configuration Location
+- **Windows:** `%APPDATA%/Claude/claude_desktop_config.json`  
+- **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
+- **Linux:** `~/.config/Claude/claude_desktop_config.json`
+
+### Sample Configuration
+Replace the placeholder values with your installation path and credentials:
 
 ```json
 {
   "servers": {
-    "security-scorecard-enterprise": {
+    "security-scorecard-mcp": {
       "command": "node",
-      "args": ["C:\\Temp\\scorecard\\build\\index.js"],
+      "args": ["C:\\path\\to\\your\\installation\\build\\index.js"],
       "env": {
-        "SECURITY_SCORECARD_API_TOKEN": "YOUR_TOKEN_HERE",
+        "SECURITY_SCORECARD_API_TOKEN": "YOUR_API_TOKEN_HERE",
         "COMPANY_DOMAIN": "example.com",
-        "DEFAULT_ISSUE_TYPES": "spf_record_missing,dmarc_contains_none,patching_cadence_v3_critical"
-          "DEBUG_MODE": "false"
+        "DEFAULT_ISSUE_TYPES": "spf_record_missing,dmarc_contains_none,patching_cadence_v3_critical",
+        "DEBUG_MODE": "false"
       },
       "shell": false
     }
   },
-  "defaultServer": "security-scorecard-enterprise"
+  "defaultServer": "security-scorecard-mcp"
 }
 ```
 
-You can also find this example at `build_docs/claude_desktop_config.sample.json`.
+### Quick Configuration Tips
+1. **Find your installation path** - The setup script displays the installation directory
+2. **Use your actual domain** - Replace `example.com` with your company's primary domain  
+3. **Restart Claude Desktop** - After saving the configuration file
+4. **Verify connection** - Look for the SecurityScorecard MCP server in Claude's tool list
 
 
 
-## MCP tools
+## 🔧 Troubleshooting
+
+### Common Issues and Solutions
+
+**❌ "Cannot find package '@modelcontextprotocol/sdk'"**
+- **Cause:** Incomplete or corrupted installation
+- **Solution:** Re-run the setup script to ensure all dependencies are installed
+
+**❌ "Bad credentials (HTTP 401)"**  
+- **Cause:** Invalid or expired GitHub token
+- **Solution:** Clear the token and re-authenticate:
+  ```powershell
+  Remove-Item Env:GITHUB_TOKEN -ErrorAction SilentlyContinue
+  gh auth login --web --scopes "repo"
+  ```
+
+**❌ "No stable release found"**
+- **Cause:** No published releases available
+- **Solution:** Use development channel: `.\setup.ps1 -Dev`
+
+**❌ Module loading errors**
+- **Cause:** Incomplete dependency installation  
+- **Solution:** Run setup script again to download complete package
+
+### Getting Help
+- Check the [GitHub Issues](https://github.com/CallMarcus/security-scorecard-mcp/issues) for known problems
+- Review the installation logs for specific error messages
+- Ensure you have the required Node.js version (18+)
+
+## 🛠️ MCP Tools Reference
 
 Each tool is invoked with the MCP `call_tool` request. Responses are returned in
 `content[0].text` as Markdown. Errors use the same structure and are prefixed
