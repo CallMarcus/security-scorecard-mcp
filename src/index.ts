@@ -850,96 +850,65 @@ export class ScoreImpactSecurityScorecardServer {
   ): Promise<any> {
       domain = this.sanitizeDomain(domain);
       topN = this.validateTopN(topN);
-      // Since /companies/{domain}/issues/active returns 404, try alternative approach
-      // Get factor data first to know what issue types to query for
+      
+      // Use factors endpoint to get issue summaries with score impact data
       const [companyData, allFactors] = await Promise.all([
           this.makeRequest(`/companies/${domain}/factors`),
           this.getFactors()
       ]);
 
-      // Extract issue types from factor summaries and query them individually  
-      const issueTypes = new Set<string>();
+      const factorMap = new Map(allFactors.map(f => [f.name, f]));
+      const issuesByRoi: IssueROI[] = [];
+
+      // Process issue summaries from each factor
       companyData.entries?.forEach((factor: any) => {
         factor.issue_summary?.forEach((issue: any) => {
-          if (issue.type) issueTypes.add(issue.type);
+          if (issue.type && issue.count > 0) {
+            const factorDetails = factorMap.get(factor.name);
+            const factorWeight = factorDetails?.weight || 5;
+            
+            // Use actual score impact from API if available, otherwise calculate estimate
+            const scoreImpact = issue.total_score_impact || 
+              ((this.getSeverityScore(issue.severity || 'medium') / 5) * (factorWeight / 100) * Math.log1p(issue.count) * 2);
+            
+            const effort = this.getEffortForIssue(issue.type);
+            const effortScore = this.getEffortScore(effort);
+            const roiScore = scoreImpact / effortScore;
+
+            issuesByRoi.push({
+                issue_type: issue.type,
+                volume: issue.count,
+                factor: factor.name,
+                severity: issue.severity || 'medium',
+                estimated_score_impact: scoreImpact,
+                effort_level: effort,
+                roi_score: roiScore,
+            });
+          }
         });
       });
 
-      // Get all issues by querying individual issue types
-      let allIssues: { entries: Issue[] } = { entries: [] };
-      if (issueTypes.size > 0) {
-        const issuePromises = Array.from(issueTypes).slice(0, 10).map(async (issueType) => {
-          try {
-            const result = await this.makeRequest(`/companies/${domain}/issues/${issueType}?size=${this.pageSize}`);
-            return result.entries || [];
-          } catch (error) {
-            return [];
-          }
-        });
-        
-        const issueResults = await Promise.all(issuePromises);
-        allIssues.entries = issueResults.flat();
-      }
-
-      if (!allIssues.entries || allIssues.entries.length === 0) {
+      if (issuesByRoi.length === 0) {
           return { content: [{ type: "text", text: `✅ No ${status} issues found for ${domain}.` }] };
       }
-      
-      const factorMap = new Map(allFactors.map(f => [f.name, f]));
 
-      const issueCounts = allIssues.entries.reduce((acc: Record<string, number>, issue: Issue) => {
-          acc[issue.type] = (acc[issue.type] || 0) + 1;
-          return acc;
-      }, {});
-
-      const issueDetailsMap = new Map<string, Issue>(
-          allIssues.entries.map((issue: Issue) => [issue.type, issue])
-      );
-
-      // FIX: The map/filter/sort chain was refactored to be type-safe.
-      // 1. Map to an array that can contain nulls.
-      // 2. Filter out the nulls, which tells TypeScript the remaining items are valid IssueROI objects.
-      // 3. Now sort and slice can be safely called.
-      const issuesByRoi: IssueROI[] = Object.keys(issueCounts)
-        .map((issueType): IssueROI | null => {
-            const issueDetail = issueDetailsMap.get(issueType);
-            if (!issueDetail) {
-                return null;
-            }
-            const factorName = this.getFactorForIssueType(issueType);
-            const factorDetails = factorMap.get(factorName);
-            const factorWeight = factorDetails?.weight || 5;
-
-            const severityScore = this.getSeverityScore(issueDetail.severity);
-            const estimatedScoreImpact = (severityScore / 5) * (factorWeight / 100) * Math.log1p(issueCounts[issueType]) * 10;
-            const effort = this.getEffortForIssue(issueType);
-            const roiScore = estimatedScoreImpact / this.getEffortScore(effort);
-
-            return {
-                issue_type: issueType,
-                volume: issueCounts[issueType],
-                factor: factorName,
-                severity: issueDetail.severity,
-                estimated_score_impact: estimatedScoreImpact,
-                effort_level: effort,
-                roi_score: roiScore,
-            };
-        })
-        .filter((issue): issue is IssueROI => issue !== null)
+      // Sort by ROI and take top N
+      const topIssues = issuesByRoi
         .sort((a, b) => b.roi_score - a.roi_score)
         .slice(0, topN);
 
-      const text = `# 🚀 COMMON HIGH-ROI ISSUES: ${domain}\n\n` +
-                   `**Top ${issuesByRoi.length} highest ROI security improvements based on ${status} findings:**\n\n` +
-                   `${issuesByRoi.map((issue: IssueROI, i: number) =>
+      const text = `# 🚀 TOP ROI SECURITY IMPROVEMENTS: ${domain}\n\n` +
+                   `**Top ${topIssues.length} highest ROI security improvements based on ${status} findings:**\n\n` +
+                   `${topIssues.map((issue: IssueROI, i: number) =>
                        `## ${i + 1}. ${issue.issue_type.replace(/_/g, ' ').toUpperCase()}\n` +
-                       `- **📊 ROI Score**: ${issue.roi_score.toFixed(1)}\n` +
-                       `- **🎯 Est. Score Impact**: +${issue.estimated_score_impact.toFixed(2)} points\n` +
+                       `- **📊 ROI Score**: ${issue.roi_score.toFixed(2)}\n` +
+                       `- **🎯 Score Impact**: +${issue.estimated_score_impact.toFixed(3)} points\n` +
                        `- **📈 Volume**: ${issue.volume} findings\n` +
                        `- **⚡ Effort Level**: ${issue.effort_level.replace(/_/g, ' ')}\n` +
-                       `- **📂 Factor**: ${issue.factor.replace(/_/g, ' ')}\n`
+                       `- **📂 Security Factor**: ${issue.factor.replace(/_/g, ' ')}\n` +
+                       `- **🔥 Severity**: ${issue.severity}\n`
                    ).join('\n')}\n\n` +
-                   `**Implementation Strategy**: Address these issues in order of their ROI score to achieve the fastest possible improvement in your security posture.`;
+                   `**💡 Implementation Strategy**: Address these issues in order of ROI score. Start with #1 (${topIssues[0]?.issue_type.replace(/_/g, ' ')}) for maximum impact per effort invested.`;
       
       return { content: [{ type: "text", text }] };
   }
@@ -951,32 +920,76 @@ export class ScoreImpactSecurityScorecardServer {
   ): Promise<any> {
     domain = this.sanitizeDomain(domain);
     if (!Array.isArray(issueTypes) || issueTypes.length === 0) {
+      // If no issue types provided, get them from factors endpoint
+      try {
+        const companyData = await this.makeRequest(`/companies/${domain}/factors`);
+        const discoveredIssueTypes = new Set<string>();
+        companyData.entries?.forEach((factor: any) => {
+          factor.issue_summary?.forEach((issue: any) => {
+            if (issue.type && issue.count > 0) {
+              discoveredIssueTypes.add(issue.type);
+            }
+          });
+        });
+        issueTypes = Array.from(discoveredIssueTypes).slice(0, 15); // Limit to avoid rate limits
+      } catch (error) {
+        return { content: [{ type: 'text', text: "**No issue types could be discovered**: Unable to scan for findings" }] };
+      }
+    }
+
+    if (issueTypes.length === 0) {
       return { content: [{ type: 'text', text: "**Active Issue Types**: 0 / 0" }] };
     }
 
     const results = await Promise.all(
       issueTypes.map(async (issueType) => {
         try {
+          // Use correct API pattern: /companies/{domain}/issues/{issue_type}
           const res = await this.makeRequest(
-            `/companies/${domain}/issues/${status}/${issueType}?size=${this.pageSize}`
+            `/companies/${domain}/issues/${issueType}?size=${this.pageSize}`
           );
           const count = Array.isArray(res.entries) ? res.entries.length : 0;
-          return { issueType, count };
+          const severity = res.entries && res.entries.length > 0 ? 
+            (res.entries[0].severity || 'medium') : 'unknown';
+          return { issueType, count, severity };
         } catch {
-          return { issueType, count: 0 };
+          return { issueType, count: 0, severity: 'unknown' };
         }
       })
     );
 
     const activeCount = results.filter((r) => r.count > 0).length;
+    const totalFindings = results.reduce((sum, r) => sum + r.count, 0);
+    
+    // Sort by count (highest impact first)
+    const sortedResults = results.sort((a, b) => b.count - a.count);
+    
     let text =
-      `# 🔍 FINDINGS SUMMARY: ${domain}\n\n` +
-      `**Active Issue Types**: ${activeCount} / ${issueTypes.length}\n\n`;
-    results.forEach((r) => {
+      `# 🔍 HIGH-IMPACT FINDINGS ACROSS ASSETS: ${domain}\n\n` +
+      `**Active Issue Types**: ${activeCount} / ${issueTypes.length}\n` +
+      `**Total Findings**: ${totalFindings}\n` +
+      `**Status**: ${status}\n\n`;
+      
+    // Show top findings first
+    const topFindings = sortedResults.filter(r => r.count > 0).slice(0, 10);
+    if (topFindings.length > 0) {
+      text += `## 🎯 Top Security Issues (Highest Volume)\n\n`;
+      topFindings.forEach((r, i) => {
+        text +=
+          `### ${i + 1}. ${r.issueType.replace(/_/g, ' ').toUpperCase()}\n` +
+          `- **Findings**: ${r.count}\n` +
+          `- **Severity**: ${r.severity}\n` +
+          `- **Impact**: ${r.count > 50 ? 'High' : r.count > 10 ? 'Medium' : 'Low'}\n\n`;
+      });
+    }
+    
+    // Show all results summary
+    text += `## 📊 Complete Findings Summary\n\n`;
+    sortedResults.forEach((r) => {
       text +=
-        `## ${r.issueType.replace(/_/g, ' ').toUpperCase()}\n` +
-        `- **Findings**: ${r.count}\n\n`;
+        `**${r.issueType.replace(/_/g, ' ').toUpperCase()}**: ${r.count} findings\n`;
     });
+    
     return { content: [{ type: 'text', text }] };
   }
 

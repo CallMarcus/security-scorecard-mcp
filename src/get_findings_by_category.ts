@@ -17,24 +17,52 @@ export async function getFindingsByCategory(
   makeRequest: (endpoint: string) => Promise<any>,
   domain: string
 ): Promise<FactorSummary[]> {
-  const issues = await makeRequest(`/companies/${domain}/issues?limit=200`);
-  const factorMap = new Map<string, FindingEntry[]>();
-  issues.entries?.forEach((issue: FindingEntry) => {
-    const factor = issue.factor || 'unknown';
-    if (!factorMap.has(factor)) {
-      factorMap.set(factor, []);
+  // Use factors endpoint which provides issue summaries categorized by factor
+  const factorsResponse = await makeRequest(`/companies/${domain}/factors`);
+  const factorSummary: FactorSummary[] = [];
+  
+  // Process each factor and its issue summary
+  factorsResponse.entries?.forEach((factor: any) => {
+    const issues: FindingEntry[] = [];
+    let criticalCount = 0;
+    let highCount = 0;
+    let totalCount = 0;
+    
+    // Extract issues from the factor's issue_summary
+    factor.issue_summary?.forEach((issue: any) => {
+      const findingEntry: FindingEntry = {
+        factor: factor.name,
+        severity: issue.severity,
+        issue_type: issue.type,
+        count: issue.count || 0,
+        total_score_impact: issue.total_score_impact || 0
+      };
+      
+      issues.push(findingEntry);
+      totalCount += issue.count || 0;
+      
+      if (issue.severity === 'critical') {
+        criticalCount += issue.count || 0;
+      } else if (issue.severity === 'high') {
+        highCount += issue.count || 0;
+      }
+    });
+    
+    // Only include factors that have issues
+    if (totalCount > 0) {
+      factorSummary.push({
+        factor: factor.name,
+        issue_count: totalCount,
+        critical_count: criticalCount,
+        high_count: highCount,
+        issues: issues
+      });
     }
-    factorMap.get(factor)!.push(issue);
   });
-  const factorSummary: FactorSummary[] = Array.from(factorMap.entries())
-    .map(([factor, factorIssues]) => ({
-      factor,
-      issue_count: factorIssues.length,
-      critical_count: factorIssues.filter(i => i.severity === 'critical').length,
-      high_count: factorIssues.filter(i => i.severity === 'high').length,
-      issues: factorIssues
-    }))
-    .sort((a, b) => (b.critical_count * 10 + b.high_count * 5 + b.issue_count) -
-      (a.critical_count * 10 + a.high_count * 5 + a.issue_count));
-  return factorSummary;
+  
+  // Sort by risk priority (critical issues weighted highest)
+  return factorSummary.sort((a, b) => 
+    (b.critical_count * 10 + b.high_count * 5 + b.issue_count) -
+    (a.critical_count * 10 + a.high_count * 5 + a.issue_count)
+  );
 }

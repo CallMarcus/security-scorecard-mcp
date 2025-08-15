@@ -22,5 +22,29 @@
     "method": "GET",
     "url": "https://api.securityscorecard.io/companies/{domain}/issues/{issue_type}?domain={child_domain}",
     "description": "Get issue details for a child domain through parent company"
+  },
+  {
+    "file": "footprint_domains.md",
+    "method": "GET",
+    "url": "https://api.securityscorecard.io/footprint/{domain}/assets/domains",
+    "description": "Get domain assets for organization footprint (may require special access)"
+  },
+  {
+    "file": "footprint_ips.md",
+    "method": "GET",
+    "url": "https://api.securityscorecard.io/footprint/{domain}/assets/ips",
+    "description": "Get IP assets for organization footprint (may require special access)"
+  },
+  {
+    "file": "historical_factors.md",
+    "method": "GET",
+    "url": "https://api.securityscorecard.io/companies/{domain}/history/factors",
+    "description": "Get historical factor scores for trend analysis"
+  },
+  {
+    "file": "historical_score.md",
+    "method": "GET",
+    "url": "https://api.securityscorecard.io/companies/{domain}/history/score",
+    "description": "Get historical overall scores for trend analysis"
   }
 ]
