@@ -1,0 +1,26 @@
+[
+  {
+    "file": "companies.md",
+    "method": "GET",
+    "url": "https://api.securityscorecard.io/companies/{domain}",
+    "description": "Get company information and overall security score"
+  },
+  {
+    "file": "factors.md", 
+    "method": "GET",
+    "url": "https://api.securityscorecard.io/companies/{domain}/factors",
+    "description": "Get factor scores and issue summaries for a company"
+  },
+  {
+    "file": "issues.md",
+    "method": "GET", 
+    "url": "https://api.securityscorecard.io/companies/{domain}/issues/{issue_type}",
+    "description": "Get specific issue type details for a company"
+  },
+  {
+    "file": "child_issues.md",
+    "method": "GET",
+    "url": "https://api.securityscorecard.io/companies/{domain}/issues/{issue_type}?domain={child_domain}",
+    "description": "Get issue details for a child domain through parent company"
+  }
+]
