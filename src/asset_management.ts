@@ -68,10 +68,44 @@ export async function getAssetInventory(
 
   for (const domainAsset of domains) {
     try {
-      const issues = await makeRequest(`/companies/${domainAsset.name}/issues/active`);
-      const issueCount = issues.entries?.length || 0;
-      const criticalCount = issues.entries?.filter((i: any) => i.severity === 'critical').length || 0;
-      const highCount = issues.entries?.filter((i: any) => i.severity === 'high').length || 0;
+      // Use factors endpoint to get issue summary for each domain asset
+      let issueCount = 0;
+      let criticalCount = 0;
+      let highCount = 0;
+      
+      try {
+        // Try to get factors for this domain directly
+        const factors = await makeRequest(`/companies/${domainAsset.name}/factors`);
+        factors.entries?.forEach((factor: any) => {
+          factor.issue_summary?.forEach((issue: any) => {
+            if (issue.count) {
+              issueCount += issue.count;
+              if (issue.severity === 'critical') criticalCount += issue.count;
+              if (issue.severity === 'high') highCount += issue.count;
+            }
+          });
+        });
+      } catch (factorError) {
+        // If direct access fails, try through parent domain with domain parameter
+        const parentDomain = await findParentDomain(makeRequest, domainAsset.name);
+        if (parentDomain) {
+          const parentFactors = await makeRequest(`/companies/${parentDomain}/factors`);
+          const issueTypes = extractIssueTypesFromFactors(parentFactors);
+          
+          // Sample a few issue types to estimate total issues
+          for (const issueType of issueTypes.slice(0, 3)) {
+            try {
+              const issues = await makeRequest(`/companies/${parentDomain}/issues/${issueType}?domain=${domainAsset.name}`);
+              const entries = issues.entries || [];
+              issueCount += entries.length;
+              criticalCount += entries.filter((i: any) => i.severity === 'critical').length;
+              highCount += entries.filter((i: any) => i.severity === 'high').length;
+            } catch (issueError) {
+              continue;
+            }
+          }
+        }
+      }
 
       domainScores.push({
         asset_name: domainAsset.name,
@@ -117,7 +151,7 @@ export async function getAssetInventory(
 }
 
 /**
- * Get detailed findings for specific asset
+ * Get detailed findings for specific asset using correct API patterns
  */
 export async function getAssetFindings(
   makeRequest: (endpoint: string) => Promise<any>,
@@ -125,27 +159,80 @@ export async function getAssetFindings(
   assetType: 'domain' | 'ip_address' = 'domain'
 ): Promise<AssetFindings> {
   
-  const issues = await makeRequest(`/companies/${assetName}/issues/active`);
   const findings: { [key: string]: any } = {};
   
-  for (const issue of issues.entries || []) {
-    if (!findings[issue.type]) {
-      findings[issue.type] = {
-        count: 0,
-        severity: issue.severity,
-        factor: getFactorForIssueType(issue.type),
-        remediation_effort: getRemediationEffort(issue.type),
-        business_impact: getBusinessImpact(issue.type, issue.severity)
-      };
+  try {
+    // Determine if this is a child asset query or parent domain query
+    const isChildAsset = await isChildAssetDomain(makeRequest, assetName);
+    
+    if (isChildAsset) {
+      // For child assets, we need to query through parent domain
+      const parentDomain = await findParentDomain(makeRequest, assetName);
+      if (parentDomain) {
+        // Get available issue types from parent's factors
+        const factors = await makeRequest(`/companies/${parentDomain}/factors`);
+        const issueTypes = extractIssueTypesFromFactors(factors);
+        
+        // Query each issue type with domain parameter for child asset
+        for (const issueType of issueTypes.slice(0, 10)) { // Limit to avoid rate limits
+          try {
+            const issues = await makeRequest(`/companies/${parentDomain}/issues/${issueType}?domain=${assetName}`);
+            processIssuesIntoFindings(issues.entries || [], findings, issueType);
+          } catch (error) {
+            // Skip issue types we can't access
+            continue;
+          }
+        }
+      }
+    } else {
+      // For parent domains, use /factors to get issue summary, then optionally fetch specific types
+      const factors = await makeRequest(`/companies/${assetName}/factors`);
+      
+      // Extract issue types and counts from factor summaries
+      factors.entries?.forEach((factor: any) => {
+        factor.issue_summary?.forEach((issue: any) => {
+          if (issue.type && issue.count > 0) {
+            findings[issue.type] = {
+              count: issue.count,
+              severity: issue.severity || 'medium',
+              factor: factor.name,
+              remediation_effort: getRemediationEffort(issue.type),
+              business_impact: getBusinessImpact(issue.type, issue.severity || 'medium')
+            };
+          }
+        });
+      });
+      
+      // If we need more detailed data, fetch specific issue types
+      const issueTypes = Object.keys(findings).slice(0, 5); // Limit for performance
+      for (const issueType of issueTypes) {
+        try {
+          const detailedIssues = await makeRequest(`/companies/${assetName}/issues/${issueType}`);
+          // Update with more detailed information if available
+          if (detailedIssues.entries && detailedIssues.entries.length > 0) {
+            findings[issueType].count = detailedIssues.entries.length;
+            const firstIssue = detailedIssues.entries[0];
+            if (firstIssue.severity) {
+              findings[issueType].severity = firstIssue.severity;
+              findings[issueType].business_impact = getBusinessImpact(issueType, firstIssue.severity);
+            }
+          }
+        } catch (error) {
+          // Keep factor summary data if detailed fetch fails
+          continue;
+        }
+      }
     }
-    findings[issue.type].count++;
+  } catch (error) {
+    // If all approaches fail, return empty findings with error context
+    console.error(`Error fetching findings for ${assetName}:`, error);
   }
 
   // Calculate remediation priorities
   const priorities = Object.entries(findings).map(([issueType, data]) => ({
     issue_type: issueType,
     priority_score: calculatePriorityScore(data),
-    quick_win: data.remediation_effort === 'low' && data.severity in ['high', 'critical']
+    quick_win: data.remediation_effort === 'low' && ['high', 'critical'].includes(data.severity)
   })).sort((a, b) => b.priority_score - a.priority_score);
 
   return {
@@ -178,22 +265,75 @@ export async function compareAssets(
   
   for (const asset of assetNames) {
     try {
-      const issues = await makeRequest(`/companies/${asset}/issues/active`);
-      const entries = issues.entries || [];
+      let totalIssues = 0;
+      let criticalCount = 0;
+      let highCount = 0;
+      let mediumCount = 0;
+      const issueTypeCounts: { [key: string]: number } = {};
       
-      const criticalCount = entries.filter((i: any) => i.severity === 'critical').length;
-      const highCount = entries.filter((i: any) => i.severity === 'high').length;
+      try {
+        // Try to get factors for this asset directly
+        const factors = await makeRequest(`/companies/${asset}/factors`);
+        factors.entries?.forEach((factor: any) => {
+          factor.issue_summary?.forEach((issue: any) => {
+            if (issue.count) {
+              totalIssues += issue.count;
+              issueTypeCounts[issue.type] = (issueTypeCounts[issue.type] || 0) + issue.count;
+              
+              switch (issue.severity) {
+                case 'critical':
+                  criticalCount += issue.count;
+                  break;
+                case 'high':
+                  highCount += issue.count;
+                  break;
+                case 'medium':
+                  mediumCount += issue.count;
+                  break;
+              }
+            }
+          });
+        });
+      } catch (factorError) {
+        // If direct access fails, try through parent domain
+        const parentDomain = await findParentDomain(makeRequest, asset);
+        if (parentDomain) {
+          const parentFactors = await makeRequest(`/companies/${parentDomain}/factors`);
+          const issueTypes = extractIssueTypesFromFactors(parentFactors);
+          
+          // Query specific issue types for this asset through parent
+          for (const issueType of issueTypes.slice(0, 5)) {
+            try {
+              const issues = await makeRequest(`/companies/${parentDomain}/issues/${issueType}?domain=${asset}`);
+              const entries = issues.entries || [];
+              
+              totalIssues += entries.length;
+              issueTypeCounts[issueType] = (issueTypeCounts[issueType] || 0) + entries.length;
+              
+              entries.forEach((issue: any) => {
+                switch (issue.severity) {
+                  case 'critical':
+                    criticalCount++;
+                    break;
+                  case 'high':
+                    highCount++;
+                    break;
+                  case 'medium':
+                    mediumCount++;
+                    break;
+                }
+              });
+            } catch (issueError) {
+              continue;
+            }
+          }
+        }
+      }
       
       // Calculate risk score (weighted by severity)
-      const riskScore = criticalCount * 5 + highCount * 3 + 
-        entries.filter((i: any) => i.severity === 'medium').length * 1;
+      const riskScore = criticalCount * 5 + highCount * 3 + mediumCount * 1;
       
       // Get top issue types
-      const issueTypeCounts: { [key: string]: number } = {};
-      entries.forEach((issue: any) => {
-        issueTypeCounts[issue.type] = (issueTypeCounts[issue.type] || 0) + 1;
-      });
-      
       const topIssues = Object.entries(issueTypeCounts)
         .sort(([,a], [,b]) => b - a)
         .slice(0, 3)
@@ -201,7 +341,7 @@ export async function compareAssets(
 
       comparisons.push({
         asset_name: asset,
-        total_issues: entries.length,
+        total_issues: totalIssues,
         critical_issues: criticalCount,
         high_issues: highCount,
         security_risk_score: riskScore,
@@ -236,6 +376,73 @@ function getFactorForIssueType(issueType: string): string {
   if (issueType.includes('csp') || issueType.includes('hsts') || issueType.includes('xss')) return 'application_security';
   if (issueType.includes('leaked') || issueType.includes('breach')) return 'cubit_score';
   return 'endpoint_security';
+}
+
+/**
+ * Determine if a domain is a child asset by checking if direct access returns 403/404
+ */
+async function isChildAssetDomain(makeRequest: (endpoint: string) => Promise<any>, domain: string): Promise<boolean> {
+  try {
+    await makeRequest(`/companies/${domain}`);
+    return false; // If we can access it directly, it's a parent domain
+  } catch (error: any) {
+    if (error.message && (error.message.includes('403') || error.message.includes('404'))) {
+      return true; // 403/404 suggests it's a child asset
+    }
+    throw error; // Re-throw other errors
+  }
+}
+
+/**
+ * Find parent domain for a child asset (simplified approach)
+ * In a real implementation, this might query a company portfolio API
+ */
+async function findParentDomain(makeRequest: (endpoint: string) => Promise<any>, childDomain: string): Promise<string | null> {
+  // Extract root domain as potential parent
+  const parts = childDomain.split('.');
+  if (parts.length > 2) {
+    const rootDomain = parts.slice(-2).join('.');
+    try {
+      await makeRequest(`/companies/${rootDomain}`);
+      return rootDomain;
+    } catch (error) {
+      return null;
+    }
+  }
+  return null;
+}
+
+/**
+ * Extract issue types from factors response
+ */
+function extractIssueTypesFromFactors(factors: any): string[] {
+  const issueTypes = new Set<string>();
+  factors.entries?.forEach((factor: any) => {
+    factor.issue_summary?.forEach((issue: any) => {
+      if (issue.type) {
+        issueTypes.add(issue.type);
+      }
+    });
+  });
+  return Array.from(issueTypes);
+}
+
+/**
+ * Process issue entries into findings object
+ */
+function processIssuesIntoFindings(issues: any[], findings: { [key: string]: any }, issueType: string) {
+  if (!issues || issues.length === 0) return;
+  
+  const severities = issues.map(i => i.severity).filter(Boolean);
+  const primarySeverity = severities[0] || 'medium';
+  
+  findings[issueType] = {
+    count: issues.length,
+    severity: primarySeverity,
+    factor: getFactorForIssueType(issueType),
+    remediation_effort: getRemediationEffort(issueType),
+    business_impact: getBusinessImpact(issueType, primarySeverity)
+  };
 }
 
 function getRemediationEffort(issueType: string): 'low' | 'medium' | 'high' {
