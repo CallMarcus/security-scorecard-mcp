@@ -1,5 +1,12 @@
 # Security Scorecard MCP
 
+![TypeScript](https://img.shields.io/badge/typescript-%23007ACC.svg?style=for-the-badge&logo=typescript&logoColor=white)
+![Node.js](https://img.shields.io/badge/node.js-6DA55F?style=for-the-badge&logo=node.js&logoColor=white)
+![PowerShell](https://img.shields.io/badge/PowerShell-%235391FE.svg?style=for-the-badge&logo=powershell&logoColor=white)
+![Claude](https://img.shields.io/badge/Claude%20Desktop-FF6B35?style=for-the-badge&logo=anthropic&logoColor=white)
+![Security](https://img.shields.io/badge/SecurityScorecard-FF4B4B?style=for-the-badge&logo=security&logoColor=white)
+![MCP](https://img.shields.io/badge/Model%20Context%20Protocol-000000?style=for-the-badge&logo=protocol&logoColor=white)
+
 A Model Context Protocol (MCP) server that integrates with the [SecurityScorecard REST API](https://securityscorecard.readme.io/). Originally designed for executive reporting, this MCP is being refocused to support operational security teams with daily remediation workflows.
 
 **✅ Core Tools Working:** Currently 100% functional (11/11 registered tools working in Claude Desktop). 3 additional tools need registration/completion. See [OPERATIONAL-REFOCUS-STRATEGY.md](./OPERATIONAL-REFOCUS-STRATEGY.md) for remaining roadmap.
@@ -28,6 +35,17 @@ A Model Context Protocol (MCP) server that integrates with the [SecurityScorecar
 - **Category Analysis** - ✅ FIXED - Findings organized by security factors
 - **Direct API Access** - Full SecurityScorecard API integration
 
+## 🏗️ Technology Stack
+
+This MCP server is built with modern, reliable technologies:
+
+- **TypeScript** - Type-safe development with full IntelliSense support
+- **Node.js 18+** - High-performance JavaScript runtime
+- **Model Context Protocol (MCP)** - Anthropic's protocol for AI tool integration
+- **SecurityScorecard API** - Enterprise security posture management
+- **PowerShell** - Cross-platform automation and setup scripts
+- **GitHub Actions** - Automated testing and deployment pipelines
+
 ## Branch workflow
 
 The `main` branch contains the stable, production-ready code. Active development
@@ -43,9 +61,11 @@ The SecurityScorecard MCP features a streamlined installation process that works
 - **GitHub CLI** - [Download here](https://cli.github.com/) (or will be auto-installed via winget)
 - **SecurityScorecard API Token** - [Get from your SecurityScorecard dashboard](https://platform.securityscorecard.io/)
 
-### Quick Start
+### Quick Start Options
+
+#### Option 1: Full Production Setup (Recommended for new users)
 ```powershell
-# Download and run the setup script (Windows)
+# Download and run the full setup script (Windows)
 Invoke-WebRequest -Uri "https://raw.githubusercontent.com/CallMarcus/security-scorecard-mcp/main/setup.ps1" -OutFile "setup.ps1"
 .\setup.ps1
 ```
@@ -56,6 +76,18 @@ Invoke-WebRequest -Uri "https://raw.githubusercontent.com/CallMarcus/security-sc
 3. ✅ Download the latest MCP release with all dependencies
 4. ✅ Configure your SecurityScorecard API credentials
 5. ✅ Launch the MCP server ready for Claude Desktop
+
+#### Option 2: Simple Development Setup (For developers/rebuilds)
+```powershell
+# Quick local build and setup
+.\setup_simple.ps1
+```
+
+**Perfect for:** Developers, quick rebuilds, or when you already have the repository cloned. This script will:
+1. ✅ Install dependencies locally
+2. ✅ Build TypeScript to JavaScript  
+3. ✅ Verify build success
+4. ✅ Show Claude Desktop config path and instructions
 
 You'll be prompted for:
 - **Company domain** - The primary domain for your security analysis
@@ -99,8 +131,8 @@ You can change channels later by running the update script with the same flag.
 
 ## Updating MCP
 
-Run the update script to download the latest tagged release and refresh the
-compiled files:
+### Production Updates
+Run the update script to download the latest tagged release and refresh the compiled files:
 
 ```bash
 scripts/update.sh
@@ -113,6 +145,20 @@ On Windows 11 run:
 ```
 
 Add `--dev`/`-Dev` to either command to pull the most recent development build. To download the optional documentation bundle, run `scripts/update.ps1 -IncludeDocs` or `scripts/fetch-docs.ps1`.
+
+### Development Updates (Quick Rebuild)
+For developers who want to quickly rebuild after code changes:
+
+```powershell
+# Quick rebuild after making code changes
+.\setup_simple.ps1
+```
+
+This is perfect when you've:
+- Modified TypeScript source files
+- Made local changes to the codebase  
+- Want to test changes quickly
+- Need to rebuild without re-downloading dependencies
 
 ## Running the server manually
 
