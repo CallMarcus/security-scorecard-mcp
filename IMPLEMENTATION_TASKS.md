@@ -189,5 +189,5 @@ Update test files in `/tests/` directory:
 
 ## Getting Help
 - GitHub Issues: Report bugs and feature requests
-- Slack Channel: #security-mcp-dev
+- Slack Channel: #security-mcp
 - Email: security-mcp@company.com

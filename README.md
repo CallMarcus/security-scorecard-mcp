@@ -101,31 +101,19 @@ chmod +x setup.sh
 ./setup.sh
 ```
 
-## Release Channels
+## Installation
 
-`setup.sh` and `setup.ps1` download the latest build before starting the server.
-By default they fetch the stable release. Pass `--dev` to switch to the
-development channel.
+`setup.sh` and `setup.ps1` download the latest release before starting the server.
 
 ```bash
-# stable release
 ./setup.sh
-
-# development build
-./setup.sh --dev
 ```
 
 On Windows 11 run:
 
 ```powershell
-# stable release
 .\setup.ps1
-
-# development build
-.\setup.ps1 --dev
 ```
-
-You can change channels later by running the update script with the same flag.
 
 **Authentication:** The setup script uses GitHub CLI authentication automatically. For private repositories, ensure you have `repo` scope when authenticating with `gh auth login`.
 
@@ -144,7 +132,7 @@ On Windows 11 run:
 .\scripts\update.ps1
 ```
 
-Add `--dev`/`-Dev` to either command to pull the most recent development build. To download the optional documentation bundle, run `scripts/update.ps1 -IncludeDocs` or `scripts/fetch-docs.ps1`.
+To download the optional documentation bundle, run `scripts/update.ps1 -IncludeDocs` or `scripts/fetch-docs.ps1`.
 
 ### Development Updates (Quick Rebuild)
 For developers who want to quickly rebuild after code changes:
@@ -278,9 +266,9 @@ Replace the placeholder values with your installation path and credentials:
   gh auth login --web --scopes "repo"
   ```
 
-**❌ "No stable release found"**
+**❌ "No release found"**
 - **Cause:** No published releases available
-- **Solution:** Use development channel: `.\setup.ps1 -Dev`
+- **Solution:** Ensure the repository has published releases, or clone the repository for development
 
 **❌ Module loading errors**
 - **Cause:** Incomplete dependency installation  

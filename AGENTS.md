@@ -56,10 +56,8 @@ Invoke-WebRequest -Uri "https://raw.githubusercontent.com/CallMarcus/security-sc
    .\scripts\package.ps1  # Creates mcp-core.zip with dependencies
    ```
 
-## Release channels
-`setup.*` and `scripts/update.*` download prebuilt files from GitHub releases.
-They default to the latest stable release. Supply `--dev` (or `-Dev` on Windows)
-to fetch the most recent development build instead.
+## Installation
+`setup.*` and `scripts/update.*` download prebuilt files from the latest GitHub release.
 
 ## Developing and building
 1. Clone the repository and install dependencies:
