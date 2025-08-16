@@ -116,7 +116,7 @@ export class ScoreImpactSecurityScorecardServer {
     );
     this.tokens = this.burstLimit;
     this.lastRefill = Date.now();
-    this.pageSize = parseInt(process.env.SCORECARD_PAGE_SIZE || "50", 10);
+    this.pageSize = parseInt(process.env.SCORECARD_PAGE_SIZE || "100", 10);
 
     this.setupToolHandlers();
   }
@@ -522,7 +522,31 @@ export class ScoreImpactSecurityScorecardServer {
               },
               required: ["endpoint"]
             }
+          },
+        {
+          name: "discover_all_assets",
+          description: "🔍 ENHANCED DISCOVERY: Use comprehensive pagination and multiple endpoints to find ALL assets (no 50-limit), including IP addresses.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              domain: { type: "string", description: "Parent domain to discover all assets for.", default: this.config.defaultDomain }
+            },
+            required: ["domain"]
           }
+        },
+        {
+          name: "get_asset_detailed_findings",
+          description: "🎯 DETAILED ASSET ANALYSIS: Get comprehensive findings for specific asset with full context and remediation details.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              domain: { type: "string", description: "Parent domain for analysis.", default: this.config.defaultDomain },
+              asset_name: { type: "string", description: "Specific domain or IP to analyze in detail." },
+              asset_type: { type: "string", enum: ["domain", "ip_address"], default: "domain", description: "Type of asset to analyze." }
+            },
+            required: ["domain", "asset_name"]
+          }
+        }
         ],
       };
     });
@@ -641,6 +665,27 @@ export class ScoreImpactSecurityScorecardServer {
               request.params.arguments?.body
             )
           );
+
+        case "discover_all_assets": {
+          const domain = this.sanitizeDomain(rawDomain);
+          return await this.executeTool("discover_all_assets", () =>
+            this.discoverAllAssets(domain)
+          );
+        }
+
+        case "get_asset_detailed_findings": {
+          const domain = this.sanitizeDomain(rawDomain);
+          const assetName = request.params.arguments?.asset_name as string;
+          const assetType = (request.params.arguments?.asset_type as 'domain' | 'ip_address') || 'domain';
+          
+          if (!assetName) {
+            throw new McpError(ErrorCode.InvalidRequest, "asset_name is required for detailed findings analysis");
+          }
+          
+          return await this.executeTool("get_asset_detailed_findings", () =>
+            this.getAssetDetailedFindings(domain, assetName, assetType)
+          );
+        }
 
         default:
           this.log(`Unknown tool requested: ${request.params.name}`);
@@ -1231,8 +1276,10 @@ export class ScoreImpactSecurityScorecardServer {
     return { content: [{ type: "text", text }] };
   }
 
-  private async getAssetFindingsTool(assetName: string, assetType: string): Promise<any> {
-    const findings = await getAssetFindings(this.makeRequest.bind(this), assetName, assetType as 'domain' | 'ip_address');
+  private async getAssetFindingsTool(assetName: string, assetType: string, domain?: string): Promise<any> {
+    // Use the provided domain, or derive it from the asset name if it's a domain, or use default
+    const parentDomain = domain || (assetType === 'domain' ? assetName : this.config.defaultDomain);
+    const findings = await getAssetFindings(this.makeRequest.bind(this), parentDomain, assetName, assetType as 'domain' | 'ip_address');
     
     const totalFindings = Object.values(findings.findings).reduce((sum: number, f: any) => sum + f.count, 0);
     const quickWins = findings.remediation_priority.filter(p => p.quick_win);
@@ -1406,6 +1453,119 @@ export class ScoreImpactSecurityScorecardServer {
           case 'low': return 2;
           default: return 1;
       }
+  }
+
+  /**
+   * Enhanced asset discovery with comprehensive pagination and endpoint exploration
+   */
+  private async discoverAllAssets(domain: string): Promise<any> {
+    domain = this.sanitizeDomain(domain);
+    this.log(`[ENHANCED DISCOVERY] Starting comprehensive asset discovery for ${domain}`);
+    
+    // Try the enhanced asset inventory function
+    try {
+      const inventory = await getAssetInventory(
+        (endpoint: string) => this.makeRequest(endpoint),
+        domain
+      );
+      
+      this.log(`[ENHANCED DISCOVERY] Found ${inventory.total_assets} total assets`);
+      this.log(`[ENHANCED DISCOVERY] Domains: ${inventory.domains.length}, IPs: ${inventory.ip_addresses.length}`);
+      
+      return {
+        content: [{ 
+          type: "text", 
+          text: `# 🔍 COMPREHENSIVE ASSET DISCOVERY: ${domain}\n\n` +
+                `**Total Assets Found**: ${inventory.total_assets}\n` +
+                `**Domains**: ${inventory.domains.length}\n` +
+                `**IP Addresses**: ${inventory.ip_addresses.length}\n\n` +
+                `## 📊 Asset Breakdown\n\n` +
+                `### Domains (${inventory.domains.length})\n` +
+                inventory.domains.slice(0, 20).map(d => 
+                  `- **${d.asset_name}**: ${d.issues_count} issues (${d.critical_issues} critical, ${d.high_issues} high)`
+                ).join('\n') +
+                (inventory.domains.length > 20 ? `\n... and ${inventory.domains.length - 20} more domains` : '') +
+                `\n\n### IP Addresses (${inventory.ip_addresses.length})\n` +
+                inventory.ip_addresses.slice(0, 20).map(ip => 
+                  `- **${ip.asset_name}**: ${ip.issues_count} issues (${ip.critical_issues} critical, ${ip.high_issues} high)`
+                ).join('\n') +
+                (inventory.ip_addresses.length > 20 ? `\n... and ${inventory.ip_addresses.length - 20} more IPs` : '') +
+                `\n\n## 🎯 Summary\n` +
+                `- **Average Score**: ${inventory.summary.avg_score.toFixed(1)}\n` +
+                `- **Total Issues**: ${inventory.summary.total_issues}\n` +
+                `- **Worst Performers**: ${inventory.summary.worst_performers.slice(0, 3).map(p => p.asset_name).join(', ')}\n` +
+                `- **Best Performers**: ${inventory.summary.best_performers.slice(0, 3).map(p => p.asset_name).join(', ')}\n\n` +
+                `💡 **Note**: This discovery uses enhanced pagination and multiple API endpoints to find ALL assets, not just the first 50.`
+        }]
+      };
+      
+    } catch (error: any) {
+      this.log(`[ENHANCED DISCOVERY] Error: ${error.message}`);
+      return { 
+        content: [{ 
+          type: "text", 
+          text: `**Enhanced Asset Discovery Failed**: ${error.message}\n\nFalling back to standard discovery methods.` 
+        }] 
+      };
+    }
+  }
+
+  /**
+   * Get detailed findings for a specific asset with full context
+   */
+  private async getAssetDetailedFindings(domain: string, assetName: string, assetType: 'domain' | 'ip_address' = 'domain'): Promise<any> {
+    domain = this.sanitizeDomain(domain);
+    this.log(`[ASSET FINDINGS] Getting detailed findings for ${assetType} ${assetName}`);
+    
+    try {
+      const findings = await getAssetFindings(
+        (endpoint: string) => this.makeRequest(endpoint),
+        domain,
+        assetName,
+        assetType
+      );
+      
+      const findingCount = Object.keys(findings.findings).length;
+      this.log(`[ASSET FINDINGS] Found ${findingCount} finding types for ${assetName}`);
+      
+      let text = `# 🔍 DETAILED FINDINGS: ${assetName}\n\n`;
+      text += `**Asset Type**: ${assetType}\n`;
+      text += `**Finding Types**: ${findingCount}\n\n`;
+      
+      if (findingCount > 0) {
+        text += `## 🚨 Security Issues\n\n`;
+        
+        Object.entries(findings.findings).forEach(([issueType, details]) => {
+          text += `### ${issueType.replace(/_/g, ' ').toUpperCase()}\n`;
+          text += `- **Count**: ${details.count} findings\n`;
+          text += `- **Severity**: ${details.severity}\n`;
+          text += `- **Factor**: ${details.factor}\n`;
+          text += `- **Remediation Effort**: ${details.remediation_effort}\n`;
+          text += `- **Business Impact**: ${details.business_impact}\n\n`;
+        });
+        
+        text += `## 🎯 Remediation Priority\n\n`;
+        findings.remediation_priority.forEach((item, index) => {
+          text += `${index + 1}. **${item.issue_type.replace(/_/g, ' ').toUpperCase()}** `;
+          text += `(Priority Score: ${item.priority_score.toFixed(2)})`;
+          if (item.quick_win) text += ` 🏆 Quick Win`;
+          text += `\n`;
+        });
+      } else {
+        text += `✅ **No security issues found** for this asset.`;
+      }
+      
+      return { content: [{ type: "text", text }] };
+      
+    } catch (error: any) {
+      this.log(`[ASSET FINDINGS] Error: ${error.message}`);
+      return { 
+        content: [{ 
+          type: "text", 
+          text: `**Asset Findings Retrieval Failed**: ${error.message}` 
+        }] 
+      };
+    }
   }
 
   private getFactorForIssueType(issueType: string): string {

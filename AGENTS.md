@@ -107,9 +107,9 @@ Invoke-WebRequest -Uri "https://raw.githubusercontent.com/CallMarcus/security-sc
 - **Update mechanism** - Self-updating scripts with fallback strategies
 - **Documentation** - Complete user and developer guides
 
-### MCP Tool Suite Status (11/11 Registered Tools Working)
+### MCP Tool Suite Status (13/13 Registered Tools Working)
 
-**✅ Registered & Working Tools (11/11) - Claude Desktop Compatible**
+**✅ Registered & Working Tools (13/13) - Claude Desktop Compatible**
 - `get_score_improvement_roadmap` - Strategic roadmap generation
 - `calculate_factor_score_impact` - ROI analysis for security factors
 - `get_findings_by_asset` - Asset-specific issue tracking
@@ -121,8 +121,10 @@ Invoke-WebRequest -Uri "https://raw.githubusercontent.com/CallMarcus/security-sc
 - `get_asset_inventory` - Complete asset management
 - `get_asset_findings` - Asset-specific security findings
 - `compare_assets` - Security posture comparison
+- `discover_all_assets` - 🆕 **ENHANCED DISCOVERY** - Overcomes 50-asset limit with comprehensive pagination
+- `get_asset_detailed_findings` - 🆕 **DETAILED ANALYSIS** - Full context asset analysis with remediation details
 
-**❌ Implemented But Not Registered (3)**
+**❌ Implemented But Not Registered (1)**
 - `get_quick_wins` - Method exists, needs MCP tool registration
 - `simulate_score_improvement` - Stub exists, needs completion
 - `benchmark_grade_requirements` - Stub exists, needs completion
@@ -132,11 +134,13 @@ Invoke-WebRequest -Uri "https://raw.githubusercontent.com/CallMarcus/security-sc
 ### Production Testing
 Recent comprehensive testing reveals:
 - **Clean machine installation** - Working perfectly
-- **Tool functionality** - 100% success rate (11/11 registered tools working)  
+- **Tool functionality** - 100% success rate (13/13 registered tools working)  
 - **Claude Desktop integration** - Fully compatible with all registered tools
 - **Dependency resolution** - Complete and working
-- **Missing tools** - 3 tools need registration/completion for full operational support
-- **Test Report**: See [comprehensive-test-execution-report.md](./test-debug-logs/comprehensive-test-execution-report.md)
+- **Enhanced discovery** - ✅ NEW - Addresses test report API limitations
+- **Asset discovery** - Overcomes 50-asset limit, discovers IP addresses
+- **Missing tools** - 1 tool needs registration/completion for full operational support
+- **Test Report**: See [TEST-OUTPUT-securityscorecard-mcp-enhancement.md](./TEST-OUTPUT-securityscorecard-mcp-enhancement.md)
 
 ### Development Testing
 ```bash

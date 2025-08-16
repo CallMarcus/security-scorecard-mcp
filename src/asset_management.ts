@@ -47,53 +47,275 @@ export interface AssetFindings {
 }
 
 /**
+ * Get all assets using pagination to overcome API limits
+ */
+async function getAllAssetsPaginated(
+  makeRequest: (endpoint: string) => Promise<any>,
+  domain: string,
+  assetType?: 'domain' | 'ip_address'
+): Promise<any[]> {
+  const allAssets: any[] = [];
+  let offset = 0;
+  const limit = 100; // Use higher limit for pagination
+  
+  const debugMode = process.env.DEBUG_MODE === "true";
+  function debugLog(message: string) {
+    if (debugMode) console.log(`[PAGINATION] ${message}`);
+  }
+  
+  // Try different pagination patterns and endpoint variations
+  const endpointVariations = [
+    `/companies/${domain}/assets`,
+    `/companies/${domain}/inventory`,
+    `/companies/${domain}/footprint`,
+    `/esi/entities/${domain}/assets`
+  ];
+  
+  for (const baseEndpoint of endpointVariations) {
+    try {
+      debugLog(`Trying endpoint: ${baseEndpoint}`);
+      let hasMore = true;
+      offset = 0;
+      
+      while (hasMore) {
+        // Try different pagination parameter patterns
+        const paginationVariations = [
+          `${baseEndpoint}?limit=${limit}&offset=${offset}${assetType ? `&type=${assetType}` : ''}`,
+          `${baseEndpoint}?size=${limit}&from=${offset}${assetType ? `&asset_type=${assetType}` : ''}`,
+          `${baseEndpoint}?per_page=${limit}&page=${Math.floor(offset/limit) + 1}${assetType ? `&filter=${assetType}` : ''}`,
+          `${baseEndpoint}?count=${limit}&start=${offset}${assetType ? `&category=${assetType}` : ''}`
+        ];
+        
+        let response = null;
+        for (const endpoint of paginationVariations) {
+          try {
+            debugLog(`Trying pagination: ${endpoint}`);
+            response = await makeRequest(endpoint);
+            if (response && (response.entries || response.data || response.assets)) {
+              debugLog(`Success with: ${endpoint}`);
+              break;
+            }
+          } catch (error) {
+            continue;
+          }
+        }
+        
+        if (!response) {
+          debugLog(`No response for ${baseEndpoint}, trying next endpoint`);
+          break;
+        }
+        
+        // Extract data from various response structures
+        const data = response.entries || response.data || response.assets || 
+                    response.results || response.items || [];
+        
+        if (!Array.isArray(data) || data.length === 0) {
+          debugLog(`No data found in response for ${baseEndpoint}`);
+          break;
+        }
+        
+        allAssets.push(...data);
+        debugLog(`Found ${data.length} assets at offset ${offset}, total: ${allAssets.length}`);
+        
+        // Check if we should continue paginating
+        hasMore = data.length === limit;
+        offset += limit;
+        
+        // Safety limit to prevent infinite loops
+        if (offset > 10000) {
+          debugLog(`Safety limit reached at offset ${offset}`);
+          break;
+        }
+      }
+      
+      // If we found assets with this endpoint, stop trying others
+      if (allAssets.length > 0) {
+        debugLog(`Successfully found ${allAssets.length} assets using ${baseEndpoint}`);
+        break;
+      }
+      
+    } catch (error) {
+      debugLog(`Endpoint ${baseEndpoint} failed: ${error}`);
+      continue;
+    }
+  }
+  
+  return allAssets;
+}
+
+/**
+ * Validate if a string is a domain name
+ */
+function isValidDomain(str: string): boolean {
+  if (!str) return false;
+  const domainRegex = /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+  return domainRegex.test(str);
+}
+
+/**
+ * Validate if a string is an IP address
+ */
+function isValidIP(str: string): boolean {
+  if (!str) return false;
+  const ipRegex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+  return ipRegex.test(str);
+}
+
+/**
  * Get comprehensive asset inventory for organization using working API endpoints
+ * Enhanced version with pagination and multiple discovery methods
  */
 export async function getAssetInventory(
   makeRequest: (endpoint: string) => Promise<any>,
   domain: string
 ): Promise<AssetInventory> {
   
+  const debugMode = process.env.DEBUG_MODE === "true";
+  
+  function debugLog(message: string, data?: any) {
+    if (debugMode) {
+      console.log(`[ASSET DEBUG] ${message}`);
+      if (data) console.log(JSON.stringify(data, null, 2));
+    }
+  }
+  
   try {
-    // First try the footprint endpoints
-    const [domainsResponse, ipsResponse] = await Promise.all([
-      makeRequest(`/footprint/${domain}/assets/domains`).catch(() => ({ entries: [] })),
-      makeRequest(`/footprint/${domain}/assets/ips`).catch(() => ({ entries: [] }))
-    ]);
-
-    let domains = domainsResponse.entries || [];
-    let ips = ipsResponse.entries || [];
+    // First try multiple asset discovery methods
+    let domains: any[] = [];
+    let ips: any[] = [];
     
-    // If footprint endpoints don't work, fall back to discovering assets through issue data
+    // Method 1: Try footprint endpoints (may not exist)
+    debugLog("Trying footprint endpoints...");
+    try {
+      const [domainsResponse, ipsResponse] = await Promise.all([
+        makeRequest(`/footprint/${domain}/assets/domains`).catch(() => ({ entries: [] })),
+        makeRequest(`/footprint/${domain}/assets/ips`).catch(() => ({ entries: [] }))
+      ]);
+      domains = domainsResponse.entries || [];
+      ips = ipsResponse.entries || [];
+      debugLog(`Footprint results: ${domains.length} domains, ${ips.length} IPs`);
+    } catch (error) {
+      debugLog("Footprint endpoints failed, trying alternatives...");
+    }
+    
+    // Method 2: Try standard assets endpoint with pagination
     if (domains.length === 0) {
-      console.log('Footprint API unavailable, using alternative asset discovery...');
+      debugLog("Trying paginated assets endpoint...");
+      domains = await getAllAssetsPaginated(makeRequest, domain, 'domain');
+      ips = await getAllAssetsPaginated(makeRequest, domain, 'ip_address');
+    }
+    
+    // Method 3: Try assets endpoint without type filter
+    if (domains.length === 0) {
+      debugLog("Trying generic assets endpoint...");
+      const allAssets = await getAllAssetsPaginated(makeRequest, domain);
+      domains = allAssets.filter((asset: any) => 
+        asset.type === 'domain' || asset.asset_type === 'domain' || 
+        (!asset.type && !asset.asset_type && isValidDomain(asset.name || asset.domain))
+      );
+      ips = allAssets.filter((asset: any) => 
+        asset.type === 'ip_address' || asset.asset_type === 'ip_address' ||
+        (!asset.type && !asset.asset_type && isValidIP(asset.name || asset.ip || asset.address))
+      );
+    }
+    
+    // Method 4: Enhanced asset discovery through issue data (with pagination)
+    if (domains.length === 0) {
+      debugLog('Using enhanced asset discovery through issue data...');
       
       // Get factors data to discover assets mentioned in issues
       const factorsResponse = await makeRequest(`/companies/${domain}/factors`);
       const discoveredDomains = new Set<string>();
+      const discoveredIPs = new Set<string>();
       
       // Add the main domain
       discoveredDomains.add(domain);
       
-      // Extract additional domains from issue data
+      // Extract assets from issue data with pagination
       for (const factor of factorsResponse.entries || []) {
-        for (const issueType of (factor.issue_summary || []).slice(0, 3)) { // Limit to avoid rate limits
+        debugLog(`Processing factor: ${factor.name}`);
+        
+        // Process ALL issue types, not just first 3
+        for (const issueType of (factor.issue_summary || [])) {
+          if (!issueType.type || issueType.count === 0) continue;
+          
           try {
-            const issues = await makeRequest(`/companies/${domain}/issues/${issueType.type}?size=10`);
-            for (const issue of issues.entries || []) {
-              if (issue.domain && issue.domain !== domain) {
-                discoveredDomains.add(issue.domain);
+            debugLog(`Discovering assets from issue type: ${issueType.type}`);
+            
+            // Use pagination to get ALL issues, not just first 10
+            let offset = 0;
+            const limit = 100;
+            let hasMore = true;
+            
+            while (hasMore) {
+              const issues = await makeRequest(
+                `/companies/${domain}/issues/${issueType.type}?size=${limit}&offset=${offset}`
+              );
+              
+              const issueEntries = issues.entries || [];
+              if (issueEntries.length === 0) break;
+              
+              for (const issue of issueEntries) {
+                // Extract domain names
+                if (issue.domain && issue.domain !== domain && isValidDomain(issue.domain)) {
+                  discoveredDomains.add(issue.domain);
+                }
+                if (issue.parent_domain && issue.parent_domain !== domain && isValidDomain(issue.parent_domain)) {
+                  discoveredDomains.add(issue.parent_domain);
+                }
+                if (issue.hostname && isValidDomain(issue.hostname)) {
+                  discoveredDomains.add(issue.hostname);
+                }
+                
+                // Extract IP addresses
+                if (issue.ip && isValidIP(issue.ip)) {
+                  discoveredIPs.add(issue.ip);
+                }
+                if (issue.ip_address && isValidIP(issue.ip_address)) {
+                  discoveredIPs.add(issue.ip_address);
+                }
+                if (issue.host && isValidIP(issue.host)) {
+                  discoveredIPs.add(issue.host);
+                }
+                
+                // Look for IPs in other fields
+                if (issue.details) {
+                  const ipMatches = JSON.stringify(issue.details).match(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g);
+                  if (ipMatches) {
+                    ipMatches.forEach(ip => {
+                      if (isValidIP(ip)) discoveredIPs.add(ip);
+                    });
+                  }
+                }
               }
-              if (issue.parent_domain && issue.parent_domain !== domain) {
-                discoveredDomains.add(issue.parent_domain);
+              
+              hasMore = issueEntries.length === limit;
+              offset += limit;
+              
+              // Safety limit
+              if (offset > 5000) {
+                debugLog(`Safety limit reached for issue type ${issueType.type}`);
+                break;
               }
             }
+            
+            debugLog(`Found ${discoveredDomains.size} domains and ${discoveredIPs.size} IPs so far`);
+            
           } catch (error) {
-            // Skip issue types we can't access
+            debugLog(`Error processing issue type ${issueType.type}: ${error}`);
             continue;
           }
         }
       }
+      
+      // Convert discovered assets to proper format
+      ips = Array.from(discoveredIPs).map(ip => ({
+        name: ip,
+        ip: ip,
+        address: ip,
+        type: 'ip_address',
+        asset_type: 'ip_address'
+      }));
       
       // Convert discovered domains to domain objects
       domains = Array.from(discoveredDomains).map(domainName => ({
@@ -228,6 +450,7 @@ export async function getAssetInventory(
  */
 export async function getAssetFindings(
   makeRequest: (endpoint: string) => Promise<any>,
+  domain: string,
   assetName: string,
   assetType: 'domain' | 'ip_address' = 'domain'
 ): Promise<AssetFindings> {
