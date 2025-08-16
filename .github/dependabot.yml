@@ -1,0 +1,38 @@
+# GitHub Dependabot configuration for Security Scorecard MCP
+# Automatically creates pull requests for dependency updates
+# Documentation: https://docs.github.com/en/code-security/dependabot
+
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "CallMarcus"
+    commit-message:
+      prefix: "deps"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "automated"
+    # Group minor and patch updates to reduce PR noise
+    groups:
+      minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+    # Allow both dependencies and devDependencies updates
+    allow:
+      - dependency-type: "direct"
+      - dependency-type: "indirect"
+    # Automatically merge patch updates for known safe packages
+    auto-merge:
+      - dependency-type: "development"
+        update-type: "security"

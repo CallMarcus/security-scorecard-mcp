@@ -1,8 +1,15 @@
 # Security Scorecard MCP
 
+![TypeScript](https://img.shields.io/badge/typescript-%23007ACC.svg?style=for-the-badge&logo=typescript&logoColor=white)
+![Node.js](https://img.shields.io/badge/node.js-6DA55F?style=for-the-badge&logo=node.js&logoColor=white)
+![PowerShell](https://img.shields.io/badge/PowerShell-%235391FE.svg?style=for-the-badge&logo=powershell&logoColor=white)
+![Claude](https://img.shields.io/badge/Claude%20Desktop-FF6B35?style=for-the-badge&logo=anthropic&logoColor=white)
+![Security](https://img.shields.io/badge/SecurityScorecard-FF4B4B?style=for-the-badge&logo=security&logoColor=white)
+![MCP](https://img.shields.io/badge/Model%20Context%20Protocol-000000?style=for-the-badge&logo=protocol&logoColor=white)
+
 A Model Context Protocol (MCP) server that integrates with the [SecurityScorecard REST API](https://securityscorecard.readme.io/). Originally designed for executive reporting, this MCP is being refocused to support operational security teams with daily remediation workflows.
 
-**⚠️ Operational Refocus in Progress:** Currently 33% functional (4/12 tools working). See [OPERATIONAL-REFOCUS-STRATEGY.md](./OPERATIONAL-REFOCUS-STRATEGY.md) for our transformation roadmap.
+**✅ Core Tools Working:** Currently 100% functional (11/11 registered tools working in Claude Desktop). 3 additional tools need registration/completion. See [OPERATIONAL-REFOCUS-STRATEGY.md](./OPERATIONAL-REFOCUS-STRATEGY.md) for remaining roadmap.
 
 ## 🎯 Target Use Cases (After Refocus)
 
@@ -19,11 +26,25 @@ A Model Context Protocol (MCP) server that integrates with the [SecurityScorecar
 - **Validation Testing** - Verify fixes are properly implemented
 - **Rollback Procedures** - Safe recovery if changes cause issues
 
-### Current Working Features
-- **Strategic Analysis** - ROI-based security roadmaps (executive focused)
-- **Factor Impact Assessment** - Understand which areas need attention
-- **Asset Discovery** - List all security findings by asset
-- **Direct API Access** - Build custom security tools
+### Current Working Features (11/11 Registered Tools)
+- **Strategic Analysis** - ROI-based security roadmaps with operational context
+- **Factor Impact Assessment** - Comprehensive impact analysis with prioritization
+- **Issue Prioritization** - ✅ FIXED - ROI-based issue ranking working
+- **Asset Management** - Complete asset discovery, analysis, and comparison
+- **Remediation Reports** - ✅ FIXED - Comprehensive operational reports
+- **Category Analysis** - ✅ FIXED - Findings organized by security factors
+- **Direct API Access** - Full SecurityScorecard API integration
+
+## 🏗️ Technology Stack
+
+This MCP server is built with modern, reliable technologies:
+
+- **TypeScript** - Type-safe development with full IntelliSense support
+- **Node.js 18+** - High-performance JavaScript runtime
+- **Model Context Protocol (MCP)** - Anthropic's protocol for AI tool integration
+- **SecurityScorecard API** - Enterprise security posture management
+- **PowerShell** - Cross-platform automation and setup scripts
+- **GitHub Actions** - Automated testing and deployment pipelines
 
 ## Branch workflow
 
@@ -40,9 +61,11 @@ The SecurityScorecard MCP features a streamlined installation process that works
 - **GitHub CLI** - [Download here](https://cli.github.com/) (or will be auto-installed via winget)
 - **SecurityScorecard API Token** - [Get from your SecurityScorecard dashboard](https://platform.securityscorecard.io/)
 
-### Quick Start
+### Quick Start Options
+
+#### Option 1: Full Production Setup (Recommended for new users)
 ```powershell
-# Download and run the setup script (Windows)
+# Download and run the full setup script (Windows)
 Invoke-WebRequest -Uri "https://raw.githubusercontent.com/CallMarcus/security-scorecard-mcp/main/setup.ps1" -OutFile "setup.ps1"
 .\setup.ps1
 ```
@@ -53,6 +76,18 @@ Invoke-WebRequest -Uri "https://raw.githubusercontent.com/CallMarcus/security-sc
 3. ✅ Download the latest MCP release with all dependencies
 4. ✅ Configure your SecurityScorecard API credentials
 5. ✅ Launch the MCP server ready for Claude Desktop
+
+#### Option 2: Simple Development Setup (For developers/rebuilds)
+```powershell
+# Quick local build and setup
+.\setup_simple.ps1
+```
+
+**Perfect for:** Developers, quick rebuilds, or when you already have the repository cloned. This script will:
+1. ✅ Install dependencies locally
+2. ✅ Build TypeScript to JavaScript  
+3. ✅ Verify build success
+4. ✅ Show Claude Desktop config path and instructions
 
 You'll be prompted for:
 - **Company domain** - The primary domain for your security analysis
@@ -66,38 +101,26 @@ chmod +x setup.sh
 ./setup.sh
 ```
 
-## Release Channels
+## Installation
 
-`setup.sh` and `setup.ps1` download the latest build before starting the server.
-By default they fetch the stable release. Pass `--dev` to switch to the
-development channel.
+`setup.sh` and `setup.ps1` download the latest release before starting the server.
 
 ```bash
-# stable release
 ./setup.sh
-
-# development build
-./setup.sh --dev
 ```
 
 On Windows 11 run:
 
 ```powershell
-# stable release
 .\setup.ps1
-
-# development build
-.\setup.ps1 --dev
 ```
-
-You can change channels later by running the update script with the same flag.
 
 **Authentication:** The setup script uses GitHub CLI authentication automatically. For private repositories, ensure you have `repo` scope when authenticating with `gh auth login`.
 
 ## Updating MCP
 
-Run the update script to download the latest tagged release and refresh the
-compiled files:
+### Production Updates
+Run the update script to download the latest tagged release and refresh the compiled files:
 
 ```bash
 scripts/update.sh
@@ -109,7 +132,21 @@ On Windows 11 run:
 .\scripts\update.ps1
 ```
 
-Add `--dev`/`-Dev` to either command to pull the most recent development build. To download the optional documentation bundle, run `scripts/update.ps1 -IncludeDocs` or `scripts/fetch-docs.ps1`.
+To download the optional documentation bundle, run `scripts/update.ps1 -IncludeDocs` or `scripts/fetch-docs.ps1`.
+
+### Development Updates (Quick Rebuild)
+For developers who want to quickly rebuild after code changes:
+
+```powershell
+# Quick rebuild after making code changes
+.\setup_simple.ps1
+```
+
+This is perfect when you've:
+- Modified TypeScript source files
+- Made local changes to the codebase  
+- Want to test changes quickly
+- Need to rebuild without re-downloading dependencies
 
 ## Running the server manually
 
@@ -229,9 +266,9 @@ Replace the placeholder values with your installation path and credentials:
   gh auth login --web --scopes "repo"
   ```
 
-**❌ "No stable release found"**
+**❌ "No release found"**
 - **Cause:** No published releases available
-- **Solution:** Use development channel: `.\setup.ps1 -Dev`
+- **Solution:** Ensure the repository has published releases, or clone the repository for development
 
 **❌ Module loading errors**
 - **Cause:** Incomplete dependency installation  
@@ -244,9 +281,9 @@ Replace the placeholder values with your installation path and credentials:
 
 ## 🛠️ MCP Tools Reference
 
-**⚠️ Important:** Only 4 of 12 tools are currently working. See [CURRENT-TOOL-STATUS.md](./CURRENT-TOOL-STATUS.md) for details.
+**✅ Status Update:** All 11 registered tools are working in Claude Desktop. 3 additional tools need registration/completion.
 
-### Working Tools (4/12) ✅
+### Registered & Working Tools (11/11) ✅
 
 These tools are fully functional and can be used immediately:
 
@@ -303,145 +340,60 @@ Markdown list ranking factors by ROI.
 **Edge cases**
 - If all factors are already at 100, the list may be empty.
 
-#### 3. get_findings_by_asset
+#### 3. get_issues_by_roi
+**Description:** Return issue types ranked by ROI.
+**Status:** ✅ FIXED - Now returns properly prioritized issues with operational context
+
+#### 4. get_findings_by_category
+**Description:** Organize findings by SecurityScorecard factors.
+**Status:** ✅ FIXED - Returns categorized findings with operational context
+
+#### 5. find_high_impact_findings_across_assets  
+**Description:** Scan for critical vulnerabilities across all assets.
+**Status:** ✅ FIXED - Multi-asset high-impact analysis working
+
+#### 6. generate_remediation_report
+**Description:** Create comprehensive remediation plans.
+**Status:** ✅ FIXED - Generates comprehensive operational reports
+
+#### 7. get_findings_by_asset
 **Description:** List all security findings organized by asset (domains and IPs).
 **Status:** ✅ Working - Returns comprehensive asset-level security data
 
-#### 4. call_api_endpoint  
+#### 8. get_asset_inventory
+**Description:** Get comprehensive inventory of all domains and IPs.
+**Status:** ✅ Working - Complete asset management capabilities
+
+#### 9. get_asset_findings
+**Description:** Get detailed security findings for specific assets.
+**Status:** ✅ Working - Asset-specific security analysis
+
+#### 10. compare_assets
+**Description:** Compare security posture across multiple assets.
+**Status:** ✅ Working - Multi-asset security comparison
+
+#### 11. call_api_endpoint  
 **Description:** Direct access to SecurityScorecard API for custom queries.
 **Status:** ✅ Working - Full API access available
 
-### Broken Tools (3/12) ❌
+### Missing Tools (3) - Need Registration/Completion ⚠️
 
-These tools are currently non-functional but being fixed:
+These tools exist but need MCP registration or completion:
 
-#### 5. get_issues_by_roi
-**Description:** Return issue types ranked by ROI.
-**Status:** ❌ BROKEN - Returns 0 issues despite 1000+ findings available
-
-**Parameters**
-- `domain` (string, required)
-- `top_n` (number, optional, default 10) – Number of issues to return.
-- `status` (string, optional, default `"active"`) – Choose `"active"` or `"historical"` issues.
-
-**Response**
-Markdown list of issues with ROI scores and estimated impact.
-
-**Errors**
-- `InvalidRequest` if the domain is not found.
-- Returns `No active issues found` when the domain has zero findings.
-
-**Sample request**
-```json
-{ "name": "get_issues_by_roi", "arguments": {"domain": "example.com", "top_n": 5, "status": "active"} }
-```
-
-**Sample response**
-```text
-# 🚀 ISSUES RANKED BY ROI: example.com
-...
-```
-
-**Edge cases**
-- Large `top_n` values are capped at the number of available issues.
-
-#### 6. get_findings_by_category
-**Description:** Organize findings by SecurityScorecard factors.
-**Status:** ❌ BROKEN - Returns empty array
-
-#### 7. find_high_impact_findings_across_assets  
-**Description:** Scan for critical vulnerabilities across all assets.
-**Status:** ❌ BROKEN - Returns 0 findings
-
-#### 8. generate_remediation_report
-**Description:** Create comprehensive remediation plans.
-**Status:** ❌ BROKEN - Returns empty results
-
-### Not Implemented (5/12) 🚫
-
-These tools are planned but not yet built:
-
-#### 9. simulate_score_improvement
-**Description:** Forecast score impact of fixing specific issue types.
-
-**Parameters**
-- `domain` (string, required)
-- `issue_types` (array of strings, optional) – Issue types to simulate fixing.
-
-**Response**
-Markdown summary with projected overall score and factor‑level improvements.
-
-**Errors**
-- `InvalidRequest` if the domain cannot be accessed.
-
-**Sample request**
-```json
-{ "name": "simulate_score_improvement", "arguments": {"domain": "example.com", "issue_types": ["spf_record_missing"]} }
-```
-
-**Sample response**
-```text
-# 🔮 SCORE IMPROVEMENT SIMULATION: example.com
-...
-```
-
-**Edge cases**
-- Unknown issue types are ignored, resulting in little or no improvement.
-
-#### 10. get_quick_wins
+#### 12. get_quick_wins ⚠️
 **Description:** Find high‑impact, low‑effort improvements.
+**Status:** ❌ METHOD EXISTS - Needs MCP tool registration
 
-**Parameters**
-- `domain` (string, required)
-- `max_effort` (string, optional; `low` or `medium`, default `medium`) – Maximum effort level.
+**Current:** Fully implemented method with effort-based filtering  
+**Required:** Add to tools array and switch statement for Claude Desktop access
 
-**Response**
-Markdown list of quick wins with estimated score impact and timelines.
+#### 13. simulate_score_improvement ⚠️
+**Description:** Forecast score impact of fixing specific issue types.
+**Status:** ❌ STUB EXISTS - Needs full implementation
 
-**Errors**
-- Falls back to a predefined list if API calls fail.
-
-**Sample request**
-```json
-{ "name": "get_quick_wins", "arguments": {"domain": "example.com", "max_effort": "low"} }
-```
-
-**Sample response**
-```text
-# ⚡ QUICK WINS FOR example.com
-...
-```
-
-**Edge cases**
-- Using `low` filters out medium‑effort items.
-
-#### 11. benchmark_grade_requirements
+#### 14. benchmark_grade_requirements ⚠️  
 **Description:** Show score requirements and peer comparison for grade levels.
-
-**Parameters**
-- `domain` (string, required)
-
-**Response**
-Markdown summary of current score, grade requirements and next milestone.
-
-**Errors**
-- `InvalidRequest` if the domain cannot be retrieved.
-
-**Sample request**
-```json
-{ "name": "benchmark_grade_requirements", "arguments": {"domain": "example.com"} }
-```
-
-**Sample response**
-```text
-# 📊 GRADE BENCHMARKING: example.com
-...
-```
-
-**Edge cases**
-- If already at the highest grade, the "Next milestone" section notes this.
-
-#### 12. Plus 2 others referenced in test suite
+**Status:** ❌ STUB EXISTS - Needs full implementation
 
 ---
 

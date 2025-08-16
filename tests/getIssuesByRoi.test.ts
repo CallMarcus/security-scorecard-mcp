@@ -23,8 +23,8 @@ test('getIssuesByROI ranks issues with highest ROI', async () => {
           name: 'dns_health', 
           score: 85,
           issue_summary: [
-            { type: 'spf_record_missing' },
-            { type: 'dmarc_contains_none' }
+            { type: 'spf_record_missing', count: 5 },
+            { type: 'dmarc_contains_none', count: 3 }
           ]
         }
       ]
@@ -45,7 +45,7 @@ test('getIssuesByROI ranks issues with highest ROI', async () => {
 
   const result = await server.getIssuesByROI('example.com', 5);
   const text: string = result.content[0].text;
-  assert.ok(text.includes('COMMON HIGH-ROI ISSUES'));
+  assert.ok(text.includes('TOP ROI SECURITY IMPROVEMENTS'));
   assert.ok(text.includes('SPF RECORD MISSING'));
 });
 

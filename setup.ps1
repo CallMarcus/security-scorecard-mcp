@@ -1,7 +1,5 @@
 # Requires PowerShell 5+
-Param(
-    [switch]$Dev
-)
+# No parameters needed for simplified single-channel setup
 $ErrorActionPreference = 'Stop'
 
 # Verify Node.js 18+ is installed
@@ -71,12 +69,8 @@ if (-not (Test-Path $updateScript)) {
     }
 }
 
-# Determine release channel and update files
-if ($Dev) {
-    & $updateScript -Dev
-} else {
-    & $updateScript
-}
+# Update files from latest release
+& $updateScript
 
 $COMPANY_DOMAIN = Read-Host 'Enter company domain'
 $SECURITY_SCORECARD_API_TOKEN = Read-Host 'Enter SecurityScorecard API token'

@@ -1,5 +1,4 @@
 Param(
-    [switch]$Dev,
     [switch]$IncludeDocs,
     [switch]$DocsOnly
 )
@@ -9,9 +8,7 @@ $repo  = 'security-scorecard-mcp'
 
 if ($DocsOnly) { $IncludeDocs = $true }
 
-$stableApi = "https://api.github.com/repos/$owner/$repo/releases/latest"
-$devApi    = "https://api.github.com/repos/$owner/$repo/releases/tags/dev"
-$api       = if ($Dev) { $devApi } else { $stableApi }
+$api = "https://api.github.com/repos/$owner/$repo/releases/latest"
 
 $token = $env:GITHUB_TOKEN
 # Headers for GitHub API requests
@@ -37,30 +34,14 @@ try {
         $release = Invoke-RestMethod -Uri $api -Headers $apiHeaders
     } catch {
         $status = $_.Exception.Response.StatusCode.value__
-        if (-not $Dev -and $status -eq 404) {
-            Write-Warning "No stable release found. Falling back to development build."
-            try {
-                $release = Invoke-RestMethod -Uri $devApi -Headers $apiHeaders
-            } catch {
-                $message = "Failed to retrieve release info from ${devApi}: $($_.Exception.Message)"
-                if ($_.Exception.Response -and $_.Exception.Response.StatusCode.value__ -eq 404) {
-                    $message += "`nNo release was found. Publish a release or run with -Dev for development builds."
-                } else {
-                    $message += "`nCheck your network connection or verify that the repository has published releases."
-                }
-                Write-Error $message -ErrorAction Continue
-                exit 1
-            }
+        $message = "Failed to retrieve release info from ${api}: $($_.Exception.Message)"
+        if ($_.Exception.Response -and $status -eq 404) {
+            $message += "`nNo release was found. Please ensure a release has been published to the repository."
         } else {
-            $message = "Failed to retrieve release info from ${api}: $($_.Exception.Message)"
-            if ($_.Exception.Response -and $status -eq 404) {
-                $message += "`nNo release was found. Publish a release or run with -Dev for development builds."
-            } else {
-                $message += "`nCheck your network connection or verify that the repository has published releases."
-            }
-            Write-Error $message -ErrorAction Continue
-            exit 1
+            $message += "`nCheck your network connection or verify that the repository has published releases."
         }
+        Write-Error $message -ErrorAction Continue
+        exit 1
     }
     $tag = $release.tag_name
 
