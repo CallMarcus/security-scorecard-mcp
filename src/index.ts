@@ -472,7 +472,7 @@ export class ScoreImpactSecurityScorecardServer {
         },
         {
           name: "get_asset_inventory",
-          description: "📋 ASSET INVENTORY: Get comprehensive inventory of all domains and IPs with security scores and issue counts.",
+          description: "📋 ENHANCED ASSET INVENTORY: Advanced asset discovery with scoring:\n• Uses POST /parent-domains/ endpoints for maximum coverage\n• Falls back to multiple endpoint strategies\n• Includes security scores and issue counts where available\n• Results depend on API access level and domain configuration",
           inputSchema: {
             type: "object",
             properties: {
@@ -512,7 +512,7 @@ export class ScoreImpactSecurityScorecardServer {
         },
         {
           name: "call_api_endpoint",
-          description: "🔧 Low-level helper to query any SecurityScorecard API endpoint.",
+          description: "🔧 DIRECT API ACCESS: Query SecurityScorecard API endpoints directly. Common patterns:\n• `/companies/{domain}` - Company overview\n• `/companies/{domain}/factors` - Security factors\n• `/companies/{domain}/issues/{type}` - Specific issues\n• `/parent-domains/{domain}/domains` (POST) - Domain assets\n• `/parent-domains/{domain}/ips` (POST) - IP assets\n• `/footprint/{domain}/assets/domains` - Legacy domain discovery\n• `/footprint/{domain}/assets/ips` - Legacy IP discovery",
           inputSchema: {
             type: "object",
               properties: {
@@ -525,7 +525,7 @@ export class ScoreImpactSecurityScorecardServer {
           },
         {
           name: "discover_all_assets",
-          description: "🔍 ENHANCED DISCOVERY: Use comprehensive pagination and multiple endpoints to find ALL assets (no 50-limit), including IP addresses.",
+          description: "🔍 COMPREHENSIVE ASSET DISCOVERY: Uses multiple API endpoint strategies to find assets:\n• POST /parent-domains/{domain}/domains (primary)\n• POST /parent-domains/{domain}/ips (primary)\n• GET /footprint/{domain}/assets/* (fallback)\n• Pagination to overcome API limits\n• Currently achieving 100+ domains and 100+ IPs for supported domains",
           inputSchema: {
             type: "object",
             properties: {
