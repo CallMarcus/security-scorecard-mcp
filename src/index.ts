@@ -1465,7 +1465,7 @@ export class ScoreImpactSecurityScorecardServer {
     // Try the enhanced asset inventory function
     try {
       const inventory = await getAssetInventory(
-        (endpoint: string) => this.makeRequest(endpoint),
+        (endpoint: string, method?: string, body?: any) => this.makeRequest(endpoint, method, body),
         domain
       );
       
@@ -1519,7 +1519,7 @@ export class ScoreImpactSecurityScorecardServer {
     
     try {
       const findings = await getAssetFindings(
-        (endpoint: string) => this.makeRequest(endpoint),
+        (endpoint: string, method?: string, body?: any) => this.makeRequest(endpoint, method, body),
         domain,
         assetName,
         assetType

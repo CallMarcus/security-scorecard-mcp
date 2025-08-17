@@ -50,7 +50,7 @@ export interface AssetFindings {
  * Get all assets using pagination to overcome API limits
  */
 async function getAllAssetsPaginated(
-  makeRequest: (endpoint: string) => Promise<any>,
+  makeRequest: (endpoint: string, method?: string, body?: any) => Promise<any>,
   domain: string,
   assetType?: 'domain' | 'ip_address'
 ): Promise<any[]> {
@@ -59,49 +59,81 @@ async function getAllAssetsPaginated(
   const limit = 100; // Use higher limit for pagination
   
   const debugMode = process.env.DEBUG_MODE === "true";
-  function debugLog(message: string) {
-    if (debugMode) console.log(`[PAGINATION] ${message}`);
+  function debugLog(message: string, data?: any) {
+    if (debugMode) {
+      console.log(`[PAGINATION] ${message}`);
+      if (data) console.log(JSON.stringify(data, null, 2));
+    }
   }
   
   // Try different pagination patterns and endpoint variations
+  // CRITICAL: Use correct endpoints based on API documentation
   const endpointVariations = [
-    `/companies/${domain}/assets`,
-    `/companies/${domain}/inventory`,
-    `/companies/${domain}/footprint`,
-    `/esi/entities/${domain}/assets`
+    // Digital Footprint API (POST endpoints)
+    { url: `/parent-domains/${domain}/domains`, method: 'POST', useBody: true },
+    { url: `/parent-domains/${domain}/ips`, method: 'POST', useBody: true },
+    // Attack Surface Intelligence API (GET endpoints)  
+    { url: `/footprint/${domain}/assets/domains`, method: 'GET', useBody: false },
+    { url: `/footprint/${domain}/assets/ips`, method: 'GET', useBody: false },
+    // Legacy endpoints (keep for fallback)
+    { url: `/companies/${domain}/assets`, method: 'GET', useBody: false },
+    { url: `/companies/${domain}/inventory`, method: 'GET', useBody: false },
+    { url: `/companies/${domain}/footprint`, method: 'GET', useBody: false },
+    { url: `/esi/entities/${domain}/assets`, method: 'GET', useBody: false }
   ];
   
-  for (const baseEndpoint of endpointVariations) {
+  for (const endpointConfig of endpointVariations) {
     try {
-      debugLog(`Trying endpoint: ${baseEndpoint}`);
+      debugLog(`Trying endpoint: ${endpointConfig.url} (${endpointConfig.method})`);
       let hasMore = true;
-      offset = 0;
+      let page = 0;
       
       while (hasMore) {
-        // Try different pagination parameter patterns
-        const paginationVariations = [
-          `${baseEndpoint}?limit=${limit}&offset=${offset}${assetType ? `&type=${assetType}` : ''}`,
-          `${baseEndpoint}?size=${limit}&from=${offset}${assetType ? `&asset_type=${assetType}` : ''}`,
-          `${baseEndpoint}?per_page=${limit}&page=${Math.floor(offset/limit) + 1}${assetType ? `&filter=${assetType}` : ''}`,
-          `${baseEndpoint}?count=${limit}&start=${offset}${assetType ? `&category=${assetType}` : ''}`
-        ];
-        
         let response = null;
-        for (const endpoint of paginationVariations) {
-          try {
-            debugLog(`Trying pagination: ${endpoint}`);
-            response = await makeRequest(endpoint);
-            if (response && (response.entries || response.data || response.assets)) {
-              debugLog(`Success with: ${endpoint}`);
-              break;
+        
+        try {
+          if (endpointConfig.useBody && endpointConfig.method === 'POST') {
+            // POST endpoints: Digital Footprint API
+            const body: any = {
+              page: page,
+              page_size: limit
+            };
+            
+            // Add filters if we're looking for specific asset type
+            if (assetType) {
+              body.filters = [{ field: 'status', operator: 'in', values: ['CLAIMED', 'ATTRIBUTED'] }];
             }
-          } catch (error) {
-            continue;
+            
+            debugLog(`Trying POST ${endpointConfig.url} with body:`, body);
+            response = await makeRequest(endpointConfig.url, endpointConfig.method, body);
+            
+          } else {
+            // GET endpoints: Attack Surface Intelligence API or legacy endpoints
+            let queryParams = `page=${page}&size=${limit}`;
+            
+            // Add asset type filtering for legacy endpoints
+            if (!endpointConfig.url.includes('/footprint/') && !endpointConfig.url.includes('/parent-domains/')) {
+              if (assetType) {
+                queryParams += `&type=${assetType}`;
+              }
+            }
+            
+            const fullUrl = `${endpointConfig.url}?${queryParams}`;
+            debugLog(`Trying GET ${fullUrl}`);
+            response = await makeRequest(fullUrl, endpointConfig.method);
           }
+          
+          if (response && (response.entries || response.data || response.assets)) {
+            debugLog(`Success with: ${endpointConfig.url}`);
+          }
+          
+        } catch (error) {
+          debugLog(`Error with ${endpointConfig.url}: ${error}`);
+          break;
         }
         
         if (!response) {
-          debugLog(`No response for ${baseEndpoint}, trying next endpoint`);
+          debugLog(`No response for ${endpointConfig.url}, trying next endpoint`);
           break;
         }
         
@@ -110,32 +142,32 @@ async function getAllAssetsPaginated(
                     response.results || response.items || [];
         
         if (!Array.isArray(data) || data.length === 0) {
-          debugLog(`No data found in response for ${baseEndpoint}`);
+          debugLog(`No data found in response for ${endpointConfig.url}`);
           break;
         }
         
         allAssets.push(...data);
-        debugLog(`Found ${data.length} assets at offset ${offset}, total: ${allAssets.length}`);
+        debugLog(`Found ${data.length} assets on page ${page}, total: ${allAssets.length}`);
         
         // Check if we should continue paginating
         hasMore = data.length === limit;
-        offset += limit;
+        page += 1;
         
         // Safety limit to prevent infinite loops
-        if (offset > 10000) {
-          debugLog(`Safety limit reached at offset ${offset}`);
+        if (page > 100) {
+          debugLog(`Safety limit reached at page ${page}`);
           break;
         }
       }
       
       // If we found assets with this endpoint, stop trying others
       if (allAssets.length > 0) {
-        debugLog(`Successfully found ${allAssets.length} assets using ${baseEndpoint}`);
+        debugLog(`Successfully found ${allAssets.length} assets using ${endpointConfig.url}`);
         break;
       }
       
     } catch (error) {
-      debugLog(`Endpoint ${baseEndpoint} failed: ${error}`);
+      debugLog(`Endpoint ${endpointConfig.url} failed: ${error}`);
       continue;
     }
   }
@@ -166,7 +198,7 @@ function isValidIP(str: string): boolean {
  * Enhanced version with pagination and multiple discovery methods
  */
 export async function getAssetInventory(
-  makeRequest: (endpoint: string) => Promise<any>,
+  makeRequest: (endpoint: string, method?: string, body?: any) => Promise<any>,
   domain: string
 ): Promise<AssetInventory> {
   
@@ -184,18 +216,51 @@ export async function getAssetInventory(
     let domains: any[] = [];
     let ips: any[] = [];
     
-    // Method 1: Try footprint endpoints (may not exist)
-    debugLog("Trying footprint endpoints...");
+    // Method 1: Try POST endpoints for Digital Footprint API (CRITICAL FIX!)
+    debugLog("Trying Digital Footprint POST endpoints...");
     try {
       const [domainsResponse, ipsResponse] = await Promise.all([
-        makeRequest(`/footprint/${domain}/assets/domains`).catch(() => ({ entries: [] })),
-        makeRequest(`/footprint/${domain}/assets/ips`).catch(() => ({ entries: [] }))
+        makeRequest(`/parent-domains/${domain}/domains`, 'POST', { page: 0, page_size: 100 }).catch(() => ({ entries: [] })),
+        makeRequest(`/parent-domains/${domain}/ips`, 'POST', { page: 0, page_size: 100 }).catch(() => ({ entries: [] }))
       ]);
-      domains = domainsResponse.entries || [];
-      ips = ipsResponse.entries || [];
-      debugLog(`Footprint results: ${domains.length} domains, ${ips.length} IPs`);
+      
+      // Parse Digital Footprint API responses
+      domains = domainsResponse.entries || domainsResponse.data || domainsResponse.domains || [];
+      ips = ipsResponse.entries || ipsResponse.data || ipsResponse.ips || [];
+      
+      debugLog(`Digital Footprint POST results: ${domains.length} domains, ${ips.length} IPs`);
+      debugLog("POST domain response structure:", domainsResponse);
+      debugLog("POST IP response structure:", ipsResponse);
+      
+      // If POST endpoints work, we found our data!
+      if (domains.length > 0 || ips.length > 0) {
+        debugLog("SUCCESS: Digital Footprint POST endpoints returned data!");
+      }
+      
     } catch (error) {
-      debugLog("Footprint endpoints failed, trying alternatives...");
+      debugLog("Digital Footprint POST endpoints failed, trying GET alternatives...", error);
+    }
+    
+    // Method 1.5: Try GET endpoints for Attack Surface Intelligence API  
+    if (domains.length === 0 && ips.length === 0) {
+      debugLog("Trying Attack Surface Intelligence GET endpoints...");
+      try {
+        const [domainsResponse, ipsResponse] = await Promise.all([
+          makeRequest(`/footprint/${domain}/assets/domains?page=0&size=100`).catch(() => ({ entries: [] })),
+          makeRequest(`/footprint/${domain}/assets/ips?page=0&size=100`).catch(() => ({ entries: [] }))
+        ]);
+        
+        // Parse Attack Surface Intelligence API responses
+        domains = domainsResponse.entries || domainsResponse.data || domainsResponse.domains || [];
+        ips = ipsResponse.entries || ipsResponse.data || ipsResponse.ips || [];
+        
+        debugLog(`Attack Surface Intelligence GET results: ${domains.length} domains, ${ips.length} IPs`);
+        debugLog("GET domain response structure:", domainsResponse);
+        debugLog("GET IP response structure:", ipsResponse);
+        
+      } catch (error) {
+        debugLog("Attack Surface Intelligence GET endpoints failed, trying fallback methods...", error);
+      }
     }
     
     // Method 2: Try standard assets endpoint with pagination
@@ -449,7 +514,7 @@ export async function getAssetInventory(
  * Get detailed findings for specific asset using correct API patterns
  */
 export async function getAssetFindings(
-  makeRequest: (endpoint: string) => Promise<any>,
+  makeRequest: (endpoint: string, method?: string, body?: any) => Promise<any>,
   domain: string,
   assetName: string,
   assetType: 'domain' | 'ip_address' = 'domain'
@@ -543,7 +608,7 @@ export async function getAssetFindings(
  * Compare assets by security posture
  */
 export async function compareAssets(
-  makeRequest: (endpoint: string) => Promise<any>,
+  makeRequest: (endpoint: string, method?: string, body?: any) => Promise<any>,
   assetNames: string[]
 ): Promise<{
   comparison: Array<{
@@ -677,7 +742,7 @@ function getFactorForIssueType(issueType: string): string {
 /**
  * Determine if a domain is a child asset by checking if direct access returns 403/404
  */
-async function isChildAssetDomain(makeRequest: (endpoint: string) => Promise<any>, domain: string): Promise<boolean> {
+async function isChildAssetDomain(makeRequest: (endpoint: string, method?: string, body?: any) => Promise<any>, domain: string): Promise<boolean> {
   try {
     await makeRequest(`/companies/${domain}`);
     return false; // If we can access it directly, it's a parent domain
@@ -693,7 +758,7 @@ async function isChildAssetDomain(makeRequest: (endpoint: string) => Promise<any
  * Find parent domain for a child asset (simplified approach)
  * In a real implementation, this might query a company portfolio API
  */
-async function findParentDomain(makeRequest: (endpoint: string) => Promise<any>, childDomain: string): Promise<string | null> {
+async function findParentDomain(makeRequest: (endpoint: string, method?: string, body?: any) => Promise<any>, childDomain: string): Promise<string | null> {
   // Extract root domain as potential parent
   const parts = childDomain.split('.');
   if (parts.length > 2) {
