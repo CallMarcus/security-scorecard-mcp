@@ -67,14 +67,14 @@ async function getAllAssetsPaginated(
   }
   
   // Try different pagination patterns and endpoint variations
-  // CRITICAL: Use correct endpoints based on API documentation
+  // PRIORITIZE WORKING ENDPOINTS: footprint GET endpoints work best for IP discovery
   const endpointVariations = [
-    // Digital Footprint API (POST endpoints)
-    { url: `/parent-domains/${domain}/domains`, method: 'POST', useBody: true },
-    { url: `/parent-domains/${domain}/ips`, method: 'POST', useBody: true },
-    // Attack Surface Intelligence API (GET endpoints)  
+    // Footprint API (GET endpoints) - PROVEN TO WORK FOR IP DISCOVERY
     { url: `/footprint/${domain}/assets/domains`, method: 'GET', useBody: false },
     { url: `/footprint/${domain}/assets/ips`, method: 'GET', useBody: false },
+    // Digital Footprint API (POST endpoints) - fallback
+    { url: `/parent-domains/${domain}/domains`, method: 'POST', useBody: true },
+    { url: `/parent-domains/${domain}/ips`, method: 'POST', useBody: true },
     // Legacy endpoints (keep for fallback)
     { url: `/companies/${domain}/assets`, method: 'GET', useBody: false },
     { url: `/companies/${domain}/inventory`, method: 'GET', useBody: false },
@@ -216,50 +216,50 @@ export async function getAssetInventory(
     let domains: any[] = [];
     let ips: any[] = [];
     
-    // Method 1: Try POST endpoints for Digital Footprint API (CRITICAL FIX!)
-    debugLog("Trying Digital Footprint POST endpoints...");
+    // Method 1: Try GET footprint endpoints (PROVEN TO WORK!)
+    debugLog("Trying footprint GET endpoints (primary method)...");
     try {
       const [domainsResponse, ipsResponse] = await Promise.all([
-        makeRequest(`/parent-domains/${domain}/domains`, 'POST', { page: 0, page_size: 100 }).catch(() => ({ entries: [] })),
-        makeRequest(`/parent-domains/${domain}/ips`, 'POST', { page: 0, page_size: 100 }).catch(() => ({ entries: [] }))
+        makeRequest(`/footprint/${domain}/assets/domains`).catch(() => ({ entries: [] })),
+        makeRequest(`/footprint/${domain}/assets/ips`).catch(() => ({ entries: [] }))
       ]);
       
-      // Parse Digital Footprint API responses
+      // Parse footprint API responses
       domains = domainsResponse.entries || domainsResponse.data || domainsResponse.domains || [];
       ips = ipsResponse.entries || ipsResponse.data || ipsResponse.ips || [];
       
-      debugLog(`Digital Footprint POST results: ${domains.length} domains, ${ips.length} IPs`);
-      debugLog("POST domain response structure:", domainsResponse);
-      debugLog("POST IP response structure:", ipsResponse);
+      debugLog(`Footprint GET results: ${domains.length} domains, ${ips.length} IPs`);
+      debugLog("GET domain response structure:", domainsResponse);
+      debugLog("GET IP response structure:", ipsResponse);
       
-      // If POST endpoints work, we found our data!
+      // If footprint endpoints work, we found our data!
       if (domains.length > 0 || ips.length > 0) {
-        debugLog("SUCCESS: Digital Footprint POST endpoints returned data!");
+        debugLog("SUCCESS: Footprint GET endpoints returned data!");
       }
       
     } catch (error) {
-      debugLog("Digital Footprint POST endpoints failed, trying GET alternatives...", error);
+      debugLog("Footprint GET endpoints failed, trying POST alternatives...", error);
     }
     
-    // Method 1.5: Try GET endpoints for Attack Surface Intelligence API  
+    // Method 2: Try POST endpoints for Digital Footprint API (fallback)
     if (domains.length === 0 && ips.length === 0) {
-      debugLog("Trying Attack Surface Intelligence GET endpoints...");
+      debugLog("Trying Digital Footprint POST endpoints as fallback...");
       try {
         const [domainsResponse, ipsResponse] = await Promise.all([
-          makeRequest(`/footprint/${domain}/assets/domains?page=0&size=100`).catch(() => ({ entries: [] })),
-          makeRequest(`/footprint/${domain}/assets/ips?page=0&size=100`).catch(() => ({ entries: [] }))
+          makeRequest(`/parent-domains/${domain}/domains`, 'POST', { page: 0, page_size: 100 }).catch(() => ({ entries: [] })),
+          makeRequest(`/parent-domains/${domain}/ips`, 'POST', { page: 0, page_size: 100 }).catch(() => ({ entries: [] }))
         ]);
         
-        // Parse Attack Surface Intelligence API responses
+        // Parse Digital Footprint API responses
         domains = domainsResponse.entries || domainsResponse.data || domainsResponse.domains || [];
         ips = ipsResponse.entries || ipsResponse.data || ipsResponse.ips || [];
         
-        debugLog(`Attack Surface Intelligence GET results: ${domains.length} domains, ${ips.length} IPs`);
-        debugLog("GET domain response structure:", domainsResponse);
-        debugLog("GET IP response structure:", ipsResponse);
+        debugLog(`Digital Footprint POST results: ${domains.length} domains, ${ips.length} IPs`);
+        debugLog("POST domain response structure:", domainsResponse);
+        debugLog("POST IP response structure:", ipsResponse);
         
       } catch (error) {
-        debugLog("Attack Surface Intelligence GET endpoints failed, trying fallback methods...", error);
+        debugLog("Digital Footprint POST endpoints failed, trying other fallback methods...", error);
       }
     }
     
