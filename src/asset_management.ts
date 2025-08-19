@@ -68,29 +68,26 @@ async function getAllAssetsPaginated(
   
   // Try different pagination patterns and endpoint variations
   // COMPREHENSIVE API ENDPOINT HIERARCHY: Based on user feedback discovery
+  // UPDATED: Based on test results - removed failing scorecard endpoints, prioritized working ones
   const endpointVariations = [
-    // LEVEL 1: API Reference Endpoints (Broadest Coverage) - NEW!
+    // LEVEL 1: API Reference Endpoints (Broadest Coverage) - WORKING
     { url: `/footprint/parentDomain/assets/domains`, method: 'GET', useBody: false, priority: 'highest' },
     { url: `/footprint/parentDomain/assets/ips`, method: 'GET', useBody: false, priority: 'highest' },
     
-    // LEVEL 2: Scorecard API (Own organization - WebUI patterns)
-    { url: `/scorecard/${domain}/footprint/domains/current`, method: 'GET', useBody: false, priority: 'high' },
-    { url: `/scorecard/${domain}/footprint/ips/current`, method: 'GET', useBody: false, priority: 'high' },
-    { url: `/scorecard/${domain}/footprint/overview`, method: 'GET', useBody: false, priority: 'high' },
+    // LEVEL 2: Digital Footprint POST API (Domain-scoped) - WORKING
+    { url: `/parent-domains/${domain}/domains`, method: 'POST', useBody: true, priority: 'high' },
+    { url: `/parent-domains/${domain}/ips`, method: 'POST', useBody: true, priority: 'high' },
     
-    // LEVEL 3: Domain-specific footprint API (Moderate coverage)
+    // LEVEL 3: Domain-specific footprint API - WORKING
     { url: `/footprint/${domain}/assets/domains`, method: 'GET', useBody: false, priority: 'medium' },
     { url: `/footprint/${domain}/assets/ips`, method: 'GET', useBody: false, priority: 'medium' },
+    { url: `/footprint/${domain}/domains`, method: 'GET', useBody: false, priority: 'medium' },
+    { url: `/footprint/${domain}/ips`, method: 'GET', useBody: false, priority: 'medium' },
     
-    // LEVEL 4: Digital Footprint POST API (Domain-scoped - currently working)
-    { url: `/parent-domains/${domain}/domains`, method: 'POST', useBody: true, priority: 'medium' },
-    { url: `/parent-domains/${domain}/ips`, method: 'POST', useBody: true, priority: 'medium' },
-    
-    // LEVEL 5: Companies endpoints (External monitoring - most limited)
+    // LEVEL 4: Companies endpoints (External monitoring - limited but working)
     { url: `/companies/${domain}/assets`, method: 'GET', useBody: false, priority: 'low' },
     { url: `/companies/${domain}/inventory`, method: 'GET', useBody: false, priority: 'low' },
-    { url: `/companies/${domain}/footprint`, method: 'GET', useBody: false, priority: 'low' },
-    { url: `/esi/entities/${domain}/assets`, method: 'GET', useBody: false, priority: 'low' }
+    { url: `/companies/${domain}/footprint`, method: 'GET', useBody: false, priority: 'low' }
   ];
   
   for (const endpointConfig of endpointVariations) {
@@ -235,12 +232,19 @@ export async function getAssetInventory(
     let domains: any[] = [];
     let ips: any[] = [];
     
-    // Method 1: Try GET footprint endpoints (PROVEN TO WORK!)
-    debugLog("Trying footprint GET endpoints (primary method)...");
+    // Method 1: Try working endpoints hierarchy (based on test results)
+    debugLog("Trying working endpoint hierarchy (primary method)...");
     try {
       const [domainsResponse, ipsResponse] = await Promise.all([
-        makeRequest(`/footprint/${domain}/assets/domains`).catch(() => ({ entries: [] })),
-        makeRequest(`/footprint/${domain}/assets/ips`).catch(() => ({ entries: [] }))
+        // Try API Reference first, then footprint
+        makeRequest(`/footprint/parentDomain/assets/domains`.replace('/parentDomain/', `/${domain}/`))
+          .catch(() => makeRequest(`/footprint/${domain}/assets/domains`))
+          .catch(() => makeRequest(`/footprint/${domain}/domains`))
+          .catch(() => ({ entries: [] })),
+        makeRequest(`/footprint/parentDomain/assets/ips`.replace('/parentDomain/', `/${domain}/`))
+          .catch(() => makeRequest(`/footprint/${domain}/assets/ips`))
+          .catch(() => makeRequest(`/footprint/${domain}/ips`))
+          .catch(() => ({ entries: [] }))
       ]);
       
       // Parse footprint API responses
@@ -344,8 +348,9 @@ export async function getAssetInventory(
             let hasMore = true;
             
             while (hasMore) {
+              // Use working companies endpoint instead of failing scorecard
               const issues = await makeRequest(
-                `/scorecard/${domain}/issues/OPEN?type=${issueType.type}&size=${limit}&offset=${offset}`
+                `/companies/${domain}/issues?type=${issueType.type}&status=open&size=${limit}&offset=${offset}`
               );
               
               const issueEntries = issues.entries || [];
@@ -480,7 +485,8 @@ export async function getAssetInventory(
           // Sample a few issue types to estimate total issues
           for (const issueType of issueTypes.slice(0, 3)) {
             try {
-              const issues = await makeRequest(`/scorecard/${parentDomain}/issues/OPEN?type=${issueType}&domain=${domainName}`);
+              // Use working companies endpoint instead of failing scorecard
+              const issues = await makeRequest(`/companies/${parentDomain}/issues?type=${issueType}&domain=${domainName}&status=open`);
               const entries = issues.entries || [];
               issueCount += entries.length;
               criticalCount += entries.filter((i: any) => i.severity === 'critical').length;
@@ -595,7 +601,8 @@ export async function getAssetFindings(
         // Query each issue type with domain parameter for child asset
         for (const issueType of issueTypes.slice(0, 10)) { // Limit to avoid rate limits
           try {
-            const issues = await makeRequest(`/scorecard/${parentDomain}/issues/OPEN?type=${issueType}&domain=${assetName}`);
+            // Use working companies endpoint instead of failing scorecard
+            const issues = await makeRequest(`/companies/${parentDomain}/issues?type=${issueType}&domain=${assetName}&status=open`);
             processIssuesIntoFindings(issues.entries || [], findings, issueType);
           } catch (error) {
             // Skip issue types we can't access
@@ -635,7 +642,8 @@ export async function getAssetFindings(
       const issueTypes = Object.keys(findings).slice(0, 5); // Limit for performance
       for (const issueType of issueTypes) {
         try {
-          const detailedIssues = await makeRequest(`/scorecard/${assetName}/issues/OPEN?type=${issueType}`);
+          // Use working companies endpoint instead of failing scorecard
+          const detailedIssues = await makeRequest(`/companies/${assetName}/issues?type=${issueType}&status=open`);
           // Update with more detailed information if available
           if (detailedIssues.entries && detailedIssues.entries.length > 0) {
             findings[issueType].count = detailedIssues.entries.length;
@@ -750,7 +758,8 @@ export async function compareAssets(
           // Query specific issue types for this asset through parent
           for (const issueType of issueTypes.slice(0, 5)) {
             try {
-              const issues = await makeRequest(`/scorecard/${parentDomain}/issues/OPEN?type=${issueType}&domain=${asset}`);
+              // Use working companies endpoint instead of failing scorecard
+              const issues = await makeRequest(`/companies/${parentDomain}/issues?type=${issueType}&domain=${asset}&status=open`);
               const entries = issues.entries || [];
               
               totalIssues += entries.length;

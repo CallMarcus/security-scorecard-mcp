@@ -135,7 +135,7 @@ export class ScoreImpactSecurityScorecardServer {
   }
 
   /**
-   * Build flexible issue endpoints with status filtering for operational remediation
+   * Build flexible issue endpoints with status filtering using working endpoints
    */
   private buildIssuesEndpoint(
     domain: string, 
@@ -143,15 +143,20 @@ export class ScoreImpactSecurityScorecardServer {
     status: 'OPEN' | 'UNDER_REVIEW' | 'ALL' = 'OPEN',
     additionalParams?: Record<string, string>
   ): string {
-    // Build base endpoint with status
-    let endpoint = `/scorecard/${domain}/issues/${status}`;
+    // Use working companies endpoint instead of failing scorecard endpoint
+    let endpoint = `/companies/${domain}/issues`;
     
-    // Add query parameters
+    // Add query parameters including status
     const params = new URLSearchParams();
     if (issueType) {
       params.set('type', issueType);
     }
     params.set('size', this.pageSize.toString());
+    
+    // Add status filtering - use different parameter name that actually works
+    if (status !== 'ALL') {
+      params.set('status', status.toLowerCase());
+    }
     
     // Add any additional parameters
     if (additionalParams) {
@@ -174,25 +179,20 @@ export class ScoreImpactSecurityScorecardServer {
   ): Promise<any> {
     domain = this.sanitizeDomain(domain);
     
-    // Define endpoint hierarchy based on user's API Reference discovery
+    // Define endpoint hierarchy based on test results - removed failing scorecard endpoints
     const endpointHierarchy = [
-      // Level 1: API Reference (Broadest Coverage) - User Discovery
+      // Level 1: API Reference (Broadest Coverage) - WORKING
       {
         url: `/footprint/parentDomain/${endpointType}`,
         method: 'GET',
         transform: (url: string) => url.replace('/parentDomain/', `/${domain}/`)
       },
-      // Level 2: Scorecard (Organizational)  
-      {
-        url: `/scorecard/${domain}/${endpointType}`,
-        method: 'GET'
-      },
-      // Level 3: Direct footprint (Domain-specific)
+      // Level 2: Direct footprint (Domain-specific) - WORKING
       {
         url: `/footprint/${domain}/${endpointType}`,
         method: 'GET'
       },
-      // Level 4: Companies (External monitoring - Most limited)
+      // Level 3: Companies (External monitoring - Limited but working)
       {
         url: `/companies/${domain}/${endpointType}`,
         method: 'GET'
