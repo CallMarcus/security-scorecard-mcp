@@ -32,7 +32,3 @@ updates:
     allow:
       - dependency-type: "direct"
       - dependency-type: "indirect"
-    # Automatically merge patch updates for known safe packages
-    auto-merge:
-      - dependency-type: "development"
-        update-type: "security"
