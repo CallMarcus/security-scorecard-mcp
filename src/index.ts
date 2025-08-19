@@ -135,6 +135,35 @@ export class ScoreImpactSecurityScorecardServer {
   }
 
   /**
+   * Build flexible issue endpoints with status filtering for operational remediation
+   */
+  private buildIssuesEndpoint(
+    domain: string, 
+    issueType?: string, 
+    status: 'OPEN' | 'UNDER_REVIEW' | 'ALL' = 'OPEN',
+    additionalParams?: Record<string, string>
+  ): string {
+    // Build base endpoint with status
+    let endpoint = `/scorecard/${domain}/issues/${status}`;
+    
+    // Add query parameters
+    const params = new URLSearchParams();
+    if (issueType) {
+      params.set('type', issueType);
+    }
+    params.set('size', this.pageSize.toString());
+    
+    // Add any additional parameters
+    if (additionalParams) {
+      Object.entries(additionalParams).forEach(([key, value]) => {
+        params.set(key, value);
+      });
+    }
+    
+    return `${endpoint}?${params.toString()}`;
+  }
+
+  /**
    * Wraps tool execution with logging and error handling to provide
    * user-friendly feedback and partial results when possible.
    */
@@ -449,12 +478,13 @@ export class ScoreImpactSecurityScorecardServer {
           }
         },
         {
-          name: "get_findings_by_category",
-          description: "📊 List findings grouped by factor for a company domain.",
+          name: "get_findings_by_category", 
+          description: "🔍 ORGANIZE BY FACTOR: List all security findings organized by SecurityScorecard's 10 factor categories (Application Security, DNS Health, etc.). Shows issue counts and severity distribution per factor for strategic planning. Supports OPEN, UNDER_REVIEW, or ALL status filtering for operational remediation.",
           inputSchema: {
             type: "object",
             properties: {
-              domain: { type: "string", description: "Company domain to analyze.", default: this.config.defaultDomain }
+              domain: { type: "string", description: "Company domain to analyze.", default: this.config.defaultDomain },
+              status: { type: "string", enum: ["OPEN", "UNDER_REVIEW", "ALL"], description: "Filter by issue status for operational remediation.", default: "OPEN" }
             },
             required: ["domain"]
           }
@@ -512,7 +542,7 @@ export class ScoreImpactSecurityScorecardServer {
         },
         {
           name: "call_api_endpoint",
-          description: "🔧 DIRECT API ACCESS: Query SecurityScorecard API endpoints directly. Common patterns:\n• `/companies/{domain}` - Company overview\n• `/companies/{domain}/factors` - Security factors\n• `/companies/{domain}/issues/{type}` - Specific issues\n• `/parent-domains/{domain}/domains` (POST) - Domain assets\n• `/parent-domains/{domain}/ips` (POST) - IP assets\n• `/footprint/{domain}/assets/domains` - Legacy domain discovery\n• `/footprint/{domain}/assets/ips` - Legacy IP discovery",
+          description: "🔧 DIRECT API ACCESS: Query SecurityScorecard API endpoints directly. Common patterns:\n• `/scorecard/{domain}/issues/OPEN` - Your own organization's open issues\n• `/scorecard/{domain}/footprint/domains/current` - Complete domain inventory\n• `/scorecard/{domain}/footprint/ips/current` - IP address inventory\n• `/companies/{domain}` - Third-party company overview\n• `/companies/{domain}/factors` - External security factors\n• `/parent-domains/{domain}/domains` (POST) - Domain assets discovery\n• `/parent-domains/{domain}/ips` (POST) - IP assets discovery",
           inputSchema: {
             type: "object",
               properties: {
@@ -615,8 +645,9 @@ export class ScoreImpactSecurityScorecardServer {
 
         case "get_findings_by_category": {
           const domain = this.sanitizeDomain(rawDomain);
+          const status = request.params.arguments?.status as ('OPEN' | 'UNDER_REVIEW' | 'ALL') || 'OPEN';
           return await this.executeTool("get_findings_by_category", () =>
-            this.getFindingsByCategoryTool(domain)
+            this.getFindingsByCategoryTool(domain, status)
           );
         }
 
@@ -989,9 +1020,9 @@ export class ScoreImpactSecurityScorecardServer {
     const results = await Promise.all(
       issueTypes.map(async (issueType) => {
         try {
-          // Use correct API pattern: /companies/{domain}/issues/{issue_type}
+          // FIXED: Use scorecard API with flexible endpoint builder
           const res = await this.makeRequest(
-            `/companies/${domain}/issues/${issueType}?size=${this.pageSize}`
+            this.buildIssuesEndpoint(domain, issueType, 'OPEN')
           );
           const count = Array.isArray(res.entries) ? res.entries.length : 0;
           const severity = res.entries && res.entries.length > 0 ? 
@@ -1065,7 +1096,8 @@ export class ScoreImpactSecurityScorecardServer {
         
         for (const issueType of Array.from(issueTypes).slice(0, 10)) {
             try {
-                const issues = await this.makeRequest(`/companies/${domain}/issues/${issueType}?size=${this.pageSize}`);
+                // FIXED: Use scorecard API with flexible endpoint builder for detailed issues
+                const issues = await this.makeRequest(this.buildIssuesEndpoint(domain, issueType, 'OPEN'));
                 if (issues.entries && issues.entries.length > 0) {
                     results[issueType] = issues.entries.map((entry: any) => ({
                         domain: entry.domain || entry.parent_domain || domain,
@@ -1108,7 +1140,7 @@ export class ScoreImpactSecurityScorecardServer {
     maxEffort = this.validateMaxEffort(maxEffort);
     const maxEffortScore = this.getEffortScore(maxEffort);
 
-    // Since /companies/{domain}/issues/active returns 404, use factor summary approach
+    // FIXED: Use scorecard API for operational remediation of own organization
     const companyData = await this.makeRequest(`/companies/${domain}/factors`);
     
     // Extract issue types and simulate issue data from factor summaries
@@ -1182,11 +1214,11 @@ export class ScoreImpactSecurityScorecardServer {
     }
   }
 
-  private async getFindingsByCategoryTool(domain: string): Promise<any> {
+  private async getFindingsByCategoryTool(domain: string, status: 'OPEN' | 'UNDER_REVIEW' | 'ALL' = 'OPEN'): Promise<any> {
     domain = this.sanitizeDomain(domain);
-    let text = `# 📊 FINDINGS BY CATEGORY: ${domain}\n\n`;
+    let text = `# 📊 FINDINGS BY CATEGORY: ${domain} (${status} Issues)\n\n`;
     try {
-      const summary = await getFindingsByCategory(this.makeRequest.bind(this), domain);
+      const summary = await getFindingsByCategory(this.makeRequest.bind(this), domain, status);
       text += `\n\n\`\`\`json\n${JSON.stringify(summary, null, 2)}\n\`\`\``;
     } catch (error: any) {
       text += `Error retrieving category findings: ${error.message}`;

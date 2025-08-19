@@ -67,15 +67,19 @@ async function getAllAssetsPaginated(
   }
   
   // Try different pagination patterns and endpoint variations
-  // PRIORITIZE WORKING ENDPOINTS: footprint GET endpoints work best for IP discovery
+  // PRIORITIZE SCORECARD ENDPOINTS: Own organization's complete asset inventory
   const endpointVariations = [
-    // Footprint API (GET endpoints) - PROVEN TO WORK FOR IP DISCOVERY
+    // PRIMARY: Scorecard API (Own organization - discovered from WebUI patterns)
+    { url: `/scorecard/${domain}/footprint/domains/current`, method: 'GET', useBody: false },
+    { url: `/scorecard/${domain}/footprint/ips/current`, method: 'GET', useBody: false },
+    { url: `/scorecard/${domain}/footprint/overview`, method: 'GET', useBody: false },
+    // SECONDARY: Legacy footprint API (GET endpoints) - may have limited view
     { url: `/footprint/${domain}/assets/domains`, method: 'GET', useBody: false },
     { url: `/footprint/${domain}/assets/ips`, method: 'GET', useBody: false },
-    // Digital Footprint API (POST endpoints) - fallback
+    // TERTIARY: Digital Footprint API (POST endpoints) - fallback
     { url: `/parent-domains/${domain}/domains`, method: 'POST', useBody: true },
     { url: `/parent-domains/${domain}/ips`, method: 'POST', useBody: true },
-    // Legacy endpoints (keep for fallback)
+    // FALLBACK: Companies endpoints (third-party monitoring - limited view)
     { url: `/companies/${domain}/assets`, method: 'GET', useBody: false },
     { url: `/companies/${domain}/inventory`, method: 'GET', useBody: false },
     { url: `/companies/${domain}/footprint`, method: 'GET', useBody: false },
@@ -314,7 +318,7 @@ export async function getAssetInventory(
             
             while (hasMore) {
               const issues = await makeRequest(
-                `/companies/${domain}/issues/${issueType.type}?size=${limit}&offset=${offset}`
+                `/scorecard/${domain}/issues/OPEN?type=${issueType.type}&size=${limit}&offset=${offset}`
               );
               
               const issueEntries = issues.entries || [];
@@ -431,7 +435,7 @@ export async function getAssetInventory(
           // Sample a few issue types to estimate total issues
           for (const issueType of issueTypes.slice(0, 3)) {
             try {
-              const issues = await makeRequest(`/companies/${parentDomain}/issues/${issueType}?domain=${domainName}`);
+              const issues = await makeRequest(`/scorecard/${parentDomain}/issues/OPEN?type=${issueType}&domain=${domainName}`);
               const entries = issues.entries || [];
               issueCount += entries.length;
               criticalCount += entries.filter((i: any) => i.severity === 'critical').length;
@@ -537,7 +541,7 @@ export async function getAssetFindings(
         // Query each issue type with domain parameter for child asset
         for (const issueType of issueTypes.slice(0, 10)) { // Limit to avoid rate limits
           try {
-            const issues = await makeRequest(`/companies/${parentDomain}/issues/${issueType}?domain=${assetName}`);
+            const issues = await makeRequest(`/scorecard/${parentDomain}/issues/OPEN?type=${issueType}&domain=${assetName}`);
             processIssuesIntoFindings(issues.entries || [], findings, issueType);
           } catch (error) {
             // Skip issue types we can't access
@@ -568,7 +572,7 @@ export async function getAssetFindings(
       const issueTypes = Object.keys(findings).slice(0, 5); // Limit for performance
       for (const issueType of issueTypes) {
         try {
-          const detailedIssues = await makeRequest(`/companies/${assetName}/issues/${issueType}`);
+          const detailedIssues = await makeRequest(`/scorecard/${assetName}/issues/OPEN?type=${issueType}`);
           // Update with more detailed information if available
           if (detailedIssues.entries && detailedIssues.entries.length > 0) {
             findings[issueType].count = detailedIssues.entries.length;
@@ -665,7 +669,7 @@ export async function compareAssets(
           // Query specific issue types for this asset through parent
           for (const issueType of issueTypes.slice(0, 5)) {
             try {
-              const issues = await makeRequest(`/companies/${parentDomain}/issues/${issueType}?domain=${asset}`);
+              const issues = await makeRequest(`/scorecard/${parentDomain}/issues/OPEN?type=${issueType}&domain=${asset}`);
               const entries = issues.entries || [];
               
               totalIssues += entries.length;

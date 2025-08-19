@@ -15,10 +15,18 @@ export interface FactorSummary {
 
 export async function getFindingsByCategory(
   makeRequest: (endpoint: string) => Promise<any>,
-  domain: string
+  domain: string,
+  status: 'OPEN' | 'UNDER_REVIEW' | 'ALL' = 'OPEN'
 ): Promise<FactorSummary[]> {
-  // Use factors endpoint which provides issue summaries categorized by factor
-  const factorsResponse = await makeRequest(`/companies/${domain}/factors`);
+  // FIXED: Try scorecard API first for own organization, then fallback to companies API
+  let factorsResponse;
+  try {
+    // Try scorecard API for own organization's factors
+    factorsResponse = await makeRequest(`/scorecard/${domain}/factors`);
+  } catch (error) {
+    // Fallback to companies API for third-party monitoring
+    factorsResponse = await makeRequest(`/companies/${domain}/factors`);
+  }
   const factorSummary: FactorSummary[] = [];
   
   // Process each factor and its issue summary
