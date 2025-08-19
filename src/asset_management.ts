@@ -67,23 +67,30 @@ async function getAllAssetsPaginated(
   }
   
   // Try different pagination patterns and endpoint variations
-  // PRIORITIZE SCORECARD ENDPOINTS: Own organization's complete asset inventory
+  // COMPREHENSIVE API ENDPOINT HIERARCHY: Based on user feedback discovery
   const endpointVariations = [
-    // PRIMARY: Scorecard API (Own organization - discovered from WebUI patterns)
-    { url: `/scorecard/${domain}/footprint/domains/current`, method: 'GET', useBody: false },
-    { url: `/scorecard/${domain}/footprint/ips/current`, method: 'GET', useBody: false },
-    { url: `/scorecard/${domain}/footprint/overview`, method: 'GET', useBody: false },
-    // SECONDARY: Legacy footprint API (GET endpoints) - may have limited view
-    { url: `/footprint/${domain}/assets/domains`, method: 'GET', useBody: false },
-    { url: `/footprint/${domain}/assets/ips`, method: 'GET', useBody: false },
-    // TERTIARY: Digital Footprint API (POST endpoints) - fallback
-    { url: `/parent-domains/${domain}/domains`, method: 'POST', useBody: true },
-    { url: `/parent-domains/${domain}/ips`, method: 'POST', useBody: true },
-    // FALLBACK: Companies endpoints (third-party monitoring - limited view)
-    { url: `/companies/${domain}/assets`, method: 'GET', useBody: false },
-    { url: `/companies/${domain}/inventory`, method: 'GET', useBody: false },
-    { url: `/companies/${domain}/footprint`, method: 'GET', useBody: false },
-    { url: `/esi/entities/${domain}/assets`, method: 'GET', useBody: false }
+    // LEVEL 1: API Reference Endpoints (Broadest Coverage) - NEW!
+    { url: `/footprint/parentDomain/assets/domains`, method: 'GET', useBody: false, priority: 'highest' },
+    { url: `/footprint/parentDomain/assets/ips`, method: 'GET', useBody: false, priority: 'highest' },
+    
+    // LEVEL 2: Scorecard API (Own organization - WebUI patterns)
+    { url: `/scorecard/${domain}/footprint/domains/current`, method: 'GET', useBody: false, priority: 'high' },
+    { url: `/scorecard/${domain}/footprint/ips/current`, method: 'GET', useBody: false, priority: 'high' },
+    { url: `/scorecard/${domain}/footprint/overview`, method: 'GET', useBody: false, priority: 'high' },
+    
+    // LEVEL 3: Domain-specific footprint API (Moderate coverage)
+    { url: `/footprint/${domain}/assets/domains`, method: 'GET', useBody: false, priority: 'medium' },
+    { url: `/footprint/${domain}/assets/ips`, method: 'GET', useBody: false, priority: 'medium' },
+    
+    // LEVEL 4: Digital Footprint POST API (Domain-scoped - currently working)
+    { url: `/parent-domains/${domain}/domains`, method: 'POST', useBody: true, priority: 'medium' },
+    { url: `/parent-domains/${domain}/ips`, method: 'POST', useBody: true, priority: 'medium' },
+    
+    // LEVEL 5: Companies endpoints (External monitoring - most limited)
+    { url: `/companies/${domain}/assets`, method: 'GET', useBody: false, priority: 'low' },
+    { url: `/companies/${domain}/inventory`, method: 'GET', useBody: false, priority: 'low' },
+    { url: `/companies/${domain}/footprint`, method: 'GET', useBody: false, priority: 'low' },
+    { url: `/esi/entities/${domain}/assets`, method: 'GET', useBody: false, priority: 'low' }
   ];
   
   for (const endpointConfig of endpointVariations) {
@@ -112,8 +119,16 @@ async function getAllAssetsPaginated(
             response = await makeRequest(endpointConfig.url, endpointConfig.method, body);
             
           } else {
-            // GET endpoints: Attack Surface Intelligence API or legacy endpoints
+            // GET endpoints: Various API types with different parameter handling
+            let finalUrl = endpointConfig.url;
             let queryParams = `page=${page}&size=${limit}`;
+            
+            // Handle API Reference endpoints with parentDomain parameter
+            if (endpointConfig.url.includes('/footprint/parentDomain/')) {
+              // API Reference endpoints: replace parentDomain with actual domain
+              finalUrl = endpointConfig.url.replace('/parentDomain/', `/${domain}/`);
+              debugLog(`API Reference endpoint transformation: ${endpointConfig.url} → ${finalUrl}`);
+            }
             
             // Add asset type filtering for legacy endpoints
             if (!endpointConfig.url.includes('/footprint/') && !endpointConfig.url.includes('/parent-domains/')) {
@@ -122,8 +137,8 @@ async function getAllAssetsPaginated(
               }
             }
             
-            const fullUrl = `${endpointConfig.url}?${queryParams}`;
-            debugLog(`Trying GET ${fullUrl}`);
+            const fullUrl = `${finalUrl}?${queryParams}`;
+            debugLog(`Trying GET ${fullUrl} (Priority: ${endpointConfig.priority || 'standard'})`);
             response = await makeRequest(fullUrl, endpointConfig.method);
           }
           

@@ -541,8 +541,19 @@ export class ScoreImpactSecurityScorecardServer {
           }
         },
         {
+          name: "test_endpoint_hierarchy",
+          description: "🔍 ENDPOINT HIERARCHY TESTING: Test different API endpoint levels to validate access coverage. Tests all discovered endpoint patterns:\n• Level 1: `/footprint/parentDomain/assets/` (Broadest - API Reference)\n• Level 2: `/scorecard/{domain}/footprint/` (Organizational)\n• Level 3: `/footprint/{domain}/assets/` (Domain-specific)\n• Level 4: `/parent-domains/{domain}/` (POST - Scoped)\n• Level 5: `/companies/{domain}/` (External - Most limited)\nHelps identify which endpoints provide complete asset visibility.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              domain: { type: "string", description: "Domain to test against all endpoint levels.", default: this.config.defaultDomain }
+            },
+            required: ["domain"]
+          }
+        },
+        {
           name: "call_api_endpoint",
-          description: "🔧 DIRECT API ACCESS: Query SecurityScorecard API endpoints directly. Common patterns:\n• `/scorecard/{domain}/issues/OPEN` - Your own organization's open issues\n• `/scorecard/{domain}/footprint/domains/current` - Complete domain inventory\n• `/scorecard/{domain}/footprint/ips/current` - IP address inventory\n• `/companies/{domain}` - Third-party company overview\n• `/companies/{domain}/factors` - External security factors\n• `/parent-domains/{domain}/domains` (POST) - Domain assets discovery\n• `/parent-domains/{domain}/ips` (POST) - IP assets discovery",
+          description: "🔧 DIRECT API ACCESS: Query SecurityScorecard API endpoints directly. Enhanced with discovered endpoint patterns:\n• `/footprint/parentDomain/assets/ips` (GET) - API Reference (Broadest coverage)\n• `/scorecard/{domain}/issues/OPEN` - Your own organization's open issues\n• `/scorecard/{domain}/footprint/domains/current` - Complete domain inventory\n• `/footprint/{domain}/assets/ips` (GET) - Domain-specific assets\n• `/parent-domains/{domain}/ips` (POST) - Scoped organizational assets\n• `/companies/{domain}` - Third-party company overview (Most limited)",
           inputSchema: {
             type: "object",
               properties: {
@@ -715,6 +726,13 @@ export class ScoreImpactSecurityScorecardServer {
           
           return await this.executeTool("get_asset_detailed_findings", () =>
             this.getAssetDetailedFindings(domain, assetName, assetType)
+          );
+        }
+
+        case "test_endpoint_hierarchy": {
+          const domain = this.sanitizeDomain(rawDomain);
+          return await this.executeTool("test_endpoint_hierarchy", () =>
+            this.testEndpointHierarchy(domain)
           );
         }
 
@@ -1356,6 +1374,130 @@ export class ScoreImpactSecurityScorecardServer {
                  `\`\`\`json\n${JSON.stringify(comparison, null, 2)}\n\`\`\``;
     
     return { content: [{ type: "text", text }] };
+  }
+
+  private async testEndpointHierarchy(domain: string): Promise<any> {
+    domain = this.sanitizeDomain(domain);
+    let text = `# 🔍 ENDPOINT HIERARCHY TEST: ${domain}\n\n`;
+    text += `**Testing API endpoint access levels to validate asset coverage based on user feedback discovery**\n\n`;
+
+    // Define the endpoint hierarchy for testing
+    const hierarchyLevels = [
+      {
+        level: 1,
+        name: "API Reference (Broadest Coverage)",
+        description: "Should find missing assets like 35.228.6.225",
+        endpoints: [
+          { url: `/footprint/parentDomain/assets/ips`, method: 'GET' },
+          { url: `/footprint/parentDomain/assets/domains`, method: 'GET' }
+        ]
+      },
+      {
+        level: 2, 
+        name: "Scorecard (Organizational View)",
+        description: "Own organization complete visibility",
+        endpoints: [
+          { url: `/scorecard/${domain}/footprint/ips/current`, method: 'GET' },
+          { url: `/scorecard/${domain}/footprint/domains/current`, method: 'GET' }
+        ]
+      },
+      {
+        level: 3,
+        name: "Domain-Specific Footprint",
+        description: "Domain-scoped asset discovery",
+        endpoints: [
+          { url: `/footprint/${domain}/assets/ips`, method: 'GET' },
+          { url: `/footprint/${domain}/assets/domains`, method: 'GET' }
+        ]
+      },
+      {
+        level: 4,
+        name: "Parent-Domains POST (Currently Working)",
+        description: "Known working endpoints - domain-scoped",
+        endpoints: [
+          { url: `/parent-domains/${domain}/ips`, method: 'POST' },
+          { url: `/parent-domains/${domain}/domains`, method: 'POST' }
+        ]
+      },
+      {
+        level: 5,
+        name: "Companies (External - Most Limited)", 
+        description: "Third-party monitoring view",
+        endpoints: [
+          { url: `/companies/${domain}/assets`, method: 'GET' },
+          { url: `/companies/${domain}/footprint`, method: 'GET' }
+        ]
+      }
+    ];
+
+    const results: any = {};
+
+    for (const level of hierarchyLevels) {
+      text += `## Level ${level.level}: ${level.name}\n`;
+      text += `*${level.description}*\n\n`;
+      results[`level_${level.level}`] = { name: level.name, endpoints: {} };
+
+      for (const endpoint of level.endpoints) {
+        try {
+          let testUrl = endpoint.url;
+          
+          // Handle API Reference parentDomain replacement
+          if (testUrl.includes('/parentDomain/')) {
+            testUrl = testUrl.replace('/parentDomain/', `/${domain}/`);
+          }
+
+          let response;
+          if (endpoint.method === 'POST') {
+            response = await this.makeRequest(testUrl, 'POST', { page: 0, page_size: 10 });
+          } else {
+            response = await this.makeRequest(`${testUrl}?size=10`);
+          }
+
+          const entryCount = response?.entries?.length || response?.data?.length || response?.assets?.length || 0;
+          const totalCount = response?.total_count || response?.total || entryCount;
+          const hasData = entryCount > 0;
+
+          text += `✅ **${endpoint.method} ${endpoint.url}**\n`;
+          text += `   - Status: SUCCESS\n`;  
+          text += `   - Sample Assets: ${entryCount}\n`;
+          text += `   - Total Available: ${totalCount}\n`;
+          text += `   - Data Quality: ${hasData ? 'HAS DATA' : 'NO DATA'}\n\n`;
+
+          results[`level_${level.level}`].endpoints[endpoint.url] = {
+            success: true,
+            sampleCount: entryCount,
+            totalCount: totalCount,
+            hasData: hasData,
+            method: endpoint.method
+          };
+
+        } catch (error: any) {
+          text += `❌ **${endpoint.method} ${endpoint.url}**\n`;
+          text += `   - Status: FAILED\n`;
+          text += `   - Error: ${error.message}\n\n`;
+
+          results[`level_${level.level}`].endpoints[endpoint.url] = {
+            success: false,
+            error: error.message,
+            method: endpoint.method
+          };
+        }
+      }
+      text += `---\n\n`;
+    }
+
+    text += `## 📊 CRITICAL ANALYSIS\n\n`;
+    text += `**This test validates the user's discovery about API endpoint hierarchy:**\n`;
+    text += `- **Level 1 API Reference** endpoints should provide broadest coverage\n`;
+    text += `- **Missing assets** (like 35.228.6.225) may only appear in Level 1\n`;
+    text += `- **Lower levels** have increasingly limited visibility\n`;
+    text += `- **Expected outcome**: Level 1 should reveal 200+ domains vs Level 4's ~100 domains\n\n`;
+
+    text += `\`\`\`json\n${JSON.stringify(results, null, 2)}\n\`\`\``;
+
+    return {
+      content: [{ type: "text", text }],
+    };
   }
 
   // --- HELPER METHODS ---
