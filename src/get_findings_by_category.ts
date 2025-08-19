@@ -18,14 +18,24 @@ export async function getFindingsByCategory(
   domain: string,
   status: 'OPEN' | 'UNDER_REVIEW' | 'ALL' = 'OPEN'
 ): Promise<FactorSummary[]> {
-  // FIXED: Try scorecard API first for own organization, then fallback to companies API
+  // ENHANCED: Use hierarchical API approach for comprehensive organizational data
   let factorsResponse;
   try {
-    // Try scorecard API for own organization's factors
-    factorsResponse = await makeRequest(`/scorecard/${domain}/factors`);
+    // Level 1: Try API Reference endpoint for broadest coverage
+    factorsResponse = await makeRequest(`/footprint/parentDomain/factors`.replace('/parentDomain/', `/${domain}/`));
   } catch (error) {
-    // Fallback to companies API for third-party monitoring
-    factorsResponse = await makeRequest(`/companies/${domain}/factors`);
+    try {
+      // Level 2: Try scorecard API for own organization's factors
+      factorsResponse = await makeRequest(`/scorecard/${domain}/factors`);
+    } catch (error2) {
+      try {
+        // Level 3: Try direct footprint endpoint
+        factorsResponse = await makeRequest(`/footprint/${domain}/factors`);
+      } catch (error3) {
+        // Level 4: Fallback to companies API for third-party monitoring
+        factorsResponse = await makeRequest(`/companies/${domain}/factors`);
+      }
+    }
   }
   const factorSummary: FactorSummary[] = [];
   

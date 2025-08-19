@@ -307,8 +307,20 @@ export async function getAssetInventory(
     if (domains.length === 0) {
       debugLog('Using enhanced asset discovery through issue data...');
       
-      // Get factors data to discover assets mentioned in issues
-      const factorsResponse = await makeRequest(`/companies/${domain}/factors`);
+      // Get factors data to discover assets mentioned in issues using hierarchical approach
+      let factorsResponse;
+      try {
+        // Try broader API Reference endpoint first
+        factorsResponse = await makeRequest(`/footprint/${domain}/factors`);
+      } catch (error) {
+        try {
+          // Fallback to scorecard endpoint
+          factorsResponse = await makeRequest(`/scorecard/${domain}/factors`);
+        } catch (error2) {
+          // Final fallback to companies endpoint
+          factorsResponse = await makeRequest(`/companies/${domain}/factors`);
+        }
+      }
       const discoveredDomains = new Set<string>();
       const discoveredIPs = new Set<string>();
       
@@ -429,8 +441,17 @@ export async function getAssetInventory(
       let highCount = 0;
       
       try {
-        // Try to get factors for this domain directly
-        const factors = await makeRequest(`/companies/${domainName}/factors`);
+        // Try to get factors for this domain directly using hierarchical approach
+        let factors;
+        try {
+          factors = await makeRequest(`/footprint/${domainName}/factors`);
+        } catch (error) {
+          try {
+            factors = await makeRequest(`/scorecard/${domainName}/factors`);
+          } catch (error2) {
+            factors = await makeRequest(`/companies/${domainName}/factors`);
+          }
+        }
         factors.entries?.forEach((factor: any) => {
           factor.issue_summary?.forEach((issue: any) => {
             if (issue.count) {
@@ -444,7 +465,16 @@ export async function getAssetInventory(
         // If direct access fails, try through parent domain with domain parameter
         const parentDomain = await findParentDomain(makeRequest, domainName);
         if (parentDomain) {
-          const parentFactors = await makeRequest(`/companies/${parentDomain}/factors`);
+          let parentFactors;
+          try {
+            parentFactors = await makeRequest(`/footprint/${parentDomain}/factors`);
+          } catch (error) {
+            try {
+              parentFactors = await makeRequest(`/scorecard/${parentDomain}/factors`);
+            } catch (error2) {
+              parentFactors = await makeRequest(`/companies/${parentDomain}/factors`);
+            }
+          }
           const issueTypes = extractIssueTypesFromFactors(parentFactors);
           
           // Sample a few issue types to estimate total issues
@@ -549,8 +579,17 @@ export async function getAssetFindings(
       // For child assets, we need to query through parent domain
       const parentDomain = await findParentDomain(makeRequest, assetName);
       if (parentDomain) {
-        // Get available issue types from parent's factors
-        const factors = await makeRequest(`/companies/${parentDomain}/factors`);
+        // Get available issue types from parent's factors using hierarchical approach
+        let factors;
+        try {
+          factors = await makeRequest(`/footprint/${parentDomain}/factors`);
+        } catch (error) {
+          try {
+            factors = await makeRequest(`/scorecard/${parentDomain}/factors`);
+          } catch (error2) {
+            factors = await makeRequest(`/companies/${parentDomain}/factors`);
+          }
+        }
         const issueTypes = extractIssueTypesFromFactors(factors);
         
         // Query each issue type with domain parameter for child asset
@@ -565,8 +604,17 @@ export async function getAssetFindings(
         }
       }
     } else {
-      // For parent domains, use /factors to get issue summary, then optionally fetch specific types
-      const factors = await makeRequest(`/companies/${assetName}/factors`);
+      // For parent domains, use hierarchical factors to get issue summary, then optionally fetch specific types
+      let factors;
+      try {
+        factors = await makeRequest(`/footprint/${assetName}/factors`);
+      } catch (error) {
+        try {
+          factors = await makeRequest(`/scorecard/${assetName}/factors`);
+        } catch (error2) {
+          factors = await makeRequest(`/companies/${assetName}/factors`);
+        }
+      }
       
       // Extract issue types and counts from factor summaries
       factors.entries?.forEach((factor: any) => {
@@ -652,8 +700,17 @@ export async function compareAssets(
       const issueTypeCounts: { [key: string]: number } = {};
       
       try {
-        // Try to get factors for this asset directly
-        const factors = await makeRequest(`/companies/${asset}/factors`);
+        // Try to get factors for this asset directly using hierarchical approach
+        let factors;
+        try {
+          factors = await makeRequest(`/footprint/${asset}/factors`);
+        } catch (error) {
+          try {
+            factors = await makeRequest(`/scorecard/${asset}/factors`);
+          } catch (error2) {
+            factors = await makeRequest(`/companies/${asset}/factors`);
+          }
+        }
         factors.entries?.forEach((factor: any) => {
           factor.issue_summary?.forEach((issue: any) => {
             if (issue.count) {
@@ -678,7 +735,16 @@ export async function compareAssets(
         // If direct access fails, try through parent domain
         const parentDomain = await findParentDomain(makeRequest, asset);
         if (parentDomain) {
-          const parentFactors = await makeRequest(`/companies/${parentDomain}/factors`);
+          let parentFactors;
+          try {
+            parentFactors = await makeRequest(`/footprint/${parentDomain}/factors`);
+          } catch (error) {
+            try {
+              parentFactors = await makeRequest(`/scorecard/${parentDomain}/factors`);
+            } catch (error2) {
+              parentFactors = await makeRequest(`/companies/${parentDomain}/factors`);
+            }
+          }
           const issueTypes = extractIssueTypesFromFactors(parentFactors);
           
           // Query specific issue types for this asset through parent

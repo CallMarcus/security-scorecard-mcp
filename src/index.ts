@@ -164,6 +164,71 @@ export class ScoreImpactSecurityScorecardServer {
   }
 
   /**
+   * Universal API hierarchy request using /footprint/parentDomain/ pattern first
+   * Based on user discovery of broader API Reference endpoint coverage
+   */
+  private async makeHierarchicalRequest(
+    domain: string,
+    endpointType: 'factors' | 'overview' | 'score' | 'assets',
+    params?: Record<string, any>
+  ): Promise<any> {
+    domain = this.sanitizeDomain(domain);
+    
+    // Define endpoint hierarchy based on user's API Reference discovery
+    const endpointHierarchy = [
+      // Level 1: API Reference (Broadest Coverage) - User Discovery
+      {
+        url: `/footprint/parentDomain/${endpointType}`,
+        method: 'GET',
+        transform: (url: string) => url.replace('/parentDomain/', `/${domain}/`)
+      },
+      // Level 2: Scorecard (Organizational)  
+      {
+        url: `/scorecard/${domain}/${endpointType}`,
+        method: 'GET'
+      },
+      // Level 3: Direct footprint (Domain-specific)
+      {
+        url: `/footprint/${domain}/${endpointType}`,
+        method: 'GET'
+      },
+      // Level 4: Companies (External monitoring - Most limited)
+      {
+        url: `/companies/${domain}/${endpointType}`,
+        method: 'GET'
+      }
+    ];
+
+    // Try each level in hierarchy order
+    for (const endpoint of endpointHierarchy) {
+      try {
+        let finalUrl = endpoint.transform ? endpoint.transform(endpoint.url) : endpoint.url;
+        
+        if (params && Object.keys(params).length > 0) {
+          const queryParams = new URLSearchParams(params).toString();
+          finalUrl += `?${queryParams}`;
+        }
+
+        this.log(`Trying hierarchical request: ${finalUrl} (${endpoint.method})`);
+        const response = await this.makeRequest(finalUrl, endpoint.method);
+        
+        if (response && (response.entries?.length > 0 || response.factors?.length > 0 || response.score !== undefined)) {
+          this.log(`Success with hierarchical endpoint: ${finalUrl}`);
+          return response;
+        }
+      } catch (error: any) {
+        this.log(`Hierarchical endpoint failed: ${endpoint.url} - ${error.message}`);
+        // Continue to next level in hierarchy
+      }
+    }
+    
+    throw new McpError(
+      ErrorCode.InvalidRequest, 
+      `All hierarchical endpoints failed for ${endpointType} on domain: ${domain}`
+    );
+  }
+
+  /**
    * Wraps tool execution with logging and error handling to provide
    * user-friendly feedback and partial results when possible.
    */
@@ -755,9 +820,11 @@ export class ScoreImpactSecurityScorecardServer {
   private async getScoreImprovementRoadmap(domain: string, targetGrade: "A" | "B" | "C"): Promise<any> {
       domain = this.sanitizeDomain(domain);
       targetGrade = this.validateTargetGrade(targetGrade);
+      
+      // Use hierarchical API approach for comprehensive organizational data
       const [scorecard, companyFactors, allFactors] = await Promise.all([
-          this.makeRequest(`/companies/${domain}`),
-          this.makeRequest(`/companies/${domain}/factors`),
+          this.makeHierarchicalRequest(domain, 'overview').catch(() => this.makeRequest(`/companies/${domain}`)),
+          this.makeHierarchicalRequest(domain, 'factors'),
           this.getFactors()
       ]);
 
@@ -864,7 +931,8 @@ export class ScoreImpactSecurityScorecardServer {
 
   private async benchmarkGradeRequirements(domain: string): Promise<any> {
     domain = this.sanitizeDomain(domain);
-    const scorecard = await this.makeRequest(`/companies/${domain}`);
+    // Use hierarchical request for comprehensive organizational data
+    const scorecard = await this.makeHierarchicalRequest(domain, 'overview').catch(() => this.makeRequest(`/companies/${domain}`));
     const text =
       `# 📈 GRADE BENCHMARKING: ${domain}\n\n` +
       `Current Score: ${scorecard.score}\n\n` +
@@ -875,9 +943,10 @@ export class ScoreImpactSecurityScorecardServer {
   private async calculateFactorScoreImpact(domain: string): Promise<any> {
     domain = this.sanitizeDomain(domain);
     try {
+      // Use hierarchical API approach for comprehensive organizational data
       const [scorecard, companyFactors, allFactors] = await Promise.all([
-        this.makeRequest(`/companies/${domain}`),
-        this.makeRequest(`/companies/${domain}/factors`),
+        this.makeHierarchicalRequest(domain, 'overview').catch(() => this.makeRequest(`/companies/${domain}`)),
+        this.makeHierarchicalRequest(domain, 'factors'),
         this.getFactors(),
       ]);
 
@@ -945,9 +1014,9 @@ export class ScoreImpactSecurityScorecardServer {
       domain = this.sanitizeDomain(domain);
       topN = this.validateTopN(topN);
       
-      // Use factors endpoint to get issue summaries with score impact data
+      // Use hierarchical factors endpoint to get comprehensive issue summaries with score impact data
       const [companyData, allFactors] = await Promise.all([
-          this.makeRequest(`/companies/${domain}/factors`),
+          this.makeHierarchicalRequest(domain, 'factors'),
           this.getFactors()
       ]);
 
@@ -1014,9 +1083,9 @@ export class ScoreImpactSecurityScorecardServer {
   ): Promise<any> {
     domain = this.sanitizeDomain(domain);
     if (!Array.isArray(issueTypes) || issueTypes.length === 0) {
-      // If no issue types provided, get them from factors endpoint
+      // If no issue types provided, get them from hierarchical factors endpoint
       try {
-        const companyData = await this.makeRequest(`/companies/${domain}/factors`);
+        const companyData = await this.makeHierarchicalRequest(domain, 'factors');
         const discoveredIssueTypes = new Set<string>();
         companyData.entries?.forEach((factor: any) => {
           factor.issue_summary?.forEach((issue: any) => {
@@ -1093,8 +1162,8 @@ export class ScoreImpactSecurityScorecardServer {
     let text = `# 🔍 FINDINGS BY ASSET: ${domain}\n\n`;
     
     try {
-        // Since /esi/assets endpoint returns 404, use company factors to get issue types
-        const companyData = await this.makeRequest(`/companies/${domain}/factors`);
+        // Use hierarchical factors endpoint to get comprehensive issue types
+        const companyData = await this.makeHierarchicalRequest(domain, 'factors');
         
         // Extract issue types from factor summaries
         const issueTypes = new Set<string>();
@@ -1158,8 +1227,8 @@ export class ScoreImpactSecurityScorecardServer {
     maxEffort = this.validateMaxEffort(maxEffort);
     const maxEffortScore = this.getEffortScore(maxEffort);
 
-    // FIXED: Use scorecard API for operational remediation of own organization
-    const companyData = await this.makeRequest(`/companies/${domain}/factors`);
+    // Use hierarchical factors endpoint for comprehensive organizational remediation data
+    const companyData = await this.makeHierarchicalRequest(domain, 'factors');
     
     // Extract issue types and simulate issue data from factor summaries
     const allIssues: { entries: Issue[] } = { entries: [] };
@@ -1209,8 +1278,8 @@ export class ScoreImpactSecurityScorecardServer {
     domain = this.sanitizeDomain(domain);
     try {
       const [scorecard] = await Promise.all([
-        this.makeRequest(`/companies/${domain}`),
-        this.makeRequest(`/companies/${domain}/factors`),
+        this.makeHierarchicalRequest(domain, 'overview').catch(() => this.makeRequest(`/companies/${domain}`)),
+        this.makeHierarchicalRequest(domain, 'factors'),
       ]);
       const gainPerIssue = 2.65;
       const projectedScore = Math.min(
@@ -1249,8 +1318,8 @@ export class ScoreImpactSecurityScorecardServer {
     let text = `# 🛠️ REMEDIATION REPORT: ${domain}\n\n`;
     try {
       const [issuesInfo, factorsInfo] = await Promise.all([
-        getEndpointDetails('/companies/{domain}/issues/active'),
-        getEndpointDetails('/companies/{domain}/factors')
+        getEndpointDetails('/scorecard/{domain}/issues/OPEN'),
+        getEndpointDetails('/footprint/parentDomain/factors')
       ]);
       if (issuesInfo || factorsInfo) {
         text += '> Data sources:\n';
