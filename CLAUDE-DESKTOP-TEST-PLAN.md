@@ -1,8 +1,14 @@
 # Claude Desktop Operational Test Plan
-## SecurityScorecard MCP - Enhanced Asset Discovery & Analysis
+## SecurityScorecard MCP - Scorecard-Focused Operational Remediation
 
 ### 🎯 Purpose
-This test plan validates the SecurityScorecard MCP's operational capabilities through real-world security team scenarios. Focus is on daily operational tasks that security professionals need to perform.
+This test plan validates the SecurityScorecard MCP's scorecard-focused operational capabilities for your own organization's security remediation workflows. The MCP has been architecturally transformed to use `/scorecard/{domain}/` endpoints instead of `/companies/{domain}/` to access your complete organizational asset inventory and operational remediation features.
+
+### 🚨 CRITICAL CHANGES TESTED
+- **Scorecard API Architecture**: Tests the new `/scorecard/{domain}/` endpoints for own organization analysis
+- **Complete Asset Discovery**: Validates resolution of 100 vs 200+ domain under-reporting issue  
+- **Operational Status Filtering**: Tests OPEN/UNDER_REVIEW/ALL issue status filtering
+- **Own Organization Focus**: Confirms operational remediation capabilities vs. external monitoring
 
 ### 📋 Prerequisites
 - Claude Desktop installed and configured
@@ -12,40 +18,41 @@ This test plan validates the SecurityScorecard MCP's operational capabilities th
 
 ---
 
-## 🧪 Test Suite 1: Enhanced Asset Discovery
-**Objective**: Validate comprehensive asset discovery addressing API limitations
+## 🧪 Test Suite 1: Scorecard-Focused Asset Discovery
+**Objective**: Validate complete organizational asset discovery using scorecard endpoints
 
-### Test 1.1: Comprehensive Asset Inventory
-**Scenario**: Security team needs complete visibility of all organizational assets
+### Test 1.1: Complete Organizational Asset Inventory
+**Scenario**: Security team needs complete visibility of own organization's assets using scorecard APIs
 
 **Test Steps**:
-1. In Claude Desktop, ask: *"Use the discover_all_assets tool to find all assets for [domain]. I need to see if we're hitting the 50-asset limit and whether we can find IP addresses."*
+1. In Claude Desktop, ask: *"Use get_asset_inventory to find all assets for [your-domain]. With the new scorecard endpoints, I expect to see our complete asset portfolio, not the limited external view."*
 
 **Expected Results**:
-- ✅ Returns more than 50 assets (if available)
-- ✅ Includes both domains and IP addresses
-- ✅ Shows total asset count breakdown
-- ✅ Lists worst/best performers by security score
-- ✅ Indicates enhanced discovery was used (not standard API)
+- ✅ **CRITICAL**: Returns 150-200+ assets (vs. previous 100-asset limit)
+- ✅ Uses `/scorecard/{domain}/footprint/domains/current` endpoint priority
+- ✅ Includes both domains and IP addresses from own organization monitoring
+- ✅ Shows complete asset count breakdown with internal visibility
+- ✅ Lists worst/best performers from own organization's scorecard
 
 **Validation Criteria**:
 ```
-Total Assets Found: > 50 (if org has more than 50 assets)
-Domains: [number] > 0
-IP Addresses: [number] > 0
-Note mentions: "enhanced pagination and multiple API endpoints"
+CRITICAL TEST: Assets Found should be 150-200+ domains (not 100)
+Domains: [number] significantly > previous 100-domain limit
+IP Addresses: [number] > 0 (if org has IP monitoring)
+API Evidence: Should see scorecard endpoints mentioned, not companies endpoints
 ```
 
-### Test 1.2: Compare Enhanced vs Standard Discovery
-**Scenario**: Validate that enhanced discovery finds more assets than standard methods
+### Test 1.2: Scorecard vs Companies Endpoint Comparison  
+**Scenario**: Validate that scorecard endpoints provide complete organizational view vs. limited external view
 
 **Test Steps**:
-1. Ask: *"First use get_asset_inventory tool, then use discover_all_assets tool for [domain]. Compare the results - do we get more assets with the enhanced discovery?"*
+1. Ask: *"Use call_api_endpoint to test both `/scorecard/[domain]/footprint/domains/current` and `/companies/[domain]/assets`. Compare the results - scorecard should show our complete internal asset inventory."*
 
 **Expected Results**:
-- ✅ Enhanced discovery finds equal or more assets
-- ✅ Enhanced discovery includes IP addresses
-- ✅ Clear comparison shows differences
+- ✅ **CRITICAL**: Scorecard endpoint returns significantly more assets than companies endpoint
+- ✅ Scorecard provides internal organizational view (200+ domains)
+- ✅ Companies endpoint shows limited external monitoring view (~100 domains)  
+- ✅ Clear architectural distinction demonstrated
 
 ---
 
@@ -88,23 +95,25 @@ Action: Remediation priorities provided
 ## 🧪 Test Suite 3: Specific Vulnerability Hunting
 **Objective**: Find specific security issues across the organization
 
-### Test 3.1: Missing SPF Records
-**Scenario**: Email security audit - find domains without SPF protection
+### Test 3.1: Missing SPF Records with Status Filtering
+**Scenario**: Operational remediation - find OPEN SPF issues ready for immediate action
 
 **Test Steps**:
-1. Ask: *"Find all domains under [domain] that are missing SPF records. Use get_findings_by_category to look for email security issues, specifically SPF-related problems."*
+1. Ask: *"Use get_findings_by_category with status='OPEN' to find all OPEN SPF record issues for [domain]. This should use the new scorecard endpoints to show issues needing immediate remediation."*
+2. Follow up: *"Now show me UNDER_REVIEW SPF issues - these should be issues already being worked on by the team."*
 
 **Expected Results**:
-- ✅ Lists domains missing SPF records
-- ✅ Categorizes under email security or DNS health
-- ✅ Provides specific remediation guidance
-- ✅ Shows impact/severity of missing SPF
+- ✅ **NEW**: Separates OPEN issues (need action) from UNDER_REVIEW (being worked on)
+- ✅ Uses `/scorecard/{domain}/issues/OPEN` endpoint with type filtering
+- ✅ Shows significantly more SPF issues than previous 118+ domains discovered
+- ✅ Provides operational status context for daily workflows
 
 **Validation Criteria**:
 ```
-Issue Type: SPF, DMARC, or email-related findings
-Assets: Specific domains listed
-Guidance: Remediation steps provided
+CRITICAL: Should find 150-200+ domains with SPF issues (vs. previous 118)
+Status Separation: OPEN vs UNDER_REVIEW clearly distinguished
+API Evidence: Uses scorecard endpoints with status filtering
+Operational Context: Ready-to-action vs in-progress issues identified
 ```
 
 ### Test 3.2: TLS/SSL Certificate Issues
@@ -224,61 +233,101 @@ Guidance: Remediation steps provided
 
 ---
 
-## 🧪 Test Suite 7: Operational Workflow Integration
-**Objective**: Test real security team workflows
+## 🧪 Test Suite 7: Operational Remediation Workflows  
+**Objective**: Test new scorecard-focused operational remediation capabilities
 
-### Test 7.1: Weekly Security Review Workflow
-**Scenario**: Weekly security team meeting - need comprehensive status update
-
-**Test Steps**:
-1. Ask: *"Prepare a weekly security review for [domain]. Include: new critical issues, quick wins available, overall risk trends, and recommended actions for this week."*
-
-**Expected Results**:
-- ✅ Executive summary of security status
-- ✅ New issues since last review
-- ✅ Available quick wins
-- ✅ Weekly action recommendations
-- ✅ Metrics and trends
-
-### Test 7.2: Incident Response Asset Investigation
-**Scenario**: Security incident - need rapid assessment of affected assets
+### Test 7.1: Daily Remediation Status Review
+**Scenario**: Daily standup - security team needs to see OPEN vs UNDER_REVIEW issue status
 
 **Test Steps**:
-1. Ask: *"We have a security incident involving [specific domain/IP]. Give me immediate intel: what vulnerabilities exist, what's the risk profile, and what should we prioritize for immediate remediation?"*
+1. Ask: *"Give me a daily remediation dashboard for [domain]. Show me OPEN issues that need immediate attention and UNDER_REVIEW issues that are being worked on. Use the new status filtering capabilities."*
 
 **Expected Results**:
-- ✅ Rapid risk assessment
-- ✅ Vulnerability inventory
-- ✅ Immediate action items
-- ✅ Risk mitigation priorities
+- ✅ **NEW**: Clear separation of OPEN (actionable) vs UNDER_REVIEW (in progress) issues
+- ✅ Uses scorecard endpoints with status filtering for operational context
+- ✅ Shows significantly more issues than previous limited external view
+- ✅ Provides ready-to-action prioritization for daily workflows
+
+### Test 7.2: Team Assignment and Progress Tracking
+**Scenario**: Security team lead needs to track remediation progress and assign work
+
+**Test Steps**:
+1. Ask: *"Show me all OPEN high-severity issues for [domain] that can be assigned to team members today. Then show me what's UNDER_REVIEW to track our progress."*
+
+**Expected Results**:
+- ✅ **NEW**: Operational status awareness for team management
+- ✅ High-priority OPEN issues ready for assignment
+- ✅ UNDER_REVIEW issues showing work in progress
+- ✅ Complete organizational visibility for team coordination
+
+### Test 7.3: Remediation Workflow State Transitions
+**Scenario**: Understanding how issues move through operational states
+
+**Test Steps**:
+1. Ask: *"Use get_findings_by_category to show me ALL status issues for [domain], then help me understand the difference between OPEN, UNDER_REVIEW, and resolved issues for operational planning."*
+
+**Expected Results**:
+- ✅ **NEW**: Shows complete issue lifecycle states
+- ✅ Demonstrates operational remediation workflow support
+- ✅ Provides context for team planning and resource allocation
 
 ---
 
-## 🧪 Test Suite 8: Advanced API Functionality
-**Objective**: Test advanced features and edge cases
+## 🧪 Test Suite 8: Operational Workflow Integration
+**Objective**: Test real security team workflows with scorecard focus
 
-### Test 8.1: Custom API Queries
-**Scenario**: Need specific data not covered by standard tools
-
-**Test Steps**:
-1. Ask: *"Use the call_api_endpoint tool to get raw factor data for [domain]. Then interpret the results for me in operational terms."*
-
-**Expected Results**:
-- ✅ Raw API data retrieved
-- ✅ Data interpreted in security context
-- ✅ Operational recommendations provided
-
-### Test 8.2: Large Dataset Handling
-**Scenario**: Organization with hundreds of assets - test pagination and performance
+### Test 8.1: Weekly Security Review with Scorecard Focus
+**Scenario**: Weekly security team meeting - need comprehensive organizational status update
 
 **Test Steps**:
-1. Ask: *"Find all assets and issues for [large organization domain]. How does the system handle large datasets?"*
+1. Ask: *"Prepare a weekly security review for [domain] using our complete scorecard data. Include: OPEN critical issues, UNDER_REVIEW progress, quick wins available, and actions for this week using the new scorecard endpoints."*
 
 **Expected Results**:
-- ✅ Handles large asset counts efficiently
-- ✅ Pagination works correctly
-- ✅ Performance remains acceptable
-- ✅ Complete data retrieval
+- ✅ **ENHANCED**: Executive summary using complete organizational data (200+ assets)
+- ✅ **NEW**: OPEN vs UNDER_REVIEW status distinction for progress tracking
+- ✅ Complete organizational view vs. previous limited external monitoring
+- ✅ Operational workflow integration with status-aware recommendations
+
+### Test 8.2: Incident Response with Complete Asset Visibility
+**Scenario**: Security incident - need rapid assessment with complete organizational asset visibility
+
+**Test Steps**:
+1. Ask: *"We have a security incident involving [specific domain/IP]. Use the new scorecard endpoints to give me complete organizational intel: what vulnerabilities exist across our full asset portfolio, risk profile, and immediate remediation priorities."*
+
+**Expected Results**:
+- ✅ **ENHANCED**: Rapid assessment using complete 200+ asset inventory
+- ✅ **NEW**: Full organizational context instead of limited external view
+- ✅ OPEN issue prioritization for immediate incident response
+- ✅ Complete vulnerability inventory for organizational impact assessment
+
+---
+
+## 🧪 Test Suite 9: Advanced Scorecard API Functionality
+**Objective**: Test scorecard-focused API features and endpoint architecture
+
+### Test 9.1: Scorecard vs Companies Endpoint Testing
+**Scenario**: Validate architectural transformation - scorecard endpoints for own org vs companies for third-party
+
+**Test Steps**:
+1. Ask: *"Use call_api_endpoint to test `/scorecard/[domain]/factors` vs `/companies/[domain]/factors`. Compare the data - scorecard should show complete organizational factors while companies shows limited external view."*
+
+**Expected Results**:
+- ✅ **NEW**: Scorecard endpoints provide complete organizational factor data
+- ✅ **NEW**: Companies endpoints provide limited third-party monitoring view
+- ✅ Clear architectural distinction for operational vs external monitoring
+- ✅ Enhanced data depth for own organization analysis
+
+### Test 9.2: Large Organizational Dataset with Scorecard APIs
+**Scenario**: Large organization - test complete asset portfolio handling with scorecard endpoints
+
+**Test Steps**:
+1. Ask: *"Use the scorecard endpoints to find all assets and issues for [large organization domain]. This should now handle our complete 200+ domain portfolio efficiently."*
+
+**Expected Results**:
+- ✅ **ENHANCED**: Handles 200+ organizational assets efficiently (vs. previous 100-asset limit)
+- ✅ **NEW**: Uses scorecard endpoint pagination for complete data retrieval
+- ✅ Performance acceptable for large organizational datasets
+- ✅ Complete remediation data access for operational planning
 
 ---
 
@@ -286,28 +335,38 @@ Guidance: Remediation steps provided
 
 ### ✅ Tool Registration Validation
 - All 13 tools respond correctly in Claude Desktop
-- No tool registration errors
-- Proper parameter validation
+- No tool registration errors  
+- Proper parameter validation including new status filtering
 
-### ✅ Enhanced Discovery Validation  
-- Discovers more than 50 assets (when available)
-- Finds IP addresses consistently
-- Overcomes previous API limitations
+### 🚨 CRITICAL: Scorecard Architecture Validation
+- **Asset Discovery**: Finds 150-200+ domains (vs. previous 100-asset limit)
+- **API Architecture**: Uses `/scorecard/{domain}/` endpoints for own organization
+- **Status Filtering**: OPEN/UNDER_REVIEW/ALL operational status filtering works
+- **Complete Visibility**: Accesses full organizational asset portfolio vs. limited external view
 
-### ✅ Operational Workflow Support
-- Supports real security team workflows
-- Provides actionable recommendations
-- Delivers results in operational timeframes
+### ✅ Enhanced Organizational Discovery
+- **CRITICAL**: Discovers complete organizational asset portfolio (200+ domains expected)
+- Finds IP addresses using scorecard endpoint priority
+- Demonstrates clear improvement over previous companies-based limitations
+- Shows internal organizational visibility vs. external monitoring
 
-### ✅ Data Quality & Accuracy
-- Returns accurate security findings
-- Proper categorization of issues
-- Correct severity and priority assignments
+### ✅ Operational Remediation Workflow Support  
+- **NEW**: OPEN vs UNDER_REVIEW status separation for daily workflows
+- **NEW**: Team assignment and progress tracking capabilities
+- **ENHANCED**: Operational context for security team management
+- Delivers results in operational timeframes with status awareness
 
-### ✅ Performance & Reliability
-- Handles large datasets efficiently
-- Graceful error handling
-- Consistent response times
+### ✅ Data Quality & Accuracy with Complete Context
+- **ENHANCED**: Returns accurate findings from complete organizational asset base
+- **NEW**: Proper operational status categorization (OPEN/UNDER_REVIEW)
+- **ENHANCED**: Priority assignments with full organizational context
+- Significantly more comprehensive data than previous external monitoring approach
+
+### ✅ Performance & Reliability at Organizational Scale
+- **NEW**: Handles complete organizational datasets (200+ assets) efficiently  
+- **ENHANCED**: Scorecard endpoint performance for large asset portfolios
+- Graceful error handling with fallback to companies endpoints
+- Consistent response times despite increased data volume
 
 ---
 
@@ -353,16 +412,23 @@ Guidance: Remediation steps provided
 
 ## 🎯 Test Completion Checklist
 
-- [ ] **Suite 1**: Enhanced Asset Discovery (2 tests)
+- [ ] **Suite 1**: Scorecard-Focused Asset Discovery (2 tests) 🚨 CRITICAL
 - [ ] **Suite 2**: IP Address Analysis (2 tests)  
-- [ ] **Suite 3**: Specific Vulnerability Hunting (3 tests)
+- [ ] **Suite 3**: Specific Vulnerability Hunting with Status Filtering (3 tests) 🚨 CRITICAL
 - [ ] **Suite 4**: ROI-Based Prioritization (2 tests)
 - [ ] **Suite 5**: Asset Comparison & Risk Assessment (2 tests)
 - [ ] **Suite 6**: Detailed Asset Analysis (2 tests)
-- [ ] **Suite 7**: Operational Workflow Integration (2 tests)
-- [ ] **Suite 8**: Advanced API Functionality (2 tests)
+- [ ] **Suite 7**: Operational Remediation Workflows (3 tests) 🚨 NEW
+- [ ] **Suite 8**: Operational Workflow Integration (2 tests)
+- [ ] **Suite 9**: Advanced Scorecard API Functionality (2 tests) 🚨 NEW
 
-**Total**: 17 operational test scenarios covering all enhanced capabilities
+**Total**: 20 operational test scenarios covering scorecard-focused remediation capabilities
+
+### 🚨 CRITICAL TESTS (Must Pass)
+- **Suite 1.1**: Complete Organizational Asset Inventory (200+ domains expected)
+- **Suite 1.2**: Scorecard vs Companies Endpoint Comparison  
+- **Suite 3.1**: SPF Records with OPEN/UNDER_REVIEW Status Filtering
+- **Suite 7.1-7.3**: Operational Remediation Workflow Tests
 
 ---
 
@@ -370,11 +436,20 @@ Guidance: Remediation steps provided
 
 Upon successful completion of this test plan:
 
-1. **Validation** of enhanced asset discovery capabilities
-2. **Confirmation** that 50-asset limit has been overcome
-3. **Verification** of IP address discovery functionality  
-4. **Demonstration** of operational security workflow support
-5. **Documentation** of real-world usage patterns
-6. **Identification** of any remaining limitations or issues
+1. **🚨 CRITICAL VALIDATION**: Complete organizational asset discovery (150-200+ domains vs. previous 100-asset limit)
+2. **🚨 ARCHITECTURAL CONFIRMATION**: Scorecard endpoints provide complete organizational view vs. limited external monitoring
+3. **🚨 OPERATIONAL ENHANCEMENT**: OPEN/UNDER_REVIEW status filtering enables true remediation workflows
+4. **ENHANCED CAPABILITY**: IP address discovery with complete organizational context  
+5. **WORKFLOW INTEGRATION**: Operational security team workflows with status-aware prioritization
+6. **PERFORMANCE VALIDATION**: Large organizational dataset handling (200+ assets)
+7. **DOCUMENTATION**: Real-world usage patterns for operational remediation
+8. **ISSUE RESOLUTION**: Confirmation that critical asset under-reporting issue is resolved
 
-This test plan ensures the SecurityScorecard MCP meets the operational needs of security teams and successfully addresses the limitations identified in the original test report.
+### 🎯 SUCCESS INDICATORS
+- **Asset Discovery**: 2x+ improvement in discovered assets (100 → 200+ domains)
+- **Operational Status**: Clear OPEN/UNDER_REVIEW separation for team workflows  
+- **API Architecture**: Successful scorecard-first approach vs. companies fallback
+- **Remediation Focus**: Own organization operational capabilities vs. external monitoring
+- **Team Integration**: Ready-to-use workflows for daily security operations
+
+This updated test plan validates the MCP's transformation from external company monitoring to **scorecard-focused operational remediation** for your own organization's security team workflows.
