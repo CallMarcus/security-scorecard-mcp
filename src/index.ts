@@ -829,6 +829,31 @@ export class ScoreImpactSecurityScorecardServer {
           }
         },
         {
+          name: "diagnose_api_coverage",
+          description: "📊 API COVERAGE DIAGNOSTIC: Comprehensive analysis of API access capabilities and limitations:\n• Tests all critical SecurityScorecard API endpoints systematically\n• Identifies available vs unavailable data sources for domain\n• Analyzes API token permissions and access scope\n• Provides gap analysis and coverage recommendations\n• Essential for understanding integration capabilities and constraints",
+          inputSchema: {
+            type: "object",
+            properties: {
+              domain: { type: "string", description: "Domain to test API coverage against.", default: this.config.defaultDomain },
+              include_rate_limits: { type: "boolean", default: true, description: "Include rate limit testing and analysis" },
+              detailed_analysis: { type: "boolean", default: false, description: "Perform detailed endpoint response analysis (slower but comprehensive)" }
+            },
+            required: ["domain"]
+          }
+        },
+        {
+          name: "analyze_api_limitations",
+          description: "🔍 API LIMITATION ANALYSIS: Deep dive into API constraints and workarounds:\n• Identifies specific API limitations affecting data access\n• Analyzes authentication scope and permission boundaries\n• Documents known workarounds for common API issues\n• Provides strategic recommendations for optimal API usage\n• Helps plan integration architecture within API constraints",
+          inputSchema: {
+            type: "object",
+            properties: {
+              domain: { type: "string", description: "Domain to analyze API limitations for.", default: this.config.defaultDomain },
+              focus_area: { type: "string", enum: ["authentication", "data_access", "rate_limits", "comprehensive"], default: "comprehensive", description: "Specific area to focus limitation analysis on" }
+            },
+            required: ["domain"]
+          }
+        },
+        {
           name: "discover_api_endpoints",
           description: "🔍 API ENDPOINT DISCOVERY: Systematically test and validate available SecurityScorecard API endpoints:\n• Tests multiple endpoint patterns (footprint, companies, scorecard)\n• Validates authentication and permissions for each endpoint\n• Discovers working vs non-working endpoints for domain\n• Provides endpoint recommendations based on actual API access\n• Essential for understanding API capabilities and limitations",
           inputSchema: {
@@ -1061,6 +1086,25 @@ export class ScoreImpactSecurityScorecardServer {
           
           return await this.executeTool("discover_assets_with_issues", () =>
             this.discoverAssetsWithIssues(domain, maxAssets, priorityFocus)
+          );
+        }
+
+        case "diagnose_api_coverage": {
+          const domain = this.sanitizeDomain(rawDomain);
+          const includeRateLimits = (request.params.arguments?.include_rate_limits as boolean) ?? true;
+          const detailedAnalysis = (request.params.arguments?.detailed_analysis as boolean) ?? false;
+          
+          return await this.executeTool("diagnose_api_coverage", () =>
+            this.diagnoseAPICoverage(domain, includeRateLimits, detailedAnalysis)
+          );
+        }
+
+        case "analyze_api_limitations": {
+          const domain = this.sanitizeDomain(rawDomain);
+          const focusArea = (request.params.arguments?.focus_area as 'authentication' | 'data_access' | 'rate_limits' | 'comprehensive') || 'comprehensive';
+          
+          return await this.executeTool("analyze_api_limitations", () =>
+            this.analyzeAPILimitations(domain, focusArea)
           );
         }
 
@@ -2996,6 +3040,776 @@ export class ScoreImpactSecurityScorecardServer {
    */
   private delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  /**
+   * TASK 5: API COVERAGE DIAGNOSTIC CAPABILITIES
+   */
+
+  /**
+   * Comprehensive API coverage diagnostic and analysis
+   */
+  private async diagnoseAPICoverage(domain: string, includeRateLimits: boolean, detailedAnalysis: boolean): Promise<any> {
+    domain = this.sanitizeDomain(domain);
+    this.log(`Starting comprehensive API coverage diagnostic for ${domain}`);
+    this.log(`Include rate limits: ${includeRateLimits}, Detailed analysis: ${detailedAnalysis}`);
+    
+    const diagnosticResults = {
+      domain: domain,
+      timestamp: new Date().toISOString(),
+      api_token_status: 'unknown',
+      total_endpoints_tested: 0,
+      working_endpoints: 0,
+      failed_endpoints: 0,
+      coverage_categories: {} as any,
+      data_sources_available: [] as string[],
+      data_sources_unavailable: [] as string[],
+      rate_limit_info: {} as any,
+      permission_analysis: {} as any,
+      integration_recommendations: [] as string[]
+    };
+    
+    // Define comprehensive endpoint test matrix
+    const endpointTestMatrix = [
+      // Basic Company Data
+      { 
+        category: 'Company_Basics', 
+        endpoints: [
+          { path: `/companies/${domain}`, description: 'Company Overview', critical: true },
+          { path: `/companies/${domain}/factors`, description: 'Security Factors', critical: true },
+          { path: `/companies/${domain}/issues`, description: 'Security Issues', critical: true }
+        ]
+      },
+      // Asset Discovery
+      {
+        category: 'Asset_Discovery',
+        endpoints: [
+          { path: `/footprint/${domain}/assets/domains`, description: 'Domain Assets', critical: true },
+          { path: `/footprint/${domain}/assets/ips`, description: 'IP Assets', critical: true },
+          { path: `/parent-domains/${domain}/domains`, description: 'Parent Domain Discovery', critical: false, method: 'POST' },
+          { path: `/parent-domains/${domain}/ips`, description: 'Parent IP Discovery', critical: false, method: 'POST' }
+        ]
+      },
+      // Scorecard Access
+      {
+        category: 'Scorecard_Access',
+        endpoints: [
+          { path: `/scorecard/${domain}/issues/OPEN`, description: 'Open Issues', critical: false },
+          { path: `/scorecard/${domain}/footprint/domains/current`, description: 'Current Domains', critical: false },
+          { path: `/scorecard/${domain}/history`, description: 'Score History', critical: false }
+        ]
+      },
+      // Advanced Features
+      {
+        category: 'Advanced_Features',
+        endpoints: [
+          { path: `/companies/${domain}/history`, description: 'Company History', critical: false },
+          { path: `/companies/${domain}/portfolio`, description: 'Portfolio Data', critical: false },
+          { path: `/footprint/${domain}/findings`, description: 'Footprint Findings', critical: false }
+        ]
+      }
+    ];
+    
+    // Test API token validity first
+    try {
+      await this.makeRequestWithTimeout(`/companies/${domain}`, 'GET', null, 5000);
+      diagnosticResults.api_token_status = 'valid';
+      this.log('✅ API token is valid');
+    } catch (error: any) {
+      if (error.message.includes('401')) {
+        diagnosticResults.api_token_status = 'invalid';
+        return this.generateTokenErrorResponse(domain, error.message);
+      } else if (error.message.includes('403')) {
+        diagnosticResults.api_token_status = 'limited_permissions';
+        this.log('⚠️ API token has limited permissions');
+      } else {
+        diagnosticResults.api_token_status = 'network_error';
+        this.log(`❌ Network error: ${error.message}`);
+      }
+    }
+    
+    // Test all endpoint categories
+    for (const category of endpointTestMatrix) {
+      this.log(`Testing category: ${category.category}`);
+      
+      const categoryResults = {
+        total: category.endpoints.length,
+        working: 0,
+        failed: 0,
+        critical_working: 0,
+        critical_total: category.endpoints.filter(e => e.critical).length,
+        endpoints_status: [] as any[]
+      };
+      
+      for (const endpoint of category.endpoints) {
+        diagnosticResults.total_endpoints_tested++;
+        
+        try {
+          const startTime = Date.now();
+          const method = endpoint.method || 'GET';
+          const testBody = method === 'POST' ? {} : null;
+          
+          const response = await this.makeRequestWithTimeout(
+            endpoint.path, 
+            method, 
+            testBody,
+            detailedAnalysis ? 15000 : 8000
+          );
+          
+          const endTime = Date.now();
+          const dataPoints = this.countDataPoints(response);
+          const hasData = dataPoints > 0;
+          
+          const endpointResult = {
+            path: endpoint.path,
+            description: endpoint.description,
+            method: method,
+            status: 'working',
+            critical: endpoint.critical,
+            response_time: endTime - startTime,
+            data_points: dataPoints,
+            has_data: hasData,
+            response_size: JSON.stringify(response).length
+          };
+          
+          if (detailedAnalysis) {
+            endpointResult['response_structure'] = this.analyzeResponseStructure(response);
+            endpointResult['sample_data'] = this.extractSampleData(response);
+          }
+          
+          categoryResults.endpoints_status.push(endpointResult);
+          categoryResults.working++;
+          diagnosticResults.working_endpoints++;
+          
+          if (endpoint.critical) {
+            categoryResults.critical_working++;
+          }
+          
+          if (hasData) {
+            diagnosticResults.data_sources_available.push(endpoint.description);
+          }
+          
+          this.log(`✅ ${endpoint.path}: ${dataPoints} data points`);
+          
+          // Rate limiting respect
+          await this.delay(includeRateLimits ? 300 : 150);
+          
+        } catch (error: any) {
+          const endpointResult = {
+            path: endpoint.path,
+            description: endpoint.description,
+            method: endpoint.method || 'GET',
+            status: 'failed',
+            critical: endpoint.critical,
+            error_category: this.categorizeEndpointError(error),
+            error_message: error.message
+          };
+          
+          categoryResults.endpoints_status.push(endpointResult);
+          categoryResults.failed++;
+          diagnosticResults.failed_endpoints++;
+          diagnosticResults.data_sources_unavailable.push(endpoint.description);
+          
+          this.log(`❌ ${endpoint.path}: ${error.message}`);
+        }
+      }
+      
+      diagnosticResults.coverage_categories[category.category] = categoryResults;
+    }
+    
+    // Rate limit analysis if requested
+    if (includeRateLimits) {
+      diagnosticResults.rate_limit_info = await this.analyzeRateLimits();
+    }
+    
+    // Generate permission analysis
+    diagnosticResults.permission_analysis = this.analyzePermissions(diagnosticResults.coverage_categories);
+    
+    // Generate integration recommendations
+    diagnosticResults.integration_recommendations = this.generateIntegrationRecommendations(diagnosticResults);
+    
+    // Generate comprehensive report
+    const report = this.generateAPICoverageReport(diagnosticResults);
+    
+    return {
+      content: [{ type: "text", text: report }]
+    };
+  }
+
+  /**
+   * Analyze specific API limitations and provide workarounds
+   */
+  private async analyzeAPILimitations(domain: string, focusArea: 'authentication' | 'data_access' | 'rate_limits' | 'comprehensive'): Promise<any> {
+    domain = this.sanitizeDomain(domain);
+    this.log(`Analyzing API limitations for ${domain}, focus: ${focusArea}`);
+    
+    const limitationAnalysis = {
+      domain: domain,
+      focus_area: focusArea,
+      timestamp: new Date().toISOString(),
+      limitations_identified: [] as any[],
+      workarounds_available: [] as any[],
+      strategic_recommendations: [] as string[],
+      severity_assessment: 'unknown' as 'low' | 'medium' | 'high' | 'critical' | 'unknown'
+    };
+    
+    // Authentication limitations analysis
+    if (focusArea === 'authentication' || focusArea === 'comprehensive') {
+      await this.analyzeAuthenticationLimitations(domain, limitationAnalysis);
+    }
+    
+    // Data access limitations analysis  
+    if (focusArea === 'data_access' || focusArea === 'comprehensive') {
+      await this.analyzeDataAccessLimitations(domain, limitationAnalysis);
+    }
+    
+    // Rate limiting analysis
+    if (focusArea === 'rate_limits' || focusArea === 'comprehensive') {
+      await this.analyzeRateLimitConstraints(domain, limitationAnalysis);
+    }
+    
+    // Assess overall severity
+    limitationAnalysis.severity_assessment = this.assessLimitationSeverity(limitationAnalysis.limitations_identified);
+    
+    // Generate strategic recommendations
+    limitationAnalysis.strategic_recommendations = this.generateStrategicRecommendations(
+      limitationAnalysis.limitations_identified, 
+      limitationAnalysis.workarounds_available
+    );
+    
+    // Generate limitation analysis report
+    const report = this.generateAPILimitationReport(limitationAnalysis);
+    
+    return {
+      content: [{ type: "text", text: report }]
+    };
+  }
+
+  /**
+   * Helper methods for API coverage diagnostics
+   */
+
+  private generateTokenErrorResponse(domain: string, errorMessage: string): any {
+    return {
+      content: [{
+        type: "text",
+        text: `# ❌ API COVERAGE DIAGNOSTIC FAILED: ${domain}\n\n` +
+              `**Critical Error**: API Token Invalid\n\n` +
+              `## 🔐 AUTHENTICATION ISSUE\n\n` +
+              `**Error Details**: ${errorMessage}\n\n` +
+              `## 🔧 RESOLUTION STEPS\n\n` +
+              `1. **Verify Token**: Check SECURITY_SCORECARD_API_TOKEN environment variable\n` +
+              `2. **Token Format**: Ensure token is complete alphanumeric string\n` +
+              `3. **Token Validity**: Check if token has expired or been revoked\n` +
+              `4. **Permissions**: Verify token has appropriate API access permissions\n` +
+              `5. **Contact Support**: If issues persist, contact SecurityScorecard support\n\n` +
+              `**Note**: Cannot perform coverage diagnostic without valid API token.`
+      }]
+    };
+  }
+
+  private async analyzeRateLimits(): Promise<any> {
+    // This would analyze rate limits by making controlled requests
+    // For now, return general rate limit information based on API documentation
+    return {
+      estimated_limit: '100 requests per minute',
+      recommended_delay: '600ms between requests',
+      burst_capacity: 'Unknown',
+      status: 'estimated_from_documentation'
+    };
+  }
+
+  private analyzePermissions(coverageCategories: any): any {
+    const analysis = {
+      basic_access: false,
+      asset_discovery: false,
+      scorecard_access: false,
+      advanced_features: false,
+      overall_level: 'unknown' as 'none' | 'basic' | 'standard' | 'premium' | 'unknown'
+    };
+    
+    // Check basic access
+    if (coverageCategories.Company_Basics?.critical_working > 0) {
+      analysis.basic_access = true;
+    }
+    
+    // Check asset discovery access
+    if (coverageCategories.Asset_Discovery?.working > 0) {
+      analysis.asset_discovery = true;
+    }
+    
+    // Check scorecard access
+    if (coverageCategories.Scorecard_Access?.working > 0) {
+      analysis.scorecard_access = true;
+    }
+    
+    // Check advanced features
+    if (coverageCategories.Advanced_Features?.working > 0) {
+      analysis.advanced_features = true;
+    }
+    
+    // Determine overall access level
+    if (!analysis.basic_access) {
+      analysis.overall_level = 'none';
+    } else if (analysis.basic_access && analysis.asset_discovery && analysis.scorecard_access && analysis.advanced_features) {
+      analysis.overall_level = 'premium';
+    } else if (analysis.basic_access && analysis.asset_discovery) {
+      analysis.overall_level = 'standard';
+    } else {
+      analysis.overall_level = 'basic';
+    }
+    
+    return analysis;
+  }
+
+  private generateIntegrationRecommendations(results: any): string[] {
+    const recommendations = [];
+    const workingRate = results.working_endpoints / results.total_endpoints_tested;
+    
+    if (workingRate >= 0.8) {
+      recommendations.push('✅ Excellent API coverage - implement full-featured integration');
+      recommendations.push('💡 Use all available endpoints for comprehensive security analysis');
+      recommendations.push('⚡ Consider caching strategies to optimize API usage');
+    } else if (workingRate >= 0.6) {
+      recommendations.push('⚠️ Good API coverage with some limitations');
+      recommendations.push('🔀 Implement fallback strategies for unavailable endpoints');
+      recommendations.push('🎯 Focus integration on working data sources');
+    } else if (workingRate >= 0.4) {
+      recommendations.push('🔴 Limited API coverage - basic integration recommended');
+      recommendations.push('🛠️ Verify API token permissions with SecurityScorecard');
+      recommendations.push('📋 Use available endpoints strategically');
+    } else {
+      recommendations.push('🚨 Critical API coverage issues - integration not recommended');
+      recommendations.push('🔧 Resolve authentication and permission issues first');
+      recommendations.push('📞 Contact SecurityScorecard support for access verification');
+    }
+    
+    return recommendations;
+  }
+
+  private extractSampleData(response: any): any {
+    if (!response) return null;
+    
+    if (Array.isArray(response)) {
+      return response.slice(0, 2);
+    } else if (response.entries && Array.isArray(response.entries)) {
+      return response.entries.slice(0, 2);
+    } else if (typeof response === 'object') {
+      const sample: any = {};
+      const keys = Object.keys(response).slice(0, 5);
+      keys.forEach(key => sample[key] = response[key]);
+      return sample;
+    }
+    
+    return response;
+  }
+
+  private generateAPICoverageReport(results: any): string {
+    const coveragePercentage = Math.round((results.working_endpoints / results.total_endpoints_tested) * 100);
+    
+    let report = `# 📊 API COVERAGE DIAGNOSTIC: ${results.domain}\n\n`;
+    
+    // Overview section
+    report += `## 🎯 COVERAGE OVERVIEW\n\n`;
+    report += `**API Token Status**: ${this.formatTokenStatus(results.api_token_status)}\n`;
+    report += `**Overall Coverage**: ${coveragePercentage}% (${results.working_endpoints}/${results.total_endpoints_tested} endpoints)\n`;
+    report += `**Analysis Timestamp**: ${results.timestamp}\n\n`;
+    
+    // Permission analysis
+    if (results.permission_analysis) {
+      report += `## 🔐 PERMISSION ANALYSIS\n\n`;
+      report += `**Access Level**: ${results.permission_analysis.overall_level.toUpperCase()}\n`;
+      report += `**Basic Access**: ${results.permission_analysis.basic_access ? '✅' : '❌'}\n`;
+      report += `**Asset Discovery**: ${results.permission_analysis.asset_discovery ? '✅' : '❌'}\n`;
+      report += `**Scorecard Access**: ${results.permission_analysis.scorecard_access ? '✅' : '❌'}\n`;
+      report += `**Advanced Features**: ${results.permission_analysis.advanced_features ? '✅' : '❌'}\n\n`;
+    }
+    
+    // Coverage by category
+    report += `## 📋 COVERAGE BY CATEGORY\n\n`;
+    Object.entries(results.coverage_categories).forEach(([category, data]: [string, any]) => {
+      const categoryPercentage = Math.round((data.working / data.total) * 100);
+      const criticalPercentage = data.critical_total > 0 ? Math.round((data.critical_working / data.critical_total) * 100) : 100;
+      
+      report += `### ${category.replace('_', ' ').toUpperCase()}\n`;
+      report += `**Overall**: ${categoryPercentage}% (${data.working}/${data.total} endpoints)\n`;
+      if (data.critical_total > 0) {
+        report += `**Critical**: ${criticalPercentage}% (${data.critical_working}/${data.critical_total} endpoints)\n`;
+      }
+      
+      // List endpoint status
+      data.endpoints_status.forEach((endpoint: any) => {
+        const icon = endpoint.status === 'working' ? '✅' : '❌';
+        const critical = endpoint.critical ? ' [CRITICAL]' : '';
+        report += `• ${icon} **${endpoint.description}**${critical}\n`;
+        if (endpoint.status === 'working' && endpoint.data_points) {
+          report += `   └── ${endpoint.data_points} data points, ${endpoint.response_time}ms\n`;
+        } else if (endpoint.status === 'failed') {
+          report += `   └── ${endpoint.error_category}: ${endpoint.error_message}\n`;
+        }
+      });
+      report += '\n';
+    });
+    
+    // Data sources analysis
+    report += `## 📊 DATA SOURCES\n\n`;
+    report += `### ✅ Available Data Sources (${results.data_sources_available.length})\n`;
+    results.data_sources_available.slice(0, 10).forEach((source: string) => {
+      report += `• ${source}\n`;
+    });
+    if (results.data_sources_available.length > 10) {
+      report += `• *...and ${results.data_sources_available.length - 10} more*\n`;
+    }
+    
+    if (results.data_sources_unavailable.length > 0) {
+      report += `\n### ❌ Unavailable Data Sources (${results.data_sources_unavailable.length})\n`;
+      results.data_sources_unavailable.slice(0, 10).forEach((source: string) => {
+        report += `• ${source}\n`;
+      });
+      if (results.data_sources_unavailable.length > 10) {
+        report += `• *...and ${results.data_sources_unavailable.length - 10} more*\n`;
+      }
+    }
+    
+    // Rate limit information
+    if (results.rate_limit_info) {
+      report += `\n## ⏱️ RATE LIMIT ANALYSIS\n\n`;
+      report += `**Estimated Limit**: ${results.rate_limit_info.estimated_limit}\n`;
+      report += `**Recommended Delay**: ${results.rate_limit_info.recommended_delay}\n`;
+      report += `**Status**: ${results.rate_limit_info.status}\n\n`;
+    }
+    
+    // Integration recommendations
+    report += `## 💡 INTEGRATION RECOMMENDATIONS\n\n`;
+    results.integration_recommendations.forEach((rec: string) => {
+      report += `${rec}\n`;
+    });
+    
+    report += `\n---\n`;
+    report += `🔍 **Coverage Summary**: ${coveragePercentage}% API coverage with ${results.permission_analysis?.overall_level || 'unknown'} access level. `;
+    report += `Use this analysis to optimize your SecurityScorecard integration strategy.`;
+    
+    return report;
+  }
+
+  private formatTokenStatus(status: string): string {
+    switch (status) {
+      case 'valid': return '✅ Valid';
+      case 'invalid': return '❌ Invalid';
+      case 'limited_permissions': return '⚠️ Limited Permissions';
+      case 'network_error': return '🔄 Network Error';
+      default: return '❓ Unknown';
+    }
+  }
+
+  /**
+   * API Limitation Analysis Helper Methods
+   */
+
+  private async analyzeAuthenticationLimitations(domain: string, analysis: any): Promise<void> {
+    this.log('Analyzing authentication limitations...');
+    
+    // Test different authentication scenarios
+    const authTests = [
+      { endpoint: `/companies/${domain}`, test: 'basic_auth' },
+      { endpoint: `/scorecard/${domain}/issues/OPEN`, test: 'scorecard_auth' },
+      { endpoint: `/parent-domains/${domain}/domains`, test: 'advanced_auth', method: 'POST' }
+    ];
+    
+    for (const test of authTests) {
+      try {
+        await this.makeRequestWithTimeout(test.endpoint, test.method || 'GET', test.method === 'POST' ? {} : null, 5000);
+        this.log(`✅ ${test.test} authentication working`);
+      } catch (error: any) {
+        const limitation = {
+          category: 'authentication',
+          type: test.test,
+          description: `${test.test.replace('_', ' ')} authentication failed`,
+          endpoint: test.endpoint,
+          error: this.categorizeEndpointError(error),
+          severity: error.message.includes('403') ? 'high' : 'medium',
+          workaround: this.getAuthWorkaround(test.test, error)
+        };
+        
+        analysis.limitations_identified.push(limitation);
+        
+        if (limitation.workaround) {
+          analysis.workarounds_available.push({
+            for_limitation: test.test,
+            workaround: limitation.workaround,
+            effectiveness: 'medium'
+          });
+        }
+      }
+    }
+  }
+
+  private async analyzeDataAccessLimitations(domain: string, analysis: any): Promise<void> {
+    this.log('Analyzing data access limitations...');
+    
+    // Test data access patterns
+    const dataAccessTests = [
+      { test: 'domain_issues', endpoint: `/companies/${domain}/issues`, expected_min: 1 },
+      { test: 'ip_discovery', endpoint: `/footprint/${domain}/assets/ips`, expected_min: 1 },
+      { test: 'domain_discovery', endpoint: `/footprint/${domain}/assets/domains`, expected_min: 1 }
+    ];
+    
+    for (const test of dataAccessTests) {
+      try {
+        const response = await this.makeRequestWithTimeout(test.endpoint, 'GET', null, 8000);
+        const dataCount = this.countDataPoints(response);
+        
+        if (dataCount < test.expected_min) {
+          const limitation = {
+            category: 'data_access',
+            type: test.test,
+            description: `${test.test.replace('_', ' ')} returned insufficient data`,
+            endpoint: test.endpoint,
+            data_points: dataCount,
+            expected_min: test.expected_min,
+            severity: dataCount === 0 ? 'high' : 'medium',
+            workaround: this.getDataAccessWorkaround(test.test)
+          };
+          
+          analysis.limitations_identified.push(limitation);
+          
+          if (limitation.workaround) {
+            analysis.workarounds_available.push({
+              for_limitation: test.test,
+              workaround: limitation.workaround,
+              effectiveness: 'high'
+            });
+          }
+        }
+      } catch (error: any) {
+        const limitation = {
+          category: 'data_access',
+          type: test.test,
+          description: `${test.test.replace('_', ' ')} access failed`,
+          endpoint: test.endpoint,
+          error: this.categorizeEndpointError(error),
+          severity: 'high'
+        };
+        
+        analysis.limitations_identified.push(limitation);
+      }
+    }
+  }
+
+  private async analyzeRateLimitConstraints(domain: string, analysis: any): Promise<void> {
+    this.log('Analyzing rate limit constraints...');
+    
+    // Test rate limiting by making rapid requests
+    const testEndpoint = `/companies/${domain}`;
+    const startTime = Date.now();
+    let successfulRequests = 0;
+    let rateLimitHit = false;
+    
+    try {
+      for (let i = 0; i < 5; i++) {
+        await this.makeRequestWithTimeout(testEndpoint, 'GET', null, 3000);
+        successfulRequests++;
+        await this.delay(100); // Very short delay to test limits
+      }
+    } catch (error: any) {
+      if (error.message.includes('429')) {
+        rateLimitHit = true;
+        const limitation = {
+          category: 'rate_limits',
+          type: 'burst_limit',
+          description: 'Rate limit hit during burst testing',
+          requests_before_limit: successfulRequests,
+          time_to_limit: Date.now() - startTime,
+          severity: 'medium',
+          workaround: 'Implement request throttling with 600ms delays'
+        };
+        
+        analysis.limitations_identified.push(limitation);
+        analysis.workarounds_available.push({
+          for_limitation: 'burst_limit',
+          workaround: 'Add delays between requests (600ms recommended)',
+          effectiveness: 'high'
+        });
+      }
+    }
+    
+    if (!rateLimitHit && successfulRequests === 5) {
+      this.log('✅ No immediate rate limit constraints detected');
+    }
+  }
+
+  private assessLimitationSeverity(limitations: any[]): 'low' | 'medium' | 'high' | 'critical' {
+    if (limitations.length === 0) return 'low';
+    
+    const severityCounts = {
+      critical: limitations.filter(l => l.severity === 'critical').length,
+      high: limitations.filter(l => l.severity === 'high').length,
+      medium: limitations.filter(l => l.severity === 'medium').length
+    };
+    
+    if (severityCounts.critical > 0) return 'critical';
+    if (severityCounts.high >= 3) return 'critical';
+    if (severityCounts.high >= 1) return 'high';
+    if (severityCounts.medium >= 3) return 'high';
+    if (severityCounts.medium >= 1) return 'medium';
+    
+    return 'low';
+  }
+
+  private generateStrategicRecommendations(limitations: any[], workarounds: any[]): string[] {
+    const recommendations = [];
+    
+    const authLimitations = limitations.filter(l => l.category === 'authentication');
+    const dataLimitations = limitations.filter(l => l.category === 'data_access');
+    const rateLimitations = limitations.filter(l => l.category === 'rate_limits');
+    
+    if (authLimitations.length > 0) {
+      recommendations.push('🔐 Address authentication limitations by verifying token permissions');
+      recommendations.push('📞 Contact SecurityScorecard support for access level clarification');
+    }
+    
+    if (dataLimitations.length > 0) {
+      recommendations.push('📊 Implement fallback strategies for limited data access');
+      recommendations.push('🔄 Use alternative endpoints when primary sources are unavailable');
+    }
+    
+    if (rateLimitations.length > 0) {
+      recommendations.push('⏱️ Implement proper rate limiting in your application');
+      recommendations.push('📈 Consider API usage optimization strategies');
+    }
+    
+    if (workarounds.length > 0) {
+      recommendations.push(`🛠️ ${workarounds.length} workarounds available for identified limitations`);
+    }
+    
+    if (limitations.length === 0) {
+      recommendations.push('✅ No significant limitations detected - proceed with full integration');
+    }
+    
+    return recommendations;
+  }
+
+  private getAuthWorkaround(testType: string, error: any): string | null {
+    switch (testType) {
+      case 'scorecard_auth':
+        return 'Use /companies/{domain} endpoints instead of /scorecard/{domain} endpoints';
+      case 'advanced_auth':
+        return 'Use GET /footprint/{domain}/assets/* endpoints instead of POST /parent-domains/*';
+      default:
+        return null;
+    }
+  }
+
+  private getDataAccessWorkaround(testType: string): string | null {
+    switch (testType) {
+      case 'ip_discovery':
+        return 'Try /companies/{domain}/issues and filter for IP-related issues';
+      case 'domain_discovery':
+        return 'Use DNS resolution or external domain enumeration tools';
+      case 'domain_issues':
+        return 'Use /companies/{domain}/factors for high-level security analysis';
+      default:
+        return null;
+    }
+  }
+
+  private generateAPILimitationReport(analysis: any): string {
+    let report = `# 🔍 API LIMITATION ANALYSIS: ${analysis.domain}\n\n`;
+    
+    // Overview
+    report += `## 📊 ANALYSIS OVERVIEW\n\n`;
+    report += `**Focus Area**: ${analysis.focus_area.replace('_', ' ').toUpperCase()}\n`;
+    report += `**Limitations Found**: ${analysis.limitations_identified.length}\n`;
+    report += `**Workarounds Available**: ${analysis.workarounds_available.length}\n`;
+    report += `**Severity Assessment**: ${analysis.severity_assessment.toUpperCase()}\n`;
+    report += `**Analysis Date**: ${analysis.timestamp}\n\n`;
+    
+    // Limitations breakdown
+    if (analysis.limitations_identified.length > 0) {
+      report += `## 🚨 IDENTIFIED LIMITATIONS\n\n`;
+      
+      analysis.limitations_identified.forEach((limitation: any, index: number) => {
+        const severityIcon = limitation.severity === 'critical' ? '🔴' : 
+                            limitation.severity === 'high' ? '🟠' : 
+                            limitation.severity === 'medium' ? '🟡' : '🟢';
+        
+        report += `### ${index + 1}. ${limitation.description} ${severityIcon}\n`;
+        report += `**Category**: ${limitation.category.replace('_', ' ')}\n`;
+        report += `**Type**: ${limitation.type.replace('_', ' ')}\n`;
+        report += `**Severity**: ${limitation.severity.toUpperCase()}\n`;
+        
+        if (limitation.endpoint) {
+          report += `**Endpoint**: \`${limitation.endpoint}\`\n`;
+        }
+        
+        if (limitation.error) {
+          report += `**Error**: ${limitation.error}\n`;
+        }
+        
+        if (limitation.data_points !== undefined) {
+          report += `**Data Points**: ${limitation.data_points} (expected: ${limitation.expected_min}+)\n`;
+        }
+        
+        if (limitation.workaround) {
+          report += `**Workaround**: ${limitation.workaround}\n`;
+        }
+        
+        report += '\n';
+      });
+    }
+    
+    // Workarounds section
+    if (analysis.workarounds_available.length > 0) {
+      report += `## 🛠️ AVAILABLE WORKAROUNDS\n\n`;
+      
+      analysis.workarounds_available.forEach((workaround: any, index: number) => {
+        const effectivenessIcon = workaround.effectiveness === 'high' ? '🟢' : 
+                                 workaround.effectiveness === 'medium' ? '🟡' : '🔴';
+        
+        report += `### ${index + 1}. ${workaround.for_limitation.replace('_', ' ').toUpperCase()} ${effectivenessIcon}\n`;
+        report += `**Solution**: ${workaround.workaround}\n`;
+        report += `**Effectiveness**: ${workaround.effectiveness.toUpperCase()}\n\n`;
+      });
+    }
+    
+    // Strategic recommendations
+    if (analysis.strategic_recommendations.length > 0) {
+      report += `## 💡 STRATEGIC RECOMMENDATIONS\n\n`;
+      analysis.strategic_recommendations.forEach((rec: string) => {
+        report += `${rec}\n`;
+      });
+      report += '\n';
+    }
+    
+    // Severity assessment
+    report += `## 📊 SEVERITY ASSESSMENT: ${analysis.severity_assessment.toUpperCase()}\n\n`;
+    
+    switch (analysis.severity_assessment) {
+      case 'critical':
+        report += `🚨 **CRITICAL**: Major limitations that significantly impact API functionality.\n`;
+        report += `**Recommendation**: Address these issues before proceeding with integration.\n`;
+        break;
+      case 'high':
+        report += `🟠 **HIGH**: Notable limitations that may affect key functionality.\n`;
+        report += `**Recommendation**: Implement workarounds and monitor impact.\n`;
+        break;
+      case 'medium':
+        report += `🟡 **MEDIUM**: Some limitations present but manageable.\n`;
+        report += `**Recommendation**: Proceed with integration using available workarounds.\n`;
+        break;
+      case 'low':
+        report += `🟢 **LOW**: Minimal or no significant limitations detected.\n`;
+        report += `**Recommendation**: Proceed with full integration confidence.\n`;
+        break;
+      default:
+        report += `❓ **UNKNOWN**: Unable to assess limitation severity.\n`;
+    }
+    
+    report += `\n---\n`;
+    report += `🔍 **Analysis Summary**: Identified ${analysis.limitations_identified.length} limitations with ${analysis.workarounds_available.length} workarounds available. `;
+    report += `Use this analysis to plan your integration architecture and mitigation strategies.`;
+    
+    return report;
   }
 
   /**
