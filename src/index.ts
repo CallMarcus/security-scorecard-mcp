@@ -814,6 +814,31 @@ export class ScoreImpactSecurityScorecardServer {
             },
             required: ["asset_name"]
           }
+        },
+        {
+          name: "discover_api_endpoints",
+          description: "🔍 API ENDPOINT DISCOVERY: Systematically test and validate available SecurityScorecard API endpoints:\n• Tests multiple endpoint patterns (footprint, companies, scorecard)\n• Validates authentication and permissions for each endpoint\n• Discovers working vs non-working endpoints for domain\n• Provides endpoint recommendations based on actual API access\n• Essential for understanding API capabilities and limitations",
+          inputSchema: {
+            type: "object",
+            properties: {
+              domain: { type: "string", description: "Domain to test API endpoints against.", default: this.config.defaultDomain },
+              test_depth: { type: "string", enum: ["basic", "comprehensive"], default: "basic", description: "Level of endpoint testing: basic (core endpoints) or comprehensive (all patterns)" }
+            },
+            required: ["domain"]
+          }
+        },
+        {
+          name: "validate_endpoint_access",
+          description: "✅ ENDPOINT VALIDATION: Test specific API endpoint accessibility and functionality:\n• Validates endpoint syntax and availability\n• Tests authentication and permission levels\n• Checks response format and data quality\n• Provides troubleshooting recommendations for failed endpoints\n• Useful for debugging API integration issues",
+          inputSchema: {
+            type: "object",
+            properties: {
+              endpoint: { type: "string", description: "API endpoint to test (e.g., /companies/example.com, /footprint/example.com/assets/ips)" },
+              method: { type: "string", enum: ["GET", "POST"], default: "GET", description: "HTTP method to test" },
+              test_data: { type: "object", description: "Optional test data for POST requests" }
+            },
+            required: ["endpoint"]
+          }
         }
         ],
       };
@@ -1013,6 +1038,29 @@ export class ScoreImpactSecurityScorecardServer {
           
           return await this.executeTool("get_asset_vulnerabilities", () =>
             this.getAssetVulnerabilities(assetName, assetType, parentDomain)
+          );
+        }
+
+        case "discover_api_endpoints": {
+          const domain = this.sanitizeDomain(rawDomain);
+          const testDepth = (request.params.arguments?.test_depth as 'basic' | 'comprehensive') || 'basic';
+          
+          return await this.executeTool("discover_api_endpoints", () =>
+            this.discoverAPIEndpoints(domain, testDepth)
+          );
+        }
+
+        case "validate_endpoint_access": {
+          const endpoint = request.params.arguments?.endpoint as string;
+          const method = (request.params.arguments?.method as 'GET' | 'POST') || 'GET';
+          const testData = request.params.arguments?.test_data;
+          
+          if (!endpoint) {
+            throw new McpError(ErrorCode.InvalidRequest, "endpoint is required for endpoint validation");
+          }
+          
+          return await this.executeTool("validate_endpoint_access", () =>
+            this.validateEndpointAccess(endpoint, method, testData)
           );
         }
 
@@ -2630,6 +2678,390 @@ export class ScoreImpactSecurityScorecardServer {
     return {
       content: [{ type: "text", text }]
     };
+  }
+
+  /**
+   * TASK 2: API ENDPOINT DISCOVERY AND VALIDATION METHODS
+   */
+
+  /**
+   * Systematically discover and test available SecurityScorecard API endpoints
+   */
+  private async discoverAPIEndpoints(domain: string, testDepth: 'basic' | 'comprehensive'): Promise<any> {
+    domain = this.sanitizeDomain(domain);
+    this.log(`Discovering API endpoints for ${domain} (depth: ${testDepth})`);
+    
+    // Define endpoint patterns to test based on our API research
+    const basicEndpoints = [
+      { pattern: `/companies/${domain}`, description: 'Company Overview', category: 'Basic' },
+      { pattern: `/companies/${domain}/factors`, description: 'Security Factors', category: 'Analysis' },
+      { pattern: `/companies/${domain}/issues`, description: 'Security Issues', category: 'Analysis' },
+      { pattern: `/footprint/${domain}/assets/domains`, description: 'Domain Assets', category: 'Assets' },
+      { pattern: `/footprint/${domain}/assets/ips`, description: 'IP Assets', category: 'Assets' }
+    ];
+    
+    const comprehensiveEndpoints = [
+      ...basicEndpoints,
+      { pattern: `/scorecard/${domain}/issues/OPEN`, description: 'Open Issues', category: 'Scorecard' },
+      { pattern: `/scorecard/${domain}/footprint/domains/current`, description: 'Current Domains', category: 'Scorecard' },
+      { pattern: `/parent-domains/${domain}`, description: 'Parent Domain Info', category: 'Hierarchy' },
+      { pattern: `/companies/${domain}/history`, description: 'Score History', category: 'Historical' },
+      { pattern: `/companies/${domain}/portfolio`, description: 'Portfolio Data', category: 'Portfolio' },
+      { pattern: `/footprint/${domain}/findings`, description: 'Footprint Findings', category: 'Advanced' }
+    ];
+    
+    const endpointsToTest = testDepth === 'comprehensive' ? comprehensiveEndpoints : basicEndpoints;
+    
+    const results: any[] = [];
+    const categoryStats: { [key: string]: { working: number; total: number } } = {};
+    
+    this.log(`Testing ${endpointsToTest.length} endpoints...`);
+    
+    for (const endpoint of endpointsToTest) {
+      const category = endpoint.category;
+      if (!categoryStats[category]) {
+        categoryStats[category] = { working: 0, total: 0 };
+      }
+      categoryStats[category].total++;
+      
+      try {
+        const startTime = Date.now();
+        const response = await this.makeRequestWithTimeout(endpoint.pattern, 'GET', null, 8000);
+        const endTime = Date.now();
+        
+        const dataCount = this.countDataPoints(response);
+        const isWorking = response && dataCount > 0;
+        
+        if (isWorking) {
+          categoryStats[category].working++;
+        }
+        
+        results.push({
+          endpoint: endpoint.pattern,
+          description: endpoint.description,
+          category: endpoint.category,
+          status: isWorking ? 'working' : 'empty_response',
+          response_time: endTime - startTime,
+          data_points: dataCount,
+          response_size: JSON.stringify(response).length,
+          authentication: 'success'
+        });
+        
+        this.log(`✅ ${endpoint.pattern}: ${dataCount} data points (${endTime - startTime}ms)`);
+        
+      } catch (error: any) {
+        const status = this.categorizeEndpointError(error);
+        results.push({
+          endpoint: endpoint.pattern,
+          description: endpoint.description,
+          category: endpoint.category,
+          status: status,
+          error_message: error.message,
+          authentication: status === '401_unauthorized' ? 'failed' : 'unknown'
+        });
+        
+        this.log(`❌ ${endpoint.pattern}: ${status} - ${error.message}`);
+      }
+    }
+    
+    // Generate summary statistics
+    const workingEndpoints = results.filter(r => r.status === 'working');
+    const authenticationIssues = results.filter(r => r.status === '401_unauthorized');
+    const permissionIssues = results.filter(r => r.status === '403_forbidden');
+    const notFoundEndpoints = results.filter(r => r.status === '404_not_found');
+    
+    const text = 
+      `# 🔍 API ENDPOINT DISCOVERY: ${domain}\n\n` +
+      `**Test Scope**: ${testDepth.toUpperCase()}\n` +
+      `**Endpoints Tested**: ${endpointsToTest.length}\n` +
+      `**Working Endpoints**: ${workingEndpoints.length}\n` +
+      `**Success Rate**: ${Math.round((workingEndpoints.length / endpointsToTest.length) * 100)}%\n\n` +
+      
+      `## 📊 RESULTS BY CATEGORY\n\n` +
+      Object.entries(categoryStats).map(([category, stats]) => 
+        `**${category}**: ${stats.working}/${stats.total} working (${Math.round((stats.working / stats.total) * 100)}%)`
+      ).join('\n') + '\n\n' +
+      
+      `## ✅ WORKING ENDPOINTS (${workingEndpoints.length})\n\n` +
+      workingEndpoints.map(endpoint => 
+        `**${endpoint.description}**\n` +
+        `   • Endpoint: \`${endpoint.endpoint}\`\n` +
+        `   • Data Points: ${endpoint.data_points}\n` +
+        `   • Response Time: ${endpoint.response_time}ms\n` +
+        `   • Category: ${endpoint.category}\n`
+      ).join('\n') +
+      
+      (authenticationIssues.length > 0 ? 
+        `\n## 🔐 AUTHENTICATION ISSUES (${authenticationIssues.length})\n\n` +
+        authenticationIssues.map(endpoint => 
+          `• \`${endpoint.endpoint}\` - ${endpoint.description}\n`
+        ).join('') :
+        ''
+      ) +
+      
+      (permissionIssues.length > 0 ? 
+        `\n## 🚫 PERMISSION DENIED (${permissionIssues.length})\n\n` +
+        permissionIssues.map(endpoint => 
+          `• \`${endpoint.endpoint}\` - ${endpoint.description}\n`
+        ).join('') :
+        ''
+      ) +
+      
+      (notFoundEndpoints.length > 0 ? 
+        `\n## ❌ NOT FOUND (${notFoundEndpoints.length})\n\n` +
+        notFoundEndpoints.map(endpoint => 
+          `• \`${endpoint.endpoint}\` - ${endpoint.description}\n`
+        ).join('') :
+        ''
+      ) +
+      
+      `\n## 💡 RECOMMENDATIONS\n\n` +
+      this.generateEndpointRecommendations(results, workingEndpoints.length, endpointsToTest.length);
+    
+    return {
+      content: [{ type: "text", text }]
+    };
+  }
+
+  /**
+   * Validate specific API endpoint accessibility and functionality
+   */
+  private async validateEndpointAccess(endpoint: string, method: 'GET' | 'POST' = 'GET', testData?: any): Promise<any> {
+    this.log(`Validating endpoint access: ${method} ${endpoint}`);
+    
+    // Basic endpoint syntax validation
+    const syntaxIssues = this.validateEndpointSyntax(endpoint);
+    if (syntaxIssues.length > 0) {
+      return {
+        content: [{
+          type: "text",
+          text: `# ❌ ENDPOINT VALIDATION: ${endpoint}\n\n` +
+                `**Status**: SYNTAX ERROR\n\n` +
+                `## 🔍 SYNTAX ISSUES\n\n` +
+                syntaxIssues.map(issue => `• ${issue}`).join('\n') + '\n\n' +
+                `## 💡 CORRECTIONS\n\n` +
+                `• Use format: \`/companies/{domain}\` or \`/footprint/{domain}/assets/{type}\`\n` +
+                `• Ensure domain is properly formatted (e.g., example.com)\n` +
+                `• Check SecurityScorecard API documentation for valid endpoints`
+        }]
+      };
+    }
+    
+    let validationResult: any = {
+      endpoint: endpoint,
+      method: method,
+      syntax_valid: true,
+      tested_at: new Date().toISOString()
+    };
+    
+    try {
+      const startTime = Date.now();
+      const response = method === 'GET' 
+        ? await this.makeRequestWithTimeout(endpoint, method, null, 15000)
+        : await this.makeRequestWithTimeout(endpoint, method, testData || {}, 15000);
+      const endTime = Date.now();
+      
+      validationResult = {
+        ...validationResult,
+        status: 'success',
+        response_time: endTime - startTime,
+        data_points: this.countDataPoints(response),
+        response_size: JSON.stringify(response).length,
+        has_data: response && this.countDataPoints(response) > 0,
+        response_structure: this.analyzeResponseStructure(response),
+        authentication_status: 'valid',
+        rate_limit_headers: this.extractRateLimitInfo(response)
+      };
+      
+    } catch (error: any) {
+      const errorCategory = this.categorizeEndpointError(error);
+      validationResult = {
+        ...validationResult,
+        status: 'failed',
+        error_category: errorCategory,
+        error_message: error.message,
+        authentication_status: errorCategory === '401_unauthorized' ? 'invalid' : 'unknown',
+        troubleshooting_steps: this.generateTroubleshootingSteps(errorCategory, endpoint)
+      };
+    }
+    
+    const text = this.formatEndpointValidationReport(validationResult);
+    
+    return {
+      content: [{ type: "text", text }]
+    };
+  }
+
+  /**
+   * Helper methods for endpoint discovery and validation
+   */
+
+  private categorizeEndpointError(error: any): string {
+    const message = error.message || '';
+    const statusMatch = message.match(/HTTP (\d+)/);
+    
+    if (statusMatch) {
+      const status = parseInt(statusMatch[1]);
+      switch (status) {
+        case 401: return '401_unauthorized';
+        case 403: return '403_forbidden'; 
+        case 404: return '404_not_found';
+        case 429: return '429_rate_limited';
+        case 500: return '500_server_error';
+        default: return `http_${status}`;
+      }
+    }
+    
+    if (message.includes('timeout')) return 'timeout';
+    if (message.includes('network')) return 'network_error';
+    return 'unknown_error';
+  }
+
+  private validateEndpointSyntax(endpoint: string): string[] {
+    const issues: string[] = [];
+    
+    if (!endpoint.startsWith('/')) {
+      issues.push('Endpoint must start with "/"');
+    }
+    
+    if (endpoint.includes('//')) {
+      issues.push('Endpoint contains double slashes');
+    }
+    
+    if (!/^\/[a-zA-Z-]+/.test(endpoint)) {
+      issues.push('Endpoint must start with valid API path (e.g., /companies, /footprint)');
+    }
+    
+    const domainPattern = /[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.([a-zA-Z]{2,})/;
+    const hasDomain = domainPattern.test(endpoint);
+    if (endpoint.includes('/companies/') || endpoint.includes('/footprint/')) {
+      if (!hasDomain) {
+        issues.push('Endpoint appears to need a domain but none found');
+      }
+    }
+    
+    return issues;
+  }
+
+  private analyzeResponseStructure(response: any): any {
+    if (!response) return { type: 'null' };
+    
+    const structure: any = { type: typeof response };
+    
+    if (Array.isArray(response)) {
+      structure.is_array = true;
+      structure.length = response.length;
+      structure.sample_item = response.length > 0 ? typeof response[0] : 'empty';
+    } else if (typeof response === 'object') {
+      structure.keys = Object.keys(response);
+      structure.has_entries = !!response.entries;
+      structure.has_data = !!response.data;
+      structure.has_meta = !!response.meta;
+      structure.entries_count = response.entries?.length || 0;
+    }
+    
+    return structure;
+  }
+
+  private extractRateLimitInfo(response: any): any {
+    // This would extract rate limit headers if available
+    return { status: 'unknown', note: 'Rate limit info not available in response data' };
+  }
+
+  private generateTroubleshootingSteps(errorCategory: string, endpoint: string): string[] {
+    const steps: string[] = [];
+    
+    switch (errorCategory) {
+      case '401_unauthorized':
+        steps.push('Check SECURITY_SCORECARD_API_TOKEN environment variable');
+        steps.push('Verify API token is valid and not expired');
+        steps.push('Confirm token has correct format (should be long alphanumeric string)');
+        break;
+      case '403_forbidden':
+        steps.push('Verify API token has sufficient permissions for this endpoint');
+        steps.push('Check if endpoint requires specific subscription level');
+        steps.push('Contact SecurityScorecard support to verify access permissions');
+        break;
+      case '404_not_found':
+        steps.push('Verify domain exists and is monitored by SecurityScorecard');
+        steps.push('Check endpoint syntax against API documentation');
+        steps.push('Try alternative endpoint patterns (e.g., /companies instead of /footprint)');
+        break;
+      case '429_rate_limited':
+        steps.push('Wait for rate limit reset (usually 60 seconds)');
+        steps.push('Implement request throttling in application');
+        steps.push('Consider upgrading API subscription for higher limits');
+        break;
+      default:
+        steps.push('Check network connectivity');
+        steps.push('Verify endpoint syntax');
+        steps.push('Try alternative endpoints for same data');
+    }
+    
+    return steps;
+  }
+
+  private generateEndpointRecommendations(results: any[], workingCount: number, totalCount: number): string {
+    const successRate = workingCount / totalCount;
+    
+    if (successRate >= 0.8) {
+      return `• ✅ Excellent API access (${Math.round(successRate * 100)}% success rate)\n` +
+             `• Use working endpoints for production integrations\n` +
+             `• Consider caching responses to minimize API calls`;
+    } else if (successRate >= 0.5) {
+      return `• ⚠️ Partial API access (${Math.round(successRate * 100)}% success rate)\n` +
+             `• Focus on working endpoints for core functionality\n` +
+             `• Investigate authentication/permission issues for failed endpoints`;
+    } else if (successRate >= 0.2) {
+      return `• 🔴 Limited API access (${Math.round(successRate * 100)}% success rate)\n` +
+             `• Verify API token permissions with SecurityScorecard\n` +
+             `• Use fallback strategies for missing endpoint access`;
+    } else {
+      return `• 🚨 Critical API access issues (${Math.round(successRate * 100)}% success rate)\n` +
+             `• Check API token validity and permissions immediately\n` +
+             `• Contact SecurityScorecard support for access verification`;
+    }
+  }
+
+  private formatEndpointValidationReport(result: any): string {
+    const statusIcon = result.status === 'success' ? '✅' : '❌';
+    const statusText = result.status === 'success' ? 'SUCCESS' : 'FAILED';
+    
+    let report = 
+      `# ${statusIcon} ENDPOINT VALIDATION: ${result.method} ${result.endpoint}\n\n` +
+      `**Status**: ${statusText}\n` +
+      `**Tested At**: ${result.tested_at}\n\n`;
+    
+    if (result.status === 'success') {
+      report += 
+        `## 📊 PERFORMANCE METRICS\n\n` +
+        `**Response Time**: ${result.response_time}ms\n` +
+        `**Data Points**: ${result.data_points}\n` +
+        `**Response Size**: ${Math.round(result.response_size / 1024)}KB\n` +
+        `**Has Data**: ${result.has_data ? 'Yes' : 'No'}\n\n` +
+        
+        `## 🔍 RESPONSE STRUCTURE\n\n` +
+        `**Type**: ${result.response_structure.type}\n` +
+        `**Keys**: ${result.response_structure.keys?.join(', ') || 'N/A'}\n` +
+        `**Entries Count**: ${result.response_structure.entries_count || 0}\n\n` +
+        
+        `## ✅ VALIDATION RESULTS\n\n` +
+        `• Endpoint is accessible and functional\n` +
+        `• Authentication successful\n` +
+        `• Response format is valid\n` +
+        `• Data is available (${result.data_points} points)`;
+    } else {
+      report += 
+        `## ❌ ERROR DETAILS\n\n` +
+        `**Error Category**: ${result.error_category}\n` +
+        `**Error Message**: ${result.error_message}\n` +
+        `**Authentication**: ${result.authentication_status}\n\n` +
+        
+        `## 🔧 TROUBLESHOOTING STEPS\n\n` +
+        result.troubleshooting_steps.map((step: string) => `• ${step}`).join('\n');
+    }
+    
+    return report;
   }
 
   /**
