@@ -299,6 +299,13 @@ export class ScoreImpactSecurityScorecardServer {
       return result;
     } catch (error: any) {
       this.log(`Tool failed: ${name}`, error);
+      
+      // Enhanced error handling with automatic fallback logic
+      const fallbackResult = await this.handleToolErrorWithFallback(name, error);
+      if (fallbackResult) {
+        return fallbackResult;
+      }
+      
       const message = error?.message || "Unknown error";
       const partial = error?.partial || error?.partialResult;
       if (partial) {
@@ -320,6 +327,56 @@ export class ScoreImpactSecurityScorecardServer {
         ],
       };
     }
+  }
+
+  /**
+   * TASK 3: Enhanced error handling with automatic fallback logic
+   * Attempts to provide partial or alternative results when primary tool execution fails
+   */
+  private async handleToolErrorWithFallback(toolName: string, error: any): Promise<any | null> {
+    this.log(`Attempting fallback recovery for tool: ${toolName}`);
+    
+    try {
+      // Extract domain from error context or use default
+      const domain = this.extractDomainFromError(error) || this.config.defaultDomain;
+      
+      switch (toolName) {
+        case "discover_all_assets":
+          return await this.fallbackAssetDiscovery(domain, error);
+        
+        case "get_issues_by_roi":
+          return await this.fallbackROIAnalysis(domain, error);
+        
+        case "get_score_improvement_roadmap":
+          return await this.fallbackScoreRoadmap(domain, error);
+          
+        case "get_findings_by_category":
+          return await this.fallbackCategoryFindings(domain, error);
+          
+        case "get_ip_security_details":
+        case "get_ip_detailed_issues":
+          return await this.fallbackIPAnalysis(domain, error);
+          
+        case "get_domain_detailed_issues":
+          return await this.fallbackDomainAnalysis(domain, error);
+          
+        default:
+          // Generic fallback: try to provide domain overview when specific tools fail
+          return await this.genericFallbackAnalysis(domain, toolName, error);
+      }
+    } catch (fallbackError: any) {
+      this.log(`Fallback also failed for ${toolName}:`, fallbackError);
+      return null; // Let original error handling proceed
+    }
+  }
+
+  /**
+   * Extract domain context from error for fallback operations
+   */
+  private extractDomainFromError(error: any): string | null {
+    const errorStr = JSON.stringify(error);
+    const domainMatch = errorStr.match(/[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+/);
+    return domainMatch ? domainMatch[0] : null;
   }
 
   /**
@@ -2573,6 +2630,339 @@ export class ScoreImpactSecurityScorecardServer {
     return {
       content: [{ type: "text", text }]
     };
+  }
+
+  /**
+   * TASK 3 FALLBACK METHODS: Automatic fallback logic implementations
+   */
+
+  /**
+   * Fallback asset discovery using multiple endpoint strategies
+   */
+  private async fallbackAssetDiscovery(domain: string, originalError: any): Promise<any> {
+    this.log(`Fallback asset discovery for ${domain}`);
+    
+    const fallbackAttempts: { method: string; endpoint: string }[] = [
+      { method: 'companies_overview', endpoint: `/companies/${domain}` },
+      { method: 'factors_analysis', endpoint: `/companies/${domain}/factors` },
+      { method: 'basic_issues', endpoint: `/companies/${domain}/issues?size=50` }
+    ];
+    
+    let partialResults: any[] = [];
+    let workingMethods: string[] = [];
+    
+    for (const attempt of fallbackAttempts) {
+      try {
+        const result = await this.makeRequestWithTimeout(attempt.endpoint, 'GET', null, 10000);
+        if (result) {
+          partialResults.push({ source: attempt.method, data: result });
+          workingMethods.push(attempt.method);
+        }
+      } catch (error) {
+        this.log(`Fallback attempt ${attempt.method} failed:`, error);
+      }
+    }
+    
+    if (partialResults.length === 0) {
+      return null; // No fallback worked
+    }
+    
+    return {
+      content: [{
+        type: "text",
+        text: `# 🔄 FALLBACK ASSET DISCOVERY: ${domain}\n\n` +
+              `**Primary Method Failed**: ${originalError.message}\n` +
+              `**Fallback Methods Used**: ${workingMethods.join(', ')}\n\n` +
+              `## 📊 PARTIAL RESULTS AVAILABLE\n\n` +
+              partialResults.map(r => 
+                `### ${r.source.toUpperCase().replace('_', ' ')}\n` +
+                `**Status**: ✅ Available\n` +
+                `**Data Points**: ${this.countDataPoints(r.data)}\n`
+              ).join('\n') +
+              `\n**Note**: Full asset discovery failed, but partial domain information is available. ` +
+              `Try individual asset functions or check API token permissions.`
+      }]
+    };
+  }
+
+  /**
+   * Fallback ROI analysis using available data sources
+   */
+  private async fallbackROIAnalysis(domain: string, originalError: any): Promise<any> {
+    this.log(`Fallback ROI analysis for ${domain}`);
+    
+    try {
+      // Try to get basic issues and factors for minimal ROI calculation
+      const [issuesResult, factorsResult] = await Promise.allSettled([
+        this.makeRequestWithTimeout(`/companies/${domain}/issues?size=100`, 'GET', null, 10000),
+        this.makeRequestWithTimeout(`/companies/${domain}/factors`, 'GET', null, 10000)
+      ]);
+      
+      const hasIssues = issuesResult.status === 'fulfilled' && issuesResult.value?.entries;
+      const hasFactors = factorsResult.status === 'fulfilled' && factorsResult.value?.entries;
+      
+      if (!hasIssues && !hasFactors) {
+        return null;
+      }
+      
+      const quickWins = hasIssues ? this.identifyQuickWinsFromIssues(issuesResult.value.entries) : [];
+      const factorInsights = hasFactors ? this.extractFactorInsights(factorsResult.value.entries) : [];
+      
+      return {
+        content: [{
+          type: "text", 
+          text: `# 🔄 FALLBACK ROI ANALYSIS: ${domain}\n\n` +
+                `**Primary Analysis Failed**: ${originalError.message}\n` +
+                `**Available Data**: ${hasIssues ? '✅ Issues' : '❌ Issues'} | ${hasFactors ? '✅ Factors' : '❌ Factors'}\n\n` +
+                `## 🎯 QUICK WIN OPPORTUNITIES\n${quickWins.length > 0 ? quickWins.map(w => `• ${w}`).join('\n') : '• No quick wins identified from available data'}\n\n` +
+                `## 📊 FACTOR INSIGHTS\n${factorInsights.length > 0 ? factorInsights.map(f => `• ${f}`).join('\n') : '• No factor analysis available'}\n\n` +
+                `**Recommendation**: Try individual analysis tools or verify API access scope for complete ROI analysis.`
+        }]
+      };
+    } catch (fallbackError) {
+      return null;
+    }
+  }
+
+  /**
+   * Fallback score improvement roadmap using basic data
+   */
+  private async fallbackScoreRoadmap(domain: string, originalError: any): Promise<any> {
+    this.log(`Fallback score roadmap for ${domain}`);
+    
+    try {
+      const factorsResult = await this.makeRequestWithTimeout(`/companies/${domain}/factors`, 'GET', null, 10000);
+      
+      if (!factorsResult?.entries) {
+        return null;
+      }
+      
+      const factors = factorsResult.entries;
+      const lowScoreFactors = factors.filter((f: any) => f.score < 70).slice(0, 5);
+      
+      return {
+        content: [{
+          type: "text",
+          text: `# 🔄 FALLBACK SCORE ROADMAP: ${domain}\n\n` +
+                `**Primary Roadmap Failed**: ${originalError.message}\n` +
+                `**Available**: Basic factor analysis\n\n` +
+                `## 📈 PRIORITY IMPROVEMENT AREAS\n\n` +
+                lowScoreFactors.map((factor: any, index: number) => 
+                  `**${index + 1}. ${factor.name}**\n` +
+                  `   • Current Score: ${factor.score}/100\n` +
+                  `   • Impact: ${this.getImpactLevel(factor.score)}\n` +
+                  `   • Issues: ${factor.issue_summary?.length || 0} categories\n`
+                ).join('\n') +
+                `\n**Note**: Detailed roadmap unavailable. Use individual factor analysis for specific recommendations.`
+        }]
+      };
+    } catch (fallbackError) {
+      return null;
+    }
+  }
+
+  /**
+   * Fallback category findings using general issue data
+   */
+  private async fallbackCategoryFindings(domain: string, originalError: any): Promise<any> {
+    this.log(`Fallback category findings for ${domain}`);
+    
+    try {
+      const issuesResult = await this.makeRequestWithTimeout(`/companies/${domain}/issues?size=200`, 'GET', null, 15000);
+      
+      if (!issuesResult?.entries) {
+        return null;
+      }
+      
+      // Group issues by type/category
+      const categoryGroups: { [key: string]: any[] } = {};
+      issuesResult.entries.forEach((issue: any) => {
+        const category = issue.type || issue.category || 'uncategorized';
+        if (!categoryGroups[category]) {
+          categoryGroups[category] = [];
+        }
+        categoryGroups[category].push(issue);
+      });
+      
+      const topCategories = Object.entries(categoryGroups)
+        .sort(([,a], [,b]) => b.length - a.length)
+        .slice(0, 10);
+      
+      return {
+        content: [{
+          type: "text",
+          text: `# 🔄 FALLBACK CATEGORY ANALYSIS: ${domain}\n\n` +
+                `**Primary Category Analysis Failed**: ${originalError.message}\n` +
+                `**Available**: General issue categorization\n\n` +
+                `## 📊 TOP ISSUE CATEGORIES\n\n` +
+                topCategories.map(([category, issues]: [string, any[]]) => 
+                  `**${category.replace(/_/g, ' ').toUpperCase()}**: ${issues.length} issues\n` +
+                  `   • Severities: ${this.getSeverityDistribution(issues)}\n`
+                ).join('\n') +
+                `\n**Total Issues Analyzed**: ${issuesResult.entries.length}\n` +
+                `**Note**: Detailed category analysis unavailable. Basic grouping provided.`
+        }]
+      };
+    } catch (fallbackError) {
+      return null;
+    }
+  }
+
+  /**
+   * Fallback IP analysis using domain-level data
+   */
+  private async fallbackIPAnalysis(domain: string, originalError: any): Promise<any> {
+    this.log(`Fallback IP analysis for ${domain}`);
+    
+    try {
+      // Try to get any IP-related data from domain issues
+      const issuesResult = await this.makeRequestWithTimeout(`/companies/${domain}/issues?size=100`, 'GET', null, 10000);
+      
+      if (!issuesResult?.entries) {
+        return null;
+      }
+      
+      // Look for any IP-related issues
+      const ipIssues = issuesResult.entries.filter((issue: any) => 
+        issue.ip || issue.ip_address || issue.host || 
+        (typeof issue.description === 'string' && /\d+\.\d+\.\d+\.\d+/.test(issue.description))
+      );
+      
+      return {
+        content: [{
+          type: "text",
+          text: `# 🔄 FALLBACK IP ANALYSIS: ${domain}\n\n` +
+                `**Primary IP Analysis Failed**: ${originalError.message}\n` +
+                `**Available**: Domain-level IP references\n\n` +
+                `## 🌐 IP-RELATED FINDINGS\n\n` +
+                `**Total Domain Issues**: ${issuesResult.entries.length}\n` +
+                `**IP-Related Issues**: ${ipIssues.length}\n\n` +
+                (ipIssues.length > 0 ? 
+                  ipIssues.slice(0, 5).map((issue: any) => 
+                    `• **${issue.type}**: ${issue.ip || issue.ip_address || issue.host || 'IP in description'}\n`
+                  ).join('') :
+                  '• No specific IP issues found in available data\n'
+                ) +
+                `\n**Recommendation**: Try asset discovery or use specific IP addresses for detailed analysis.`
+        }]
+      };
+    } catch (fallbackError) {
+      return null;
+    }
+  }
+
+  /**
+   * Fallback domain analysis using basic company data
+   */
+  private async fallbackDomainAnalysis(domain: string, originalError: any): Promise<any> {
+    this.log(`Fallback domain analysis for ${domain}`);
+    
+    try {
+      const companyResult = await this.makeRequestWithTimeout(`/companies/${domain}`, 'GET', null, 10000);
+      
+      if (!companyResult) {
+        return null;
+      }
+      
+      return {
+        content: [{
+          type: "text",
+          text: `# 🔄 FALLBACK DOMAIN ANALYSIS: ${domain}\n\n` +
+                `**Primary Domain Analysis Failed**: ${originalError.message}\n` +
+                `**Available**: Basic company information\n\n` +
+                `## 🏢 COMPANY OVERVIEW\n\n` +
+                `**Domain**: ${companyResult.domain || domain}\n` +
+                `**Grade**: ${companyResult.grade || 'Unknown'}\n` +
+                `**Score**: ${companyResult.score || 'Unknown'}\n` +
+                `**Industry**: ${companyResult.industry || 'Unknown'}\n\n` +
+                `**Note**: Detailed domain analysis unavailable. Use factor analysis tools for deeper insights.`
+        }]
+      };
+    } catch (fallbackError) {
+      return null;
+    }
+  }
+
+  /**
+   * Generic fallback providing basic domain overview
+   */
+  private async genericFallbackAnalysis(domain: string, toolName: string, originalError: any): Promise<any> {
+    this.log(`Generic fallback for ${toolName} on ${domain}`);
+    
+    try {
+      const basicData = await this.makeRequestWithTimeout(`/companies/${domain}`, 'GET', null, 5000);
+      
+      if (!basicData) {
+        return null;
+      }
+      
+      return {
+        content: [{
+          type: "text",
+          text: `# 🔄 FALLBACK ANALYSIS: ${toolName}\n\n` +
+                `**Tool Failed**: ${toolName}\n` +
+                `**Error**: ${originalError.message}\n` +
+                `**Domain**: ${domain}\n\n` +
+                `## 📊 AVAILABLE BASIC INFO\n\n` +
+                `**Grade**: ${basicData.grade || 'Unknown'}\n` +
+                `**Score**: ${basicData.score || 'Unknown'}\n\n` +
+                `**Recommendation**: Check API token permissions or try alternative analysis tools.`
+        }]
+      };
+    } catch (fallbackError) {
+      return null;
+    }
+  }
+
+  /**
+   * Helper methods for fallback analysis
+   */
+
+  private async makeRequestWithTimeout(endpoint: string, method: string = 'GET', body: any = null, timeout: number = 10000): Promise<any> {
+    return Promise.race([
+      this.makeRequest(endpoint, method, body),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Request timeout')), timeout))
+    ]);
+  }
+
+  private countDataPoints(data: any): number {
+    if (Array.isArray(data)) return data.length;
+    if (data?.entries) return data.entries.length;
+    if (typeof data === 'object') return Object.keys(data).length;
+    return 1;
+  }
+
+  private identifyQuickWinsFromIssues(issues: any[]): string[] {
+    const quickWinTypes = ['spf_record_missing', 'dmarc_policy_missing', 'hsts_header_missing'];
+    return issues
+      .filter(issue => quickWinTypes.some(type => issue.type?.includes(type)))
+      .slice(0, 3)
+      .map(issue => `${issue.type.replace(/_/g, ' ')} (${issue.severity || 'medium'} priority)`);
+  }
+
+  private extractFactorInsights(factors: any[]): string[] {
+    return factors
+      .filter(factor => factor.score < 80)
+      .slice(0, 5)
+      .map(factor => `${factor.name}: ${factor.score}/100 (${factor.issue_summary?.length || 0} issue types)`);
+  }
+
+  private getImpactLevel(score: number): string {
+    if (score < 30) return 'Critical Impact';
+    if (score < 50) return 'High Impact';
+    if (score < 70) return 'Medium Impact';
+    return 'Low Impact';
+  }
+
+  private getSeverityDistribution(issues: any[]): string {
+    const severities: { [key: string]: number } = {};
+    issues.forEach(issue => {
+      const sev = issue.severity || 'unknown';
+      severities[sev] = (severities[sev] || 0) + 1;
+    });
+    return Object.entries(severities)
+      .map(([sev, count]) => `${count} ${sev}`)
+      .join(', ');
   }
 
   async run() {
