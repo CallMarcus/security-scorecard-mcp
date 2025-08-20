@@ -1,0 +1,12 @@
+const options = {
+  method: 'GET',
+  headers: {
+    accept: 'application/json',
+    Authorization: 'Token WHSNMEGHCFb5aqWJDQHNh1CcOFPC'
+  }
+};
+
+fetch('https://api.securityscorecard.io/footprint/neste.com/assets/ips?size=30', options)
+  .then(res => res.json())
+  .then(res => console.log(res))
+  .catch(err => console.error(err));
