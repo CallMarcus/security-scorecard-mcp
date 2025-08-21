@@ -1679,7 +1679,7 @@ export class ScoreImpactSecurityScorecardServer {
     domain = this.sanitizeDomain(domain);
     let text = `# 📊 FINDINGS BY CATEGORY: ${domain} (${status} Issues)\n\n`;
     try {
-      const summary = await getFindingsByCategory(this.makeRequest.bind(this), domain, status);
+      const summary = await getFindingsByCategory(domain, this.config.apiToken, status);
       text += `\n\n\`\`\`json\n${JSON.stringify(summary, null, 2)}\n\`\`\``;
     } catch (error: any) {
       text += `Error retrieving category findings: ${error.message}`;
@@ -1703,12 +1703,12 @@ export class ScoreImpactSecurityScorecardServer {
       }
 
       const [categories, factors] = await Promise.all([
-        getFindingsByCategory(this.makeRequest.bind(this), domain),
+        getFindingsByCategory(domain, this.config.apiToken),
         this.getFactors()
       ]);
       const weightMap = new Map(factors.map(f => [f.name, f.weight]));
 
-      const prioritized = categories.map(cat => {
+      const prioritized = categories.factor_breakdown.map(cat => {
         const weight = weightMap.get(cat.factor) || 0;
         const priority = weight * (cat.critical_count * 5 + cat.high_count * 2 + cat.issue_count);
         const topIssues = Array.from(new Set((cat.issues || []).map(i => i.issue_type).filter(Boolean))).slice(0, 3);
@@ -1750,7 +1750,7 @@ export class ScoreImpactSecurityScorecardServer {
 
   private async getAssetInventoryTool(domain: string): Promise<any> {
     domain = this.sanitizeDomain(domain);
-    const inventory = await getAssetInventory(this.makeRequest.bind(this), domain);
+    const inventory = await getAssetInventory(domain, this.config.apiToken);
     
     const text = `# 📋 ASSET INVENTORY: ${domain}\n\n` +
                  `**Total Assets**: ${inventory.total_assets} (${inventory.domains.length} domains, ${inventory.ip_addresses.length} IPs)\n` +
@@ -1772,7 +1772,7 @@ export class ScoreImpactSecurityScorecardServer {
   private async getAssetFindingsTool(assetName: string, assetType: string, domain?: string): Promise<any> {
     // Use the provided domain, or derive it from the asset name if it's a domain, or use default
     const parentDomain = domain || (assetType === 'domain' ? assetName : this.config.defaultDomain);
-    const findings = await getAssetFindings(this.makeRequest.bind(this), parentDomain, assetName, assetType as 'domain' | 'ip_address');
+    const findings = await getAssetFindings(assetName, assetType as 'domain' | 'ip_address', this.config.apiToken);
     
     const totalFindings = Object.values(findings.findings).reduce((sum: number, f: any) => sum + f.count, 0);
     const quickWins = findings.remediation_priority.filter(p => p.quick_win);
@@ -2081,10 +2081,7 @@ export class ScoreImpactSecurityScorecardServer {
     
     // Try the enhanced asset inventory function
     try {
-      const inventory = await getAssetInventory(
-        (endpoint: string, method?: string, body?: any) => this.makeRequest(endpoint, method, body),
-        domain
-      );
+      const inventory = await getAssetInventory(domain, this.config.apiToken);
       
       this.log(`[ENHANCED DISCOVERY] Found ${inventory.total_assets} total assets`);
       this.log(`[ENHANCED DISCOVERY] Domains: ${inventory.domains.length}, IPs: ${inventory.ip_addresses.length}`);
@@ -2136,10 +2133,9 @@ export class ScoreImpactSecurityScorecardServer {
     
     try {
       const findings = await getAssetFindings(
-        (endpoint: string, method?: string, body?: any) => this.makeRequest(endpoint, method, body),
-        domain,
         assetName,
-        assetType
+        assetType,
+        this.config.apiToken
       );
       
       const findingCount = Object.keys(findings.findings).length;
@@ -2806,10 +2802,7 @@ export class ScoreImpactSecurityScorecardServer {
     // Step 1: Discover all assets using existing functionality
     let assetInventory: any;
     try {
-      const inventory = await getAssetInventory(
-        (endpoint: string, method?: string, body?: any) => this.makeRequest(endpoint, method, body),
-        domain
-      );
+      const inventory = await getAssetInventory(domain, this.config.apiToken);
       assetInventory = inventory;
       this.log(`Found ${inventory.total_assets} total assets: ${inventory.domains.length} domains, ${inventory.ip_addresses.length} IPs`);
     } catch (error: any) {

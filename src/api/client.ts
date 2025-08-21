@@ -136,10 +136,11 @@ export class SecurityScorecardApiClient {
   }
 
   /**
-   * Get company active issues
+   * Get company active issues (uses /issues endpoint with status filter due to API bug in /active-issues)
    */
   async getCompanyActiveIssues(domain: string, queryParams?: Record<string, any>): Promise<ApiResponse<any>> {
-    return this.makeRequest('GET', `/companies/${domain}/active-issues`, { queryParams });
+    const params = { status: 'open', size: 50, ...queryParams };
+    return this.makeRequest('GET', `/companies/${domain}/issues`, { queryParams: params });
   }
 
   /**

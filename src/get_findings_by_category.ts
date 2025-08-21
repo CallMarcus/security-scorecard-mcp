@@ -14,10 +14,17 @@ export interface FactorSummary {
 }
 
 export async function getFindingsByCategory(
-  makeRequest: (endpoint: string) => Promise<any>,
   domain: string,
+  apiToken: string,
   status: 'OPEN' | 'UNDER_REVIEW' | 'ALL' = 'OPEN'
-): Promise<FactorSummary[]> {
+): Promise<{ factor_breakdown: FactorSummary[] }> {
+  const { createSecurityScorecardClient } = await import('./api/client.js');
+  const client = createSecurityScorecardClient(apiToken);
+  
+  const makeRequest = async (endpoint: string) => {
+    const response = await client.callEndpoint('GET', endpoint);
+    return response.data;
+  };
   // ENHANCED: Use confirmed working API Reference pattern from user discovery
   let factorsResponse;
   try {
@@ -69,8 +76,10 @@ export async function getFindingsByCategory(
   });
   
   // Sort by risk priority (critical issues weighted highest)
-  return factorSummary.sort((a, b) => 
+  const sortedFactors = factorSummary.sort((a, b) => 
     (b.critical_count * 10 + b.high_count * 5 + b.issue_count) -
     (a.critical_count * 10 + a.high_count * 5 + a.issue_count)
   );
+  
+  return { factor_breakdown: sortedFactors };
 }

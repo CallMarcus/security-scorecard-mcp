@@ -212,9 +212,16 @@ function isValidIP(str: string): boolean {
  * Enhanced version with pagination and multiple discovery methods
  */
 export async function getAssetInventory(
-  makeRequest: (endpoint: string, method?: string, body?: any) => Promise<any>,
-  domain: string
+  domain: string,
+  apiToken: string
 ): Promise<AssetInventory> {
+  const { createSecurityScorecardClient } = await import('./api/client.js');
+  const client = createSecurityScorecardClient(apiToken);
+  
+  const makeRequest = async (endpoint: string, method = 'GET', body?: any) => {
+    const response = await client.callEndpoint(method.toUpperCase() as any, endpoint, body);
+    return response.data;
+  };
   
   const debugMode = process.env.DEBUG_MODE === "true";
   
@@ -556,11 +563,17 @@ export async function getAssetInventory(
  * Get detailed findings for specific asset using correct API patterns
  */
 export async function getAssetFindings(
-  makeRequest: (endpoint: string, method?: string, body?: any) => Promise<any>,
-  domain: string,
   assetName: string,
-  assetType: 'domain' | 'ip_address' = 'domain'
+  assetType: 'domain' | 'ip_address' = 'domain',
+  apiToken: string
 ): Promise<AssetFindings> {
+  const { createSecurityScorecardClient } = await import('./api/client.js');
+  const client = createSecurityScorecardClient(apiToken);
+  
+  const makeRequest = async (endpoint: string, method = 'GET', body?: any) => {
+    const response = await client.callEndpoint(method.toUpperCase() as any, endpoint, body);
+    return response.data;
+  };
   
   const findings: { [key: string]: any } = {};
   
