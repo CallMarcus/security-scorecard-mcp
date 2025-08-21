@@ -34,14 +34,35 @@ try {
         $release = Invoke-RestMethod -Uri $api -Headers $apiHeaders
     } catch {
         $status = $_.Exception.Response.StatusCode.value__
-        $message = "Failed to retrieve release info from ${api}: $($_.Exception.Message)"
-        if ($_.Exception.Response -and $status -eq 404) {
-            $message += "`nNo release was found. Please ensure a release has been published to the repository."
+        
+        # For private repos or when /latest fails, try getting all releases and pick the first non-prerelease
+        if ($status -eq 404) {
+            Write-Warning "Latest release endpoint returned 404 (likely private repo). Trying fallback method..."
+            try {
+                $allReleasesApi = "https://api.github.com/repos/$owner/$repo/releases"
+                $allReleases = Invoke-RestMethod -Uri $allReleasesApi -Headers $apiHeaders
+                $release = $allReleases | Where-Object { -not $_.prerelease -and -not $_.draft } | Select-Object -First 1
+                
+                if (-not $release) {
+                    Write-Error "No non-prerelease releases found in the repository." -ErrorAction Continue
+                    exit 1
+                }
+                
+                Write-Host "Found latest release: $($release.tag_name)" -ForegroundColor Green
+            } catch {
+                $message = "Failed to retrieve releases from repository: $($_.Exception.Message)"
+                if (-not $token) {
+                    $message += "`nThis appears to be a private repository. Please set GITHUB_TOKEN environment variable with a valid GitHub token."
+                }
+                Write-Error $message -ErrorAction Continue
+                exit 1
+            }
         } else {
+            $message = "Failed to retrieve release info from ${api}: $($_.Exception.Message)"
             $message += "`nCheck your network connection or verify that the repository has published releases."
+            Write-Error $message -ErrorAction Continue
+            exit 1
         }
-        Write-Error $message -ErrorAction Continue
-        exit 1
     }
     $tag = $release.tag_name
 
