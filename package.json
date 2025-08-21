@@ -1,6 +1,6 @@
 {
   "name": "security-scorecard-mcp",
-  "version": "0.2.9",
+  "version": "1.0.0",
   "description": "Compiled MCP server for the SecurityScorecard API",
   "main": "build/simplified-index.js",
   "type": "module",
