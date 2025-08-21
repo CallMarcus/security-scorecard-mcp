@@ -1,4 +1,17 @@
-import { RequestOptions, ApiResponse } from '../types/api.js';
+#!/usr/bin/env python3
+"""
+Simple, reliable SecurityScorecard API Client Generator
+Focuses on working TypeScript code without complex parameter parsing
+"""
+
+import json
+import pathlib
+import re
+
+def generate_simple_client():
+    """Generate a simple, working API client"""
+    
+    client_code = '''import { RequestOptions, ApiResponse } from '../types/api.js';
 
 export interface SecurityScorecardConfig {
   apiToken: string;
@@ -50,7 +63,7 @@ export class SecurityScorecardApiClient {
     
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`API request failed: ${response.status} ${response.statusText}\n${errorText}`);
+      throw new Error(`API request failed: ${response.status} ${response.statusText}\\n${errorText}`);
     }
     
     const data = await response.json();
@@ -325,3 +338,186 @@ export function validateApiToken(token: string): boolean {
 }
 
 export default SecurityScorecardApiClient;
+'''
+
+    return client_code
+
+def generate_simple_types():
+    """Generate simple TypeScript types"""
+    
+    types_code = '''// SecurityScorecard API Types
+
+export interface RequestOptions {
+  queryParams?: Record<string, any>;
+  body?: any;
+  headers?: Record<string, string>;
+}
+
+export interface ApiResponse<T> {
+  data: T;
+  status: number;
+  headers: Headers;
+}
+
+export interface ApiError {
+  message: string;
+  status?: number;
+  code?: string;
+  details?: any;
+}
+
+// === COMMON DATA TYPES ===
+
+export interface Portfolio {
+  id: string;
+  name: string;
+  description?: string;
+  privacy: 'public' | 'private';
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Company {
+  domain: string;
+  name?: string;
+  score: number;
+  grade: string;
+  factors: Factor[];
+  size?: string;
+  industry?: string;
+}
+
+export interface Factor {
+  name: string;
+  description: string;
+  weight: number;
+  score: number;
+  grade: string;
+}
+
+export interface Issue {
+  type: string;
+  severity: 'informational' | 'low' | 'medium' | 'high' | 'critical';
+  count: number;
+  description?: string;
+  detail_url?: string;
+}
+
+export interface ScoreHistory {
+  date: string;
+  score: number;
+  grade: string;
+}
+
+export interface Tag {
+  id: string;
+  name: string;
+  description?: string;
+  color?: string;
+  created_at: string;
+}
+
+export interface Asset {
+  id: string;
+  type: 'domain' | 'ip_address';
+  name: string;
+  first_seen?: string;
+  last_seen?: string;
+}
+
+// === API REQUEST/RESPONSE TYPES ===
+
+export interface PortfolioListResponse {
+  entries: Portfolio[];
+  count: number;
+}
+
+export interface CompanySearchRequest {
+  query: string;
+  limit?: number;
+  offset?: number;
+}
+
+export interface CompanySearchResponse {
+  entries: Company[];
+  count: number;
+  total: number;
+}
+
+export interface HistoryEventsResponse {
+  entries: any[];
+  count: number;
+}
+
+// === MCP TOOL TYPES ===
+
+export interface FindingsByCategory {
+  category: string;
+  issues: Issue[];
+  total_count: number;
+  severity_breakdown: {
+    critical: number;
+    high: number;
+    medium: number;
+    low: number;
+    informational: number;
+  };
+}
+
+export interface RemediationReport {
+  domain: string;
+  current_score: number;
+  grade: string;
+  critical_findings: Issue[];
+  high_findings: Issue[];
+  recommendations: Recommendation[];
+  estimated_score_improvement: number;
+}
+
+export interface Recommendation {
+  issue_type: string;
+  severity: string;
+  impact: 'high' | 'medium' | 'low';
+  effort: 'high' | 'medium' | 'low';
+  description: string;
+  remediation_steps: string[];
+}
+
+export interface AssetInventory {
+  parent_domain: string;
+  domains: Asset[];
+  ip_addresses: Asset[];
+  total_domains: number;
+  total_ips: number;
+  last_updated: string;
+}
+'''
+
+    return types_code
+
+def main():
+    """Generate simple, working API client"""
+    
+    # Create directories
+    pathlib.Path("src/api").mkdir(parents=True, exist_ok=True)
+    pathlib.Path("src/types").mkdir(parents=True, exist_ok=True)
+    
+    # Generate simple client
+    client_code = generate_simple_client()
+    pathlib.Path("src/api/client.ts").write_text(client_code, encoding="utf-8")
+    
+    # Generate simple types
+    types_code = generate_simple_types()
+    pathlib.Path("src/types/api.ts").write_text(types_code, encoding="utf-8")
+    
+    print("✅ Generated simple, working API client!")
+    print("📁 Files created:")
+    print("   - src/api/client.ts (Main API client)")
+    print("   - src/types/api.ts (TypeScript types)")
+    print("\n🚀 Usage:")
+    print("   import { createSecurityScorecardClient } from './src/api/client.js';")
+    print("   const client = createSecurityScorecardClient(process.env.API_TOKEN!);")
+    print("   const portfolios = await client.getPortfolios();")
+
+if __name__ == "__main__":
+    main()

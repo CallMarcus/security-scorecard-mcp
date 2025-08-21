@@ -8,10 +8,10 @@
     "build": "tsc",
     "start": "node build/index.js",
     "test": "NODE_ENV=test node --import 'data:text/javascript,import { register } from \"node:module\"; import { pathToFileURL } from \"node:url\"; register(\"ts-node/esm\", pathToFileURL(\"./\"));' --test tests/*.test.ts",
-    "api:generate": "python3 build_actionable_reference.py",
+    "api:generate": "python3 build_simple_client.py",
     "api:test": "npm test -- tests/api/",
     "api:validate": "node examples/basic_usage.js",
-    "api:update": "python3 split_swagger.py && python3 build_actionable_reference.py",
+    "api:update": "python3 split_swagger.py && python3 build_simple_client.py",
     "dev:api": "npm run api:update && npm run build"
   },
   "dependencies": {

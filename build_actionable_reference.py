@@ -22,6 +22,13 @@ def slug(s: str) -> str:
     """Convert string to TypeScript-safe identifier"""
     return re.sub(r'[^a-zA-Z0-9]', '', s.title())
 
+def safe_param_name(name: str) -> str:
+    """Convert parameter name to TypeScript-safe property"""
+    # Replace hyphens with underscores and make camelCase
+    safe_name = re.sub(r'-([a-z])', lambda m: m.group(1).upper(), name)
+    safe_name = re.sub(r'[^a-zA-Z0-9_]', '_', safe_name)
+    return safe_name
+
 def to_typescript_type(swagger_type: Dict[str, Any]) -> str:
     """Convert Swagger type to TypeScript type"""
     if isinstance(swagger_type, str):
@@ -92,7 +99,8 @@ def generate_api_method(endpoint: Dict[str, Any], spec: Dict[str, Any]) -> str:
             params.append(f"{param}: string")
     
     if query_params:
-        params.append(f"queryParams?: {{ {'; '.join([f'{p}?: any' for p in query_params])} }}")
+        safe_query_params = [f'{safe_param_name(p)}?: any' for p in query_params]
+        params.append(f"queryParams?: {{ {'; '.join(safe_query_params)} }}")
     
     if has_body:
         params.append("body?: any")
