@@ -179,20 +179,14 @@ export class ScoreImpactSecurityScorecardServer {
   ): Promise<any> {
     domain = this.sanitizeDomain(domain);
     
-    // Define endpoint hierarchy based on test results - removed failing scorecard endpoints
+    // Define endpoint hierarchy based on user's confirmed working API Reference pattern
     const endpointHierarchy = [
-      // Level 1: API Reference (Broadest Coverage) - WORKING
-      {
-        url: `/footprint/parentDomain/${endpointType}`,
-        method: 'GET',
-        transform: (url: string) => url.replace('/parentDomain/', `/${domain}/`)
-      },
-      // Level 2: Direct footprint (Domain-specific) - WORKING
+      // Level 1: Confirmed working API Reference pattern (WORKING - user verified)
       {
         url: `/footprint/${domain}/${endpointType}`,
         method: 'GET'
       },
-      // Level 3: Companies (External monitoring - Limited but working)
+      // Level 2: Companies (External monitoring - Limited but working)
       {
         url: `/companies/${domain}/${endpointType}`,
         method: 'GET'
@@ -202,7 +196,7 @@ export class ScoreImpactSecurityScorecardServer {
     // Try each level in hierarchy order
     for (const endpoint of endpointHierarchy) {
       try {
-        let finalUrl = endpoint.transform ? endpoint.transform(endpoint.url) : endpoint.url;
+        let finalUrl = endpoint.url;
         
         if (params && Object.keys(params).length > 0) {
           const queryParams = new URLSearchParams(params).toString();

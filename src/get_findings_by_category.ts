@@ -18,19 +18,14 @@ export async function getFindingsByCategory(
   domain: string,
   status: 'OPEN' | 'UNDER_REVIEW' | 'ALL' = 'OPEN'
 ): Promise<FactorSummary[]> {
-  // ENHANCED: Use working hierarchical API approach based on test results
+  // ENHANCED: Use confirmed working API Reference pattern from user discovery
   let factorsResponse;
   try {
-    // Level 1: Try API Reference endpoint for broadest coverage (WORKING)
-    factorsResponse = await makeRequest(`/footprint/parentDomain/factors`.replace('/parentDomain/', `/${domain}/`));
+    // Level 1: Use confirmed working API Reference pattern (user verified)
+    factorsResponse = await makeRequest(`/footprint/${domain}/factors`);
   } catch (error) {
-    try {
-      // Level 2: Try direct footprint endpoint (WORKING)
-      factorsResponse = await makeRequest(`/footprint/${domain}/factors`);
-    } catch (error2) {
-      // Level 3: Fallback to companies API (WORKING but limited)
-      factorsResponse = await makeRequest(`/companies/${domain}/factors`);
-    }
+    // Level 2: Fallback to companies API (working but limited)
+    factorsResponse = await makeRequest(`/companies/${domain}/factors`);
   }
   const factorSummary: FactorSummary[] = [];
   

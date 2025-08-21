@@ -68,19 +68,17 @@ async function getAllAssetsPaginated(
   
   // Try different pagination patterns and endpoint variations
   // COMPREHENSIVE API ENDPOINT HIERARCHY: Based on user feedback discovery
-  // UPDATED: Based on test results - removed failing scorecard endpoints, prioritized working ones
+  // UPDATED: Based on user's working API Reference discovery - correct endpoint structure
   const endpointVariations = [
-    // LEVEL 1: API Reference Endpoints (Broadest Coverage) - WORKING
-    { url: `/footprint/parentDomain/assets/domains`, method: 'GET', useBody: false, priority: 'highest' },
-    { url: `/footprint/parentDomain/assets/ips`, method: 'GET', useBody: false, priority: 'highest' },
+    // LEVEL 1: Working API Reference Pattern - CONFIRMED WORKING by user
+    { url: `/footprint/${domain}/assets/domains`, method: 'GET', useBody: false, priority: 'highest' },
+    { url: `/footprint/${domain}/assets/ips`, method: 'GET', useBody: false, priority: 'highest' },
     
     // LEVEL 2: Digital Footprint POST API (Domain-scoped) - WORKING
     { url: `/parent-domains/${domain}/domains`, method: 'POST', useBody: true, priority: 'high' },
     { url: `/parent-domains/${domain}/ips`, method: 'POST', useBody: true, priority: 'high' },
     
-    // LEVEL 3: Domain-specific footprint API - WORKING
-    { url: `/footprint/${domain}/assets/domains`, method: 'GET', useBody: false, priority: 'medium' },
-    { url: `/footprint/${domain}/assets/ips`, method: 'GET', useBody: false, priority: 'medium' },
+    // LEVEL 3: Alternative footprint patterns
     { url: `/footprint/${domain}/domains`, method: 'GET', useBody: false, priority: 'medium' },
     { url: `/footprint/${domain}/ips`, method: 'GET', useBody: false, priority: 'medium' },
     
@@ -232,17 +230,15 @@ export async function getAssetInventory(
     let domains: any[] = [];
     let ips: any[] = [];
     
-    // Method 1: Try working endpoints hierarchy (based on test results)
-    debugLog("Trying working endpoint hierarchy (primary method)...");
+    // Method 1: Try working endpoints hierarchy (based on user's API Reference discovery)
+    debugLog("Trying confirmed working endpoint patterns (primary method)...");
     try {
       const [domainsResponse, ipsResponse] = await Promise.all([
-        // Try API Reference first, then footprint
-        makeRequest(`/footprint/parentDomain/assets/domains`.replace('/parentDomain/', `/${domain}/`))
-          .catch(() => makeRequest(`/footprint/${domain}/assets/domains`))
+        // Use confirmed working pattern from user's API Reference discovery
+        makeRequest(`/footprint/${domain}/assets/domains`)
           .catch(() => makeRequest(`/footprint/${domain}/domains`))
           .catch(() => ({ entries: [] })),
-        makeRequest(`/footprint/parentDomain/assets/ips`.replace('/parentDomain/', `/${domain}/`))
-          .catch(() => makeRequest(`/footprint/${domain}/assets/ips`))
+        makeRequest(`/footprint/${domain}/assets/ips`)
           .catch(() => makeRequest(`/footprint/${domain}/ips`))
           .catch(() => ({ entries: [] }))
       ]);
@@ -311,19 +307,14 @@ export async function getAssetInventory(
     if (domains.length === 0) {
       debugLog('Using enhanced asset discovery through issue data...');
       
-      // Get factors data to discover assets mentioned in issues using hierarchical approach
+      // Get factors data to discover assets mentioned in issues using confirmed working pattern
       let factorsResponse;
       try {
-        // Try broader API Reference endpoint first
+        // Use confirmed working API Reference pattern (user verified)
         factorsResponse = await makeRequest(`/footprint/${domain}/factors`);
       } catch (error) {
-        try {
-          // Fallback to scorecard endpoint
-          factorsResponse = await makeRequest(`/scorecard/${domain}/factors`);
-        } catch (error2) {
-          // Final fallback to companies endpoint
-          factorsResponse = await makeRequest(`/companies/${domain}/factors`);
-        }
+        // Fallback to companies endpoint
+        factorsResponse = await makeRequest(`/companies/${domain}/factors`);
       }
       const discoveredDomains = new Set<string>();
       const discoveredIPs = new Set<string>();
@@ -446,16 +437,14 @@ export async function getAssetInventory(
       let highCount = 0;
       
       try {
-        // Try to get factors for this domain directly using hierarchical approach
+        // Try to get factors for this domain directly using confirmed working pattern
         let factors;
         try {
+          // Use confirmed working API Reference pattern
           factors = await makeRequest(`/footprint/${domainName}/factors`);
         } catch (error) {
-          try {
-            factors = await makeRequest(`/scorecard/${domainName}/factors`);
-          } catch (error2) {
-            factors = await makeRequest(`/companies/${domainName}/factors`);
-          }
+          // Fallback to companies endpoint
+          factors = await makeRequest(`/companies/${domainName}/factors`);
         }
         factors.entries?.forEach((factor: any) => {
           factor.issue_summary?.forEach((issue: any) => {
@@ -472,13 +461,11 @@ export async function getAssetInventory(
         if (parentDomain) {
           let parentFactors;
           try {
+            // Use confirmed working API Reference pattern
             parentFactors = await makeRequest(`/footprint/${parentDomain}/factors`);
           } catch (error) {
-            try {
-              parentFactors = await makeRequest(`/scorecard/${parentDomain}/factors`);
-            } catch (error2) {
-              parentFactors = await makeRequest(`/companies/${parentDomain}/factors`);
-            }
+            // Fallback to companies endpoint  
+            parentFactors = await makeRequest(`/companies/${parentDomain}/factors`);
           }
           const issueTypes = extractIssueTypesFromFactors(parentFactors);
           
@@ -585,16 +572,14 @@ export async function getAssetFindings(
       // For child assets, we need to query through parent domain
       const parentDomain = await findParentDomain(makeRequest, assetName);
       if (parentDomain) {
-        // Get available issue types from parent's factors using hierarchical approach
+        // Get available issue types from parent's factors using confirmed working pattern
         let factors;
         try {
+          // Use confirmed working API Reference pattern
           factors = await makeRequest(`/footprint/${parentDomain}/factors`);
         } catch (error) {
-          try {
-            factors = await makeRequest(`/scorecard/${parentDomain}/factors`);
-          } catch (error2) {
-            factors = await makeRequest(`/companies/${parentDomain}/factors`);
-          }
+          // Fallback to companies endpoint
+          factors = await makeRequest(`/companies/${parentDomain}/factors`);
         }
         const issueTypes = extractIssueTypesFromFactors(factors);
         
@@ -611,16 +596,14 @@ export async function getAssetFindings(
         }
       }
     } else {
-      // For parent domains, use hierarchical factors to get issue summary, then optionally fetch specific types
+      // For parent domains, use confirmed working pattern to get issue summary, then optionally fetch specific types
       let factors;
       try {
+        // Use confirmed working API Reference pattern
         factors = await makeRequest(`/footprint/${assetName}/factors`);
       } catch (error) {
-        try {
-          factors = await makeRequest(`/scorecard/${assetName}/factors`);
-        } catch (error2) {
-          factors = await makeRequest(`/companies/${assetName}/factors`);
-        }
+        // Fallback to companies endpoint
+        factors = await makeRequest(`/companies/${assetName}/factors`);
       }
       
       // Extract issue types and counts from factor summaries
@@ -708,16 +691,14 @@ export async function compareAssets(
       const issueTypeCounts: { [key: string]: number } = {};
       
       try {
-        // Try to get factors for this asset directly using hierarchical approach
+        // Try to get factors for this asset directly using confirmed working pattern
         let factors;
         try {
+          // Use confirmed working API Reference pattern
           factors = await makeRequest(`/footprint/${asset}/factors`);
         } catch (error) {
-          try {
-            factors = await makeRequest(`/scorecard/${asset}/factors`);
-          } catch (error2) {
-            factors = await makeRequest(`/companies/${asset}/factors`);
-          }
+          // Fallback to companies endpoint
+          factors = await makeRequest(`/companies/${asset}/factors`);
         }
         factors.entries?.forEach((factor: any) => {
           factor.issue_summary?.forEach((issue: any) => {
@@ -745,13 +726,11 @@ export async function compareAssets(
         if (parentDomain) {
           let parentFactors;
           try {
+            // Use confirmed working API Reference pattern
             parentFactors = await makeRequest(`/footprint/${parentDomain}/factors`);
           } catch (error) {
-            try {
-              parentFactors = await makeRequest(`/scorecard/${parentDomain}/factors`);
-            } catch (error2) {
-              parentFactors = await makeRequest(`/companies/${parentDomain}/factors`);
-            }
+            // Fallback to companies endpoint  
+            parentFactors = await makeRequest(`/companies/${parentDomain}/factors`);
           }
           const issueTypes = extractIssueTypesFromFactors(parentFactors);
           
