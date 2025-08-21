@@ -36,12 +36,12 @@ class SimplifiedSecurityScorecardServer {
     );
 
     this.config = {
-      apiToken: process.env.SECURITY_SCORECARD_TOKEN || "",
+      apiToken: process.env.SECURITY_SCORECARD_API_TOKEN || process.env.SECURITY_SCORECARD_TOKEN || "",
       defaultDomain: process.env.COMPANY_DOMAIN || "example.com"
     };
 
     if (!this.config.apiToken) {
-      console.error("❌ SECURITY_SCORECARD_TOKEN environment variable is required");
+      console.error("❌ SECURITY_SCORECARD_API_TOKEN or SECURITY_SCORECARD_TOKEN environment variable is required");
       process.exit(1);
     }
 
