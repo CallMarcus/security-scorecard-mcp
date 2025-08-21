@@ -1,455 +1,361 @@
-# Claude Desktop Operational Test Plan
-## SecurityScorecard MCP - Scorecard-Focused Operational Remediation
+# Claude Desktop Comprehensive Test Plan
+## SecurityScorecard MCP - Enhanced Security Operations Suite
 
 ### 🎯 Purpose
-This test plan validates the SecurityScorecard MCP's scorecard-focused operational capabilities for your own organization's security remediation workflows. The MCP has been architecturally transformed to use `/scorecard/{domain}/` endpoints instead of `/companies/{domain}/` to access your complete organizational asset inventory and operational remediation features.
+This test plan validates the SecurityScorecard MCP's comprehensive security analysis capabilities including asset discovery, issue management, API diagnostics, and web UI gap analysis. The MCP has been enhanced with 26 specialized tools for complete security operations support.
 
-### 🚨 CRITICAL CHANGES TESTED
-- **Scorecard API Architecture**: Tests the new `/scorecard/{domain}/` endpoints for own organization analysis
-- **Complete Asset Discovery**: Validates resolution of 100 vs 200+ domain under-reporting issue  
-- **Operational Status Filtering**: Tests OPEN/UNDER_REVIEW/ALL issue status filtering
-- **Own Organization Focus**: Confirms operational remediation capabilities vs. external monitoring
+### 🚨 CRITICAL ENHANCEMENTS TESTED
+- **26 Comprehensive Tools**: Complete security analysis and operational capabilities
+- **Enhanced Asset Discovery**: Resolution of API limitations through advanced pagination and fallback logic
+- **Detailed Issue Analysis**: 3 specialized tools for comprehensive asset issue investigation
+- **API Diagnostics**: Endpoint discovery, validation, and coverage analysis
+- **Web UI Analysis**: Gap analysis between web interface capabilities and API access
+- **Automatic Fallback Logic**: Robust error handling with graceful degradation
 
 ### 📋 Prerequisites
 - Claude Desktop installed and configured
-- SecurityScorecard MCP server running (13/13 tools registered)
+- SecurityScorecard MCP server running (26/26 tools registered)
 - Valid SecurityScorecard API token configured
-- Test domain with sufficient data (recommended: use your organization's domain)
+- Test domain with sufficient data (recommended: neste.com for testing)
 
 ---
 
-## 🧪 Test Suite 1: Scorecard-Focused Asset Discovery
-**Objective**: Validate complete organizational asset discovery using scorecard endpoints
+## 🧪 Test Suite 1: Enhanced Asset Discovery & Analysis
+**Objective**: Validate comprehensive asset discovery with advanced pagination and issue integration
 
-### Test 1.1: Complete Organizational Asset Inventory
-**Scenario**: Security team needs complete visibility of own organization's assets using scorecard APIs
-
-**Test Steps**:
-1. In Claude Desktop, ask: *"Use get_asset_inventory to find all assets for [your-domain]. With the new scorecard endpoints, I expect to see our complete asset portfolio, not the limited external view."*
-
-**Expected Results**:
-- ✅ **CRITICAL**: Returns 150-200+ assets (vs. previous 100-asset limit)
-- ✅ Uses `/scorecard/{domain}/footprint/domains/current` endpoint priority
-- ✅ Includes both domains and IP addresses from own organization monitoring
-- ✅ Shows complete asset count breakdown with internal visibility
-- ✅ Lists worst/best performers from own organization's scorecard
-
-**Validation Criteria**:
-```
-CRITICAL TEST: Assets Found should be 150-200+ domains (not 100)
-Domains: [number] significantly > previous 100-domain limit
-IP Addresses: [number] > 0 (if org has IP monitoring)
-API Evidence: Should see scorecard endpoints mentioned, not companies endpoints
-```
-
-### Test 1.2: Scorecard vs Companies Endpoint Comparison  
-**Scenario**: Validate that scorecard endpoints provide complete organizational view vs. limited external view
+### Test 1.1: Complete Asset Inventory with Enhanced Discovery
+**Scenario**: Security team needs complete visibility using enhanced discovery capabilities
 
 **Test Steps**:
-1. Ask: *"Use call_api_endpoint to test both `/scorecard/[domain]/footprint/domains/current` and `/companies/[domain]/assets`. Compare the results - scorecard should show our complete internal asset inventory."*
+1. In Claude Desktop, ask: *"Use get_asset_inventory to find all assets for neste.com. With the enhanced discovery capabilities, I expect comprehensive asset data with pagination and fallback logic."*
 
 **Expected Results**:
-- ✅ **CRITICAL**: Scorecard endpoint returns significantly more assets than companies endpoint
-- ✅ Scorecard provides internal organizational view (200+ domains)
-- ✅ Companies endpoint shows limited external monitoring view (~100 domains)  
-- ✅ Clear architectural distinction demonstrated
+- ✅ **ENHANCED**: Uses multiple discovery methods (footprint, digital footprint, issues-based)
+- ✅ **PAGINATION**: Overcomes API limits with comprehensive pagination
+- ✅ **FALLBACK**: Automatic fallback between endpoint patterns for maximum data retrieval
+- ✅ **INTEGRATION**: Asset discovery integrated with issue data for complete context
+
+### Test 1.2: Detailed Asset Issue Analysis
+**Scenario**: Deep-dive analysis of specific assets with new detailed issue tools
+
+**Test Steps**:
+1. Ask: *"Use get_asset_detailed_issues for neste.com to get comprehensive issue analysis with full context and remediation insights."*
+2. Follow up: *"Use get_comprehensive_asset_issues to get an operational dashboard view of all asset issues."*
+3. Then: *"Use get_asset_remediation_insights for neste.com to get prioritized remediation guidance."*
+
+**Expected Results**:
+- ✅ **NEW**: get_asset_detailed_issues provides comprehensive analysis with severity breakdown
+- ✅ **NEW**: get_comprehensive_asset_issues shows operational dashboard format
+- ✅ **NEW**: get_asset_remediation_insights offers prioritized guidance with ROI calculations
+- ✅ **INTEGRATION**: All tools work together for complete asset analysis workflow
 
 ---
 
-## 🧪 Test Suite 2: IP Address Analysis
-**Objective**: Find and analyze IP addresses with security issues
+## 🧪 Test Suite 2: API Diagnostic and Validation Tools
+**Objective**: Test endpoint discovery, validation, and coverage analysis capabilities
 
-### Test 2.1: Find All IPs with Critical Issues
-**Scenario**: Security team needs to identify IP addresses with critical vulnerabilities
-
-**Test Steps**:
-1. Ask: *"Find all IP addresses associated with [domain] that have critical security issues. I need the IP addresses, issue counts, and types of critical issues found."*
-2. Follow up: *"For the IP with the most critical issues, give me detailed findings using get_asset_detailed_findings."*
-
-**Expected Results**:
-- ✅ Lists IP addresses with critical issue counts
-- ✅ Shows specific critical issue types per IP
-- ✅ Provides detailed analysis for highest-risk IP
-- ✅ Includes remediation recommendations
-
-**Validation Criteria**:
-```
-Format: IP addresses listed with critical issue counts
-Detail: Specific issue types identified
-Action: Remediation priorities provided
-```
-
-### Test 2.2: IP-to-Domain Mapping
-**Scenario**: Understanding which domains resolve to which IPs for incident response
+### Test 2.1: API Endpoint Discovery and Validation
+**Scenario**: Understanding available API capabilities and endpoint accessibility
 
 **Test Steps**:
-1. Ask: *"Show me the relationship between domains and IP addresses for [domain]. Which IPs are associated with which domains?"*
+1. Ask: *"Use discover_api_endpoints for neste.com to map all available API endpoints and their capabilities."*
+2. Follow up: *"Use validate_endpoint_accessibility to test which endpoints are currently working for data access."*
 
 **Expected Results**:
-- ✅ Clear domain-to-IP mappings
-- ✅ Identifies shared IPs across domains
-- ✅ Shows IP addresses not directly associated with domains
+- ✅ **NEW**: discover_api_endpoints maps comprehensive endpoint hierarchy
+- ✅ **NEW**: validate_endpoint_accessibility tests real-time endpoint availability
+- ✅ **VALIDATION**: Provides endpoint reliability scoring and performance metrics
+- ✅ **INSIGHTS**: Offers recommendations for optimal API usage patterns
+
+### Test 2.2: API Coverage Diagnosis
+**Scenario**: Understanding API limitations and data accessibility gaps
+
+**Test Steps**:
+1. Ask: *"Use diagnose_api_coverage for neste.com to understand what data is accessible through the API vs limitations."*
+2. Follow up: *"Use test_endpoint_patterns to validate different API patterns and their success rates."*
+
+**Expected Results**:
+- ✅ **NEW**: diagnose_api_coverage provides comprehensive API capability analysis
+- ✅ **NEW**: test_endpoint_patterns validates endpoint patterns with success metrics
+- ✅ **ANALYSIS**: Shows data accessibility percentages and limitation insights
+- ✅ **RECOMMENDATIONS**: Provides workarounds for API limitations
 
 ---
 
-## 🧪 Test Suite 3: Specific Vulnerability Hunting
-**Objective**: Find specific security issues across the organization
+## 🧪 Test Suite 3: Web Interface Analysis Tools
+**Objective**: Test web UI vs API gap analysis and simulation capabilities
 
-### Test 3.1: Missing SPF Records with Status Filtering
-**Scenario**: Operational remediation - find OPEN SPF issues ready for immediate action
-
-**Test Steps**:
-1. Ask: *"Use get_findings_by_category with status='OPEN' to find all OPEN SPF record issues for [domain]. This should use the new scorecard endpoints to show issues needing immediate remediation."*
-2. Follow up: *"Now show me UNDER_REVIEW SPF issues - these should be issues already being worked on by the team."*
-
-**Expected Results**:
-- ✅ **NEW**: Separates OPEN issues (need action) from UNDER_REVIEW (being worked on)
-- ✅ Uses `/scorecard/{domain}/issues/OPEN` endpoint with type filtering
-- ✅ Shows significantly more SPF issues than previous 118+ domains discovered
-- ✅ Provides operational status context for daily workflows
-
-**Validation Criteria**:
-```
-CRITICAL: Should find 150-200+ domains with SPF issues (vs. previous 118)
-Status Separation: OPEN vs UNDER_REVIEW clearly distinguished
-API Evidence: Uses scorecard endpoints with status filtering
-Operational Context: Ready-to-action vs in-progress issues identified
-```
-
-### Test 3.2: TLS/SSL Certificate Issues
-**Scenario**: Certificate management - identify expiring or misconfigured certificates
+### Test 3.1: Web UI Capability Gap Analysis
+**Scenario**: Understanding differences between web interface and API data access
 
 **Test Steps**:
-1. Ask: *"Find all TLS/SSL certificate issues across [domain] assets. Look for expired certificates, weak ciphers, or certificate configuration problems."*
+1. Ask: *"Use analyze_web_ui_gaps for neste.com to compare what's available in the web interface vs API access."*
+2. Follow up: *"Focus on asset_details to understand the gap between web UI asset information and API accessibility."*
 
 **Expected Results**:
-- ✅ Identifies certificate-related issues
-- ✅ Shows expiration dates where applicable
-- ✅ Lists affected domains/IPs
-- ✅ Prioritizes by severity
+- ✅ **NEW**: analyze_web_ui_gaps identifies specific capability differences
+- ✅ **ANALYSIS**: Shows web UI features that aren't accessible via API
+- ✅ **INSIGHTS**: Provides data about web interface capabilities (300+ issue discovery, etc.)
+- ✅ **RECOMMENDATIONS**: Suggests alternative approaches for data access
 
-### Test 3.3: Patch Management Issues
-**Scenario**: Vulnerability management - find systems needing critical patches
+### Test 3.2: Web Interface Access Simulation
+**Scenario**: Attempting to replicate web interface data access patterns through API
 
 **Test Steps**:
-1. Ask: *"Find all assets with critical patching issues. I need to understand which systems need immediate patching attention."*
+1. Ask: *"Use simulate_web_ui_access for neste.com to attempt replicating web interface data access patterns."*
+2. Follow up: *"Test comprehensive analysis to see if we can access the same detailed data the web UI provides."*
 
 **Expected Results**:
-- ✅ Lists assets with critical patch issues
-- ✅ Shows specific vulnerability types
-- ✅ Provides patching priority order
-- ✅ Indicates quick wins vs. major projects
+- ✅ **NEW**: simulate_web_ui_access tests experimental patterns
+- ✅ **SIMULATION**: Attempts reverse-engineered patterns and experimental discovery
+- ✅ **SCORING**: Provides replication success rates and data quality scores
+- ✅ **INSIGHTS**: Reports on which web UI features can be replicated via API
 
 ---
 
-## 🧪 Test Suite 4: ROI-Based Prioritization
-**Objective**: Operational decision-making based on effort vs. impact
+## 🧪 Test Suite 4: Enhanced Error Handling and Fallback Logic
+**Objective**: Validate automatic fallback logic and graceful degradation
 
-### Test 4.1: Quick Security Wins
-**Scenario**: Security team has limited time - what can be fixed quickly for maximum impact?
-
-**Test Steps**:
-1. Ask: *"Give me the top 10 quick security wins for [domain]. I need issues that are high impact but low effort to fix."*
-2. Follow up: *"For each quick win, explain exactly what needs to be done to fix it."*
-
-**Expected Results**:
-- ✅ Lists high-impact, low-effort issues
-- ✅ Provides specific implementation steps
-- ✅ Shows expected score improvement
-- ✅ Includes timeline estimates
-
-### Test 4.2: ROI Analysis for Security Investments
-**Scenario**: Security budget planning - justify security investments with data
+### Test 4.1: Automatic Fallback Testing
+**Scenario**: Testing resilience when primary endpoints fail
 
 **Test Steps**:
-1. Ask: *"Calculate the ROI of fixing different types of security issues for [domain]. Which security factors give us the biggest score improvement for our effort?"*
+1. Ask: *"Use get_findings_by_category for dns_health issues on neste.com. This should demonstrate automatic fallback when endpoints return 404s."*
+2. Follow up: *"Use get_detailed_findings for a specific issue type to see fallback logic in action."*
 
 **Expected Results**:
-- ✅ Shows score impact per security factor
-- ✅ Estimates effort levels (low/medium/high)
-- ✅ Calculates ROI scores
-- ✅ Provides investment recommendations
+- ✅ **ENHANCED**: Automatic fallback between endpoint patterns
+- ✅ **GRACEFUL**: Graceful degradation when primary methods fail
+- ✅ **COMPREHENSIVE**: Multiple discovery methods tried sequentially
+- ✅ **RELIABLE**: Consistent data retrieval despite API limitations
+
+### Test 4.2: Error Recovery and Alternative Methods
+**Scenario**: Testing comprehensive error handling and alternative data access
+
+**Test Steps**:
+1. Ask: *"Test the enhanced error handling by requesting IP security details for 20.56.23.183. This should use fallback methods when direct IP endpoints fail."*
+
+**Expected Results**:
+- ✅ **ENHANCED**: Intelligent error recovery mechanisms
+- ✅ **ALTERNATIVES**: Alternative data access methods when primary fails
+- ✅ **CONTEXT**: Error messages provide actionable insights
+- ✅ **RECOVERY**: Successful data retrieval through fallback approaches
 
 ---
 
-## 🧪 Test Suite 5: Asset Comparison & Risk Assessment
-**Objective**: Compare security posture across multiple assets
+## 🧪 Test Suite 5: Operational Workflow Integration
+**Objective**: Test real security team workflows with enhanced capabilities
 
-### Test 5.1: Multi-Domain Risk Comparison
-**Scenario**: Organization has multiple domains - which need immediate attention?
-
-**Test Steps**:
-1. Ask: *"Compare the security posture of these domains: [domain1], [domain2], [domain3]. Which one poses the highest risk and should be prioritized?"*
-
-**Expected Results**:
-- ✅ Side-by-side security comparison
-- ✅ Risk scoring for each domain
-- ✅ Identifies highest-risk domain
-- ✅ Shows common issues across domains
-- ✅ Provides prioritization recommendations
-
-### Test 5.2: Asset Inventory Risk Profiling
-**Scenario**: Understanding the overall risk profile of all organizational assets
+### Test 5.1: Complete Security Assessment Workflow
+**Scenario**: Comprehensive security assessment using multiple enhanced tools
 
 **Test Steps**:
-1. Ask: *"Give me a risk profile of all assets under [domain]. Categorize them by risk level and show me the distribution of security issues."*
+1. Ask: *"Perform a complete security assessment for neste.com using the enhanced toolset. Start with asset discovery, then detailed issue analysis, and finish with remediation insights."*
 
 **Expected Results**:
-- ✅ Risk categorization (high/medium/low)
-- ✅ Asset distribution across risk levels
-- ✅ Common vulnerability patterns
-- ✅ Risk mitigation priorities
+- ✅ **WORKFLOW**: Seamless integration between enhanced tools
+- ✅ **COMPREHENSIVE**: Complete security assessment with deep insights
+- ✅ **OPERATIONAL**: Ready-to-action recommendations and priorities
+- ✅ **INSIGHTS**: Comprehensive understanding of security posture
+
+### Test 5.2: API Diagnostic Workflow for Troubleshooting
+**Scenario**: Using diagnostic tools to troubleshoot data access issues
+
+**Test Steps**:
+1. Ask: *"I'm having trouble accessing certain security data. Use the diagnostic tools to identify API limitations and suggest workarounds."*
+
+**Expected Results**:
+- ✅ **DIAGNOSTIC**: Clear identification of API limitations and capabilities
+- ✅ **WORKAROUNDS**: Alternative approaches for accessing needed data
+- ✅ **INSIGHTS**: Understanding of what's possible vs limitations
+- ✅ **GUIDANCE**: Actionable recommendations for data access optimization
 
 ---
 
-## 🧪 Test Suite 6: Detailed Asset Analysis
-**Objective**: Deep-dive analysis of specific assets
+## 🧪 Test Suite 6: Legacy Tool Validation
+**Objective**: Ensure all original tools still work with enhancements
 
-### Test 6.1: Comprehensive Asset Security Review
-**Scenario**: Incident response - need complete security assessment of a specific asset
-
-**Test Steps**:
-1. Ask: *"Give me a comprehensive security analysis of [specific domain/IP]. Include all findings, remediation priorities, and risk factors."*
-2. Follow up: *"What are the top 3 most critical issues for this asset and how do I fix them?"*
-
-**Expected Results**:
-- ✅ Complete security findings list
-- ✅ Categorized by severity and factor
-- ✅ Remediation effort estimates
-- ✅ Priority ranking of fixes
-- ✅ Specific implementation guidance
-
-### Test 6.2: Historical Issue Tracking
-**Scenario**: Understanding if security issues are being resolved over time
+### Test 6.1: Core Security Analysis Tools
+**Scenario**: Validate enhanced versions of core security tools
 
 **Test Steps**:
-1. Ask: *"Get the current findings for [domain] and analyze the improvement roadmap. What's our path to achieving an A grade?"*
+1. Ask: *"Use get_findings_by_category for patching_cadence issues on neste.com."*
+2. Follow up: *"Use get_issues_by_roi to find high-impact, low-effort security improvements."*
+3. Then: *"Use generate_remediation_report for comprehensive remediation planning."*
 
 **Expected Results**:
-- ✅ Current security grade and score
-- ✅ Specific improvements needed for target grade
-- ✅ Effort estimates for each improvement
-- ✅ Timeline for achieving target grade
+- ✅ **ENHANCED**: All core tools maintain functionality with improvements
+- ✅ **INTEGRATION**: Enhanced error handling and fallback logic integrated
+- ✅ **PERFORMANCE**: Better data retrieval through enhanced discovery methods
+- ✅ **RELIABILITY**: More consistent results despite API limitations
+
+### Test 6.2: Asset and IP Analysis Tools
+**Scenario**: Validate IP and asset analysis capabilities
+
+**Test Steps**:
+1. Ask: *"Use get_ip_security_details for 20.56.23.183 to test enhanced IP analysis."*
+2. Follow up: *"Use compare_assets to compare multiple domains with enhanced comparison logic."*
+
+**Expected Results**:
+- ✅ **ENHANCED**: IP analysis with improved data access methods
+- ✅ **RELIABLE**: Asset comparison with better data retrieval
+- ✅ **COMPREHENSIVE**: More detailed analysis through enhanced capabilities
+- ✅ **CONSISTENT**: Reliable results through fallback mechanisms
 
 ---
 
-## 🧪 Test Suite 7: Operational Remediation Workflows  
-**Objective**: Test new scorecard-focused operational remediation capabilities
+## 🧪 Test Suite 7: Performance and Scalability
+**Objective**: Test performance with enhanced capabilities and larger datasets
 
-### Test 7.1: Daily Remediation Status Review
-**Scenario**: Daily standup - security team needs to see OPEN vs UNDER_REVIEW issue status
-
-**Test Steps**:
-1. Ask: *"Give me a daily remediation dashboard for [domain]. Show me OPEN issues that need immediate attention and UNDER_REVIEW issues that are being worked on. Use the new status filtering capabilities."*
-
-**Expected Results**:
-- ✅ **NEW**: Clear separation of OPEN (actionable) vs UNDER_REVIEW (in progress) issues
-- ✅ Uses scorecard endpoints with status filtering for operational context
-- ✅ Shows significantly more issues than previous limited external view
-- ✅ Provides ready-to-action prioritization for daily workflows
-
-### Test 7.2: Team Assignment and Progress Tracking
-**Scenario**: Security team lead needs to track remediation progress and assign work
+### Test 7.1: Large Dataset Handling
+**Scenario**: Testing enhanced pagination and discovery with comprehensive data
 
 **Test Steps**:
-1. Ask: *"Show me all OPEN high-severity issues for [domain] that can be assigned to team members today. Then show me what's UNDER_REVIEW to track our progress."*
+1. Ask: *"Use the enhanced asset discovery to find all assets for a large organization. Test the pagination and comprehensive discovery capabilities."*
 
 **Expected Results**:
-- ✅ **NEW**: Operational status awareness for team management
-- ✅ High-priority OPEN issues ready for assignment
-- ✅ UNDER_REVIEW issues showing work in progress
-- ✅ Complete organizational visibility for team coordination
+- ✅ **SCALABILITY**: Handles large datasets efficiently with pagination
+- ✅ **COMPREHENSIVE**: Discovers significantly more assets than previous limitations
+- ✅ **PERFORMANCE**: Acceptable response times despite enhanced capabilities
+- ✅ **RELIABILITY**: Consistent performance across different data sizes
 
-### Test 7.3: Remediation Workflow State Transitions
-**Scenario**: Understanding how issues move through operational states
+### Test 7.2: Multi-Tool Workflow Performance
+**Scenario**: Testing performance when using multiple enhanced tools in sequence
 
 **Test Steps**:
-1. Ask: *"Use get_findings_by_category to show me ALL status issues for [domain], then help me understand the difference between OPEN, UNDER_REVIEW, and resolved issues for operational planning."*
+1. Ask: *"Perform a comprehensive analysis using asset discovery, detailed issue analysis, API diagnostics, and web UI gap analysis in sequence."*
 
 **Expected Results**:
-- ✅ **NEW**: Shows complete issue lifecycle states
-- ✅ Demonstrates operational remediation workflow support
-- ✅ Provides context for team planning and resource allocation
+- ✅ **INTEGRATION**: Smooth workflow across multiple enhanced tools
+- ✅ **PERFORMANCE**: Acceptable performance for complex multi-tool workflows
+- ✅ **RELIABILITY**: Consistent results across extended analysis sessions
+- ✅ **OPTIMIZATION**: Efficient resource usage and API call management
 
 ---
 
-## 🧪 Test Suite 8: Operational Workflow Integration
-**Objective**: Test real security team workflows with scorecard focus
+## 📊 Enhanced Success Criteria
 
-### Test 8.1: Weekly Security Review with Scorecard Focus
-**Scenario**: Weekly security team meeting - need comprehensive organizational status update
+### ✅ Tool Registration Validation (26 Tools)
+- All 26 enhanced tools respond correctly in Claude Desktop
+- No tool registration errors for new functionality
+- Proper parameter validation for all enhanced features
 
-**Test Steps**:
-1. Ask: *"Prepare a weekly security review for [domain] using our complete scorecard data. Include: OPEN critical issues, UNDER_REVIEW progress, quick wins available, and actions for this week using the new scorecard endpoints."*
+### 🚨 CRITICAL: Enhanced Discovery Validation
+- **Asset Discovery**: Significantly improved asset discovery through pagination and fallback
+- **Issue Analysis**: Comprehensive issue analysis with 3 specialized tools
+- **API Diagnostics**: Working endpoint discovery and validation capabilities
+- **Web UI Analysis**: Functional gap analysis and simulation tools
 
-**Expected Results**:
-- ✅ **ENHANCED**: Executive summary using complete organizational data (200+ assets)
-- ✅ **NEW**: OPEN vs UNDER_REVIEW status distinction for progress tracking
-- ✅ Complete organizational view vs. previous limited external monitoring
-- ✅ Operational workflow integration with status-aware recommendations
+### ✅ Enhanced Operational Capabilities
+- **Detailed Analysis**: Deep-dive asset analysis with comprehensive context
+- **API Intelligence**: Understanding of API capabilities and limitations
+- **Web UI Insights**: Knowledge of web interface vs API capability gaps
+- **Fallback Logic**: Reliable data access through multiple methods
 
-### Test 8.2: Incident Response with Complete Asset Visibility
-**Scenario**: Security incident - need rapid assessment with complete organizational asset visibility
+### ✅ Enhanced Error Handling & Reliability
+- **Automatic Fallback**: Seamless fallback between endpoint patterns
+- **Graceful Degradation**: Useful results even when primary methods fail
+- **Error Recovery**: Intelligent recovery and alternative approaches
+- **Consistent Performance**: Reliable results despite API limitations
 
-**Test Steps**:
-1. Ask: *"We have a security incident involving [specific domain/IP]. Use the new scorecard endpoints to give me complete organizational intel: what vulnerabilities exist across our full asset portfolio, risk profile, and immediate remediation priorities."*
+### ✅ Data Quality & Comprehensive Analysis
+- **Enhanced Discovery**: More comprehensive asset and issue discovery
+- **Detailed Context**: Rich context and insights through specialized tools
+- **API Intelligence**: Understanding of data access capabilities and limitations
+- **Actionable Insights**: Practical recommendations based on comprehensive analysis
 
-**Expected Results**:
-- ✅ **ENHANCED**: Rapid assessment using complete 200+ asset inventory
-- ✅ **NEW**: Full organizational context instead of limited external view
-- ✅ OPEN issue prioritization for immediate incident response
-- ✅ Complete vulnerability inventory for organizational impact assessment
-
----
-
-## 🧪 Test Suite 9: Advanced Scorecard API Functionality
-**Objective**: Test scorecard-focused API features and endpoint architecture
-
-### Test 9.1: Scorecard vs Companies Endpoint Testing
-**Scenario**: Validate architectural transformation - scorecard endpoints for own org vs companies for third-party
-
-**Test Steps**:
-1. Ask: *"Use call_api_endpoint to test `/scorecard/[domain]/factors` vs `/companies/[domain]/factors`. Compare the data - scorecard should show complete organizational factors while companies shows limited external view."*
-
-**Expected Results**:
-- ✅ **NEW**: Scorecard endpoints provide complete organizational factor data
-- ✅ **NEW**: Companies endpoints provide limited third-party monitoring view
-- ✅ Clear architectural distinction for operational vs external monitoring
-- ✅ Enhanced data depth for own organization analysis
-
-### Test 9.2: Large Organizational Dataset with Scorecard APIs
-**Scenario**: Large organization - test complete asset portfolio handling with scorecard endpoints
-
-**Test Steps**:
-1. Ask: *"Use the scorecard endpoints to find all assets and issues for [large organization domain]. This should now handle our complete 200+ domain portfolio efficiently."*
-
-**Expected Results**:
-- ✅ **ENHANCED**: Handles 200+ organizational assets efficiently (vs. previous 100-asset limit)
-- ✅ **NEW**: Uses scorecard endpoint pagination for complete data retrieval
-- ✅ Performance acceptable for large organizational datasets
-- ✅ Complete remediation data access for operational planning
+### ✅ Performance & Scalability
+- **Enhanced Pagination**: Efficient handling of large datasets
+- **Multi-Tool Integration**: Smooth workflow across multiple specialized tools
+- **Resource Optimization**: Efficient API usage and call management
+- **Consistent Response**: Reliable performance across different scenarios
 
 ---
 
-## 📊 Success Criteria
+## 🚨 Known Capabilities & Limitations
 
-### ✅ Tool Registration Validation
-- All 13 tools respond correctly in Claude Desktop
-- No tool registration errors  
-- Proper parameter validation including new status filtering
+### Enhanced Capabilities
+- **26 Specialized Tools**: Comprehensive security analysis and operations support
+- **Advanced Discovery**: Multiple discovery methods with pagination and fallback
+- **API Intelligence**: Understanding of endpoint capabilities and limitations
+- **Web UI Analysis**: Insights into web interface vs API capability gaps
+- **Robust Error Handling**: Automatic fallback and graceful degradation
 
-### 🚨 CRITICAL: Scorecard Architecture Validation
-- **Asset Discovery**: Finds 150-200+ domains (vs. previous 100-asset limit)
-- **API Architecture**: Uses `/scorecard/{domain}/` endpoints for own organization
-- **Status Filtering**: OPEN/UNDER_REVIEW/ALL operational status filtering works
-- **Complete Visibility**: Accesses full organizational asset portfolio vs. limited external view
+### API Limitations (Now Addressed)
+- **Endpoint Failures**: Handled through automatic fallback logic
+- **Data Access Gaps**: Identified and addressed through alternative methods
+- **Rate Limiting**: Managed through intelligent request patterns
+- **Discovery Limits**: Overcome through enhanced pagination and discovery methods
 
-### ✅ Enhanced Organizational Discovery
-- **CRITICAL**: Discovers complete organizational asset portfolio (200+ domains expected)
-- Finds IP addresses using scorecard endpoint priority
-- Demonstrates clear improvement over previous companies-based limitations
-- Shows internal organizational visibility vs. external monitoring
-
-### ✅ Operational Remediation Workflow Support  
-- **NEW**: OPEN vs UNDER_REVIEW status separation for daily workflows
-- **NEW**: Team assignment and progress tracking capabilities
-- **ENHANCED**: Operational context for security team management
-- Delivers results in operational timeframes with status awareness
-
-### ✅ Data Quality & Accuracy with Complete Context
-- **ENHANCED**: Returns accurate findings from complete organizational asset base
-- **NEW**: Proper operational status categorization (OPEN/UNDER_REVIEW)
-- **ENHANCED**: Priority assignments with full organizational context
-- Significantly more comprehensive data than previous external monitoring approach
-
-### ✅ Performance & Reliability at Organizational Scale
-- **NEW**: Handles complete organizational datasets (200+ assets) efficiently  
-- **ENHANCED**: Scorecard endpoint performance for large asset portfolios
-- Graceful error handling with fallback to companies endpoints
-- Consistent response times despite increased data volume
-
----
-
-## 🚨 Known Issues & Limitations
-
-### API Rate Limiting
-- SecurityScorecard API has rate limits
-- Large organizations may hit limits during comprehensive scans
-- Built-in throttling should handle this gracefully
-
-### Data Availability
-- Some domains may have limited SecurityScorecard data
-- IP address availability depends on SecurityScorecard's scanning coverage
-- Historical data may be limited for newer domains
-
-### Asset Discovery Scope
-- Discovery limited to assets monitored by SecurityScorecard
-- Internal/private assets may not be visible
-- Asset-to-IP mappings depend on DNS resolution and scanning
+### Web Interface vs API Gaps (Now Analyzed)
+- **Capability Mapping**: Tools now identify web UI vs API capability differences
+- **Alternative Access**: Simulation tools attempt to bridge capability gaps
+- **Workaround Strategies**: Recommendations for accessing web UI-equivalent data
+- **Gap Analysis**: Clear understanding of what's possible vs limitations
 
 ---
 
 ## 📝 Test Execution Notes
 
-### Test Environment Setup
-1. Ensure Claude Desktop is connected to SecurityScorecard MCP
-2. Verify API token has appropriate permissions
-3. Use a domain with sufficient SecurityScorecard data
-4. Document any errors or unexpected behaviors
+### Enhanced Test Environment Setup
+1. Ensure Claude Desktop is connected to SecurityScorecard MCP with all 26 tools
+2. Verify API token has appropriate permissions for comprehensive testing
+3. Use neste.com for comprehensive testing (known good test domain)
+4. Document performance and capability improvements
 
-### Test Data Requirements
-- **Small Organization**: < 10 assets (basic functionality testing)
-- **Medium Organization**: 10-50 assets (standard workflow testing)  
-- **Large Organization**: > 50 assets (enhanced discovery testing)
+### Enhanced Test Data Requirements
+- **Comprehensive Testing**: Use domains with substantial security data
+- **API Limitation Testing**: Test scenarios that previously failed
+- **Multi-Tool Workflows**: Test complex workflows using multiple enhanced tools
+- **Performance Testing**: Test with varying dataset sizes
 
-### Documentation
-- Record all test results
-- Note any performance issues
-- Document workarounds for limitations
-- Capture screenshots of successful operations
+### Enhanced Documentation
+- Record improvements in data discovery and analysis capabilities
+- Note performance enhancements and reliability improvements
+- Document new insights from API diagnostics and web UI analysis
+- Capture examples of successful fallback logic and error recovery
 
 ---
 
-## 🎯 Test Completion Checklist
+## 🎯 Enhanced Test Completion Checklist
 
-- [ ] **Suite 1**: Scorecard-Focused Asset Discovery (2 tests) 🚨 CRITICAL
-- [ ] **Suite 2**: IP Address Analysis (2 tests)  
-- [ ] **Suite 3**: Specific Vulnerability Hunting with Status Filtering (3 tests) 🚨 CRITICAL
-- [ ] **Suite 4**: ROI-Based Prioritization (2 tests)
-- [ ] **Suite 5**: Asset Comparison & Risk Assessment (2 tests)
-- [ ] **Suite 6**: Detailed Asset Analysis (2 tests)
-- [ ] **Suite 7**: Operational Remediation Workflows (3 tests) 🚨 NEW
-- [ ] **Suite 8**: Operational Workflow Integration (2 tests)
-- [ ] **Suite 9**: Advanced Scorecard API Functionality (2 tests) 🚨 NEW
+- [ ] **Suite 1**: Enhanced Asset Discovery & Analysis (2 tests) 🚨 CRITICAL
+- [ ] **Suite 2**: API Diagnostic and Validation Tools (2 tests) 🚨 NEW
+- [ ] **Suite 3**: Web Interface Analysis Tools (2 tests) 🚨 NEW  
+- [ ] **Suite 4**: Enhanced Error Handling and Fallback Logic (2 tests) 🚨 ENHANCED
+- [ ] **Suite 5**: Operational Workflow Integration (2 tests)
+- [ ] **Suite 6**: Legacy Tool Validation (2 tests)
+- [ ] **Suite 7**: Performance and Scalability (2 tests)
 
-**Total**: 20 operational test scenarios covering scorecard-focused remediation capabilities
+**Total**: 14 comprehensive test scenarios covering all enhanced capabilities
 
 ### 🚨 CRITICAL TESTS (Must Pass)
-- **Suite 1.1**: Complete Organizational Asset Inventory (200+ domains expected)
-- **Suite 1.2**: Scorecard vs Companies Endpoint Comparison  
-- **Suite 3.1**: SPF Records with OPEN/UNDER_REVIEW Status Filtering
-- **Suite 7.1-7.3**: Operational Remediation Workflow Tests
+- **Suite 1.1-1.2**: Enhanced Asset Discovery & Detailed Issue Analysis
+- **Suite 2.1-2.2**: API Diagnostic and Validation Tools
+- **Suite 3.1-3.2**: Web Interface Analysis Tools
+- **Suite 4.1-4.2**: Enhanced Error Handling and Fallback Logic
 
 ---
 
-## 📈 Expected Outcomes
+## 📈 Expected Enhanced Outcomes
 
-Upon successful completion of this test plan:
+Upon successful completion of this enhanced test plan:
 
-1. **🚨 CRITICAL VALIDATION**: Complete organizational asset discovery (150-200+ domains vs. previous 100-asset limit)
-2. **🚨 ARCHITECTURAL CONFIRMATION**: Scorecard endpoints provide complete organizational view vs. limited external monitoring
-3. **🚨 OPERATIONAL ENHANCEMENT**: OPEN/UNDER_REVIEW status filtering enables true remediation workflows
-4. **ENHANCED CAPABILITY**: IP address discovery with complete organizational context  
-5. **WORKFLOW INTEGRATION**: Operational security team workflows with status-aware prioritization
-6. **PERFORMANCE VALIDATION**: Large organizational dataset handling (200+ assets)
-7. **DOCUMENTATION**: Real-world usage patterns for operational remediation
-8. **ISSUE RESOLUTION**: Confirmation that critical asset under-reporting issue is resolved
+1. **🚨 COMPREHENSIVE CAPABILITY**: 26 specialized tools providing complete security operations support
+2. **🚨 ENHANCED DISCOVERY**: Significantly improved asset and issue discovery through advanced methods
+3. **🚨 API INTELLIGENCE**: Complete understanding of API capabilities, limitations, and workarounds
+4. **🚨 WEB UI ANALYSIS**: Insights into web interface capabilities and API accessibility gaps
+5. **🚨 ROBUST ERROR HANDLING**: Reliable data access through automatic fallback and recovery mechanisms
+6. **OPERATIONAL EXCELLENCE**: Complete workflows for security analysis, assessment, and remediation
+7. **PERFORMANCE OPTIMIZATION**: Efficient handling of large datasets and complex multi-tool workflows
+8. **COMPREHENSIVE INSIGHTS**: Deep understanding of security posture through specialized analysis tools
 
-### 🎯 SUCCESS INDICATORS
-- **Asset Discovery**: 2x+ improvement in discovered assets (100 → 200+ domains)
-- **Operational Status**: Clear OPEN/UNDER_REVIEW separation for team workflows  
-- **API Architecture**: Successful scorecard-first approach vs. companies fallback
-- **Remediation Focus**: Own organization operational capabilities vs. external monitoring
-- **Team Integration**: Ready-to-use workflows for daily security operations
+### 🎯 ENHANCED SUCCESS INDICATORS
+- **Tool Capability**: 26/26 tools functional with enhanced capabilities
+- **Discovery Enhancement**: Significantly improved asset and issue discovery rates
+- **API Intelligence**: Working diagnostic and validation capabilities
+- **Web UI Analysis**: Functional gap analysis and simulation tools
+- **Reliability**: Consistent results through robust error handling and fallback logic
+- **Performance**: Efficient operation across all enhanced capabilities
 
-This updated test plan validates the MCP's transformation from external company monitoring to **scorecard-focused operational remediation** for your own organization's security team workflows.
+This comprehensive test plan validates the MCP's transformation into a **complete security operations suite** with 26 specialized tools for comprehensive security analysis, assessment, and remediation workflows.
