@@ -866,6 +866,31 @@ export class ScoreImpactSecurityScorecardServer {
           }
         },
         {
+          name: "analyze_web_ui_gaps",
+          description: "🌐 WEB INTERFACE GAP ANALYSIS: Compare web UI capabilities vs API accessibility:\n• Identifies data visible in web interface but not accessible via API\n• Analyzes feature gaps between web UI and API integration\n• Provides workarounds for accessing web-only data programmatically\n• Documents UI-API feature parity and limitations\n• Essential for understanding full SecurityScorecard capability scope",
+          inputSchema: {
+            type: "object",
+            properties: {
+              domain: { type: "string", description: "Domain to analyze web UI vs API gaps for.", default: this.config.defaultDomain },
+              focus_area: { type: "string", enum: ["asset_details", "issue_analysis", "scorecard_features", "comprehensive"], default: "comprehensive", description: "Specific area to focus web UI gap analysis on" }
+            },
+            required: ["domain"]
+          }
+        },
+        {
+          name: "simulate_web_ui_access",
+          description: "🔍 WEB UI ACCESS SIMULATION: Attempt to replicate web interface data access patterns:\n• Tests alternative API patterns that may replicate web UI data\n• Explores undocumented endpoint patterns based on web interface behavior\n• Provides data aggregation strategies to match web UI insights\n• Documents successful patterns for accessing comprehensive data\n• Bridges gap between UI capabilities and API integration possibilities",
+          inputSchema: {
+            type: "object",
+            properties: {
+              domain: { type: "string", description: "Domain to test web UI access patterns for.", default: this.config.defaultDomain },
+              target_feature: { type: "string", enum: ["detailed_ip_issues", "comprehensive_asset_view", "advanced_scoring", "all_features"], default: "all_features", description: "Specific web UI feature to simulate API access for" },
+              experimental_mode: { type: "boolean", default: false, description: "Enable experimental endpoint testing (may increase API usage)" }
+            },
+            required: ["domain"]
+          }
+        },
+        {
           name: "validate_endpoint_access",
           description: "✅ ENDPOINT VALIDATION: Test specific API endpoint accessibility and functionality:\n• Validates endpoint syntax and availability\n• Tests authentication and permission levels\n• Checks response format and data quality\n• Provides troubleshooting recommendations for failed endpoints\n• Useful for debugging API integration issues",
           inputSchema: {
@@ -1105,6 +1130,25 @@ export class ScoreImpactSecurityScorecardServer {
           
           return await this.executeTool("analyze_api_limitations", () =>
             this.analyzeAPILimitations(domain, focusArea)
+          );
+        }
+
+        case "analyze_web_ui_gaps": {
+          const domain = this.sanitizeDomain(rawDomain);
+          const focusArea = (request.params.arguments?.focus_area as 'asset_details' | 'issue_analysis' | 'scorecard_features' | 'comprehensive') || 'comprehensive';
+          
+          return await this.executeTool("analyze_web_ui_gaps", () =>
+            this.analyzeWebUIGaps(domain, focusArea)
+          );
+        }
+
+        case "simulate_web_ui_access": {
+          const domain = this.sanitizeDomain(rawDomain);
+          const targetFeature = (request.params.arguments?.target_feature as 'detailed_ip_issues' | 'comprehensive_asset_view' | 'advanced_scoring' | 'all_features') || 'all_features';
+          const experimentalMode = (request.params.arguments?.experimental_mode as boolean) ?? false;
+          
+          return await this.executeTool("simulate_web_ui_access", () =>
+            this.simulateWebUIAccess(domain, targetFeature, experimentalMode)
           );
         }
 
@@ -3040,6 +3084,746 @@ export class ScoreImpactSecurityScorecardServer {
    */
   private delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  /**
+   * TASK 6: WEB INTERFACE API UNDERSTANDING FUNCTIONS
+   */
+
+  /**
+   * Analyze gaps between web UI capabilities and API accessibility
+   */
+  private async analyzeWebUIGaps(domain: string, focusArea: 'asset_details' | 'issue_analysis' | 'scorecard_features' | 'comprehensive'): Promise<any> {
+    domain = this.sanitizeDomain(domain);
+    this.log(`Analyzing web UI vs API gaps for ${domain}, focus: ${focusArea}`);
+    
+    const gapAnalysis = {
+      domain: domain,
+      focus_area: focusArea,
+      timestamp: new Date().toISOString(),
+      identified_gaps: [] as any[],
+      workaround_strategies: [] as any[],
+      feature_parity_score: 0,
+      recommendations: [] as string[]
+    };
+    
+    // Define web UI capabilities we know exist but may not be accessible via API
+    const webUICapabilities = this.getKnownWebUICapabilities();
+    
+    // Filter capabilities based on focus area
+    const relevantCapabilities = this.filterCapabilitiesByFocus(webUICapabilities, focusArea);
+    
+    this.log(`Testing ${relevantCapabilities.length} web UI capabilities for API accessibility`);
+    
+    // Test each capability for API accessibility
+    for (const capability of relevantCapabilities) {
+      await this.testCapabilityAPIAccess(capability, domain, gapAnalysis);
+      
+      // Rate limiting
+      await this.delay(200);
+    }
+    
+    // Calculate feature parity score
+    const accessibleCapabilities = gapAnalysis.identified_gaps.filter(gap => gap.api_accessible).length;
+    gapAnalysis.feature_parity_score = Math.round((accessibleCapabilities / relevantCapabilities.length) * 100);
+    
+    // Generate workaround strategies
+    gapAnalysis.workaround_strategies = this.generateWorkaroundStrategies(gapAnalysis.identified_gaps);
+    
+    // Generate strategic recommendations
+    gapAnalysis.recommendations = this.generateGapAnalysisRecommendations(gapAnalysis);
+    
+    // Generate comprehensive report
+    const report = this.generateWebUIGapReport(gapAnalysis);
+    
+    return {
+      content: [{ type: "text", text: report }]
+    };
+  }
+
+  /**
+   * Simulate web UI access patterns using alternative API approaches
+   */
+  private async simulateWebUIAccess(domain: string, targetFeature: 'detailed_ip_issues' | 'comprehensive_asset_view' | 'advanced_scoring' | 'all_features', experimentalMode: boolean): Promise<any> {
+    domain = this.sanitizeDomain(domain);
+    this.log(`Simulating web UI access patterns for ${domain}, target: ${targetFeature}, experimental: ${experimentalMode}`);
+    
+    const simulationResults = {
+      domain: domain,
+      target_feature: targetFeature,
+      experimental_mode: experimentalMode,
+      timestamp: new Date().toISOString(),
+      simulation_attempts: [] as any[],
+      successful_patterns: [] as any[],
+      failed_patterns: [] as any[],
+      data_aggregation_strategies: [] as any[],
+      success_rate: 0
+    };
+    
+    // Define simulation patterns based on target feature
+    const simulationPatterns = this.getSimulationPatterns(targetFeature, experimentalMode);
+    
+    this.log(`Testing ${simulationPatterns.length} simulation patterns`);
+    
+    // Test each simulation pattern
+    for (const pattern of simulationPatterns) {
+      await this.testSimulationPattern(pattern, domain, simulationResults);
+      
+      // Rate limiting - more conservative for experimental mode
+      await this.delay(experimentalMode ? 400 : 250);
+    }
+    
+    // Calculate success rate
+    simulationResults.success_rate = Math.round((simulationResults.successful_patterns.length / simulationResults.simulation_attempts.length) * 100);
+    
+    // Generate data aggregation strategies
+    simulationResults.data_aggregation_strategies = this.generateDataAggregationStrategies(simulationResults.successful_patterns);
+    
+    // Generate comprehensive report
+    const report = this.generateWebUISimulationReport(simulationResults);
+    
+    return {
+      content: [{ type: "text", text: report }]
+    };
+  }
+
+  /**
+   * Helper methods for web UI analysis
+   */
+
+  private getKnownWebUICapabilities(): any[] {
+    return [
+      {
+        category: 'asset_details',
+        capability: 'detailed_ip_security_analysis',
+        description: 'Detailed security issues for specific IP addresses (300+ issues visible)',
+        expected_endpoints: [
+          '/companies/{domain}/issues?ip={ip}',
+          '/scorecard/{domain}/assets/ip/{ip}/issues',
+          '/footprint/{domain}/assets/ips/{ip}/details'
+        ],
+        web_ui_evidence: '300+ issues visible for IP 34.107.205.171 in web interface',
+        criticality: 'high'
+      },
+      {
+        category: 'asset_details', 
+        capability: 'comprehensive_asset_inventory',
+        description: 'Complete asset inventory with detailed scoring per asset',
+        expected_endpoints: [
+          '/companies/{domain}/assets/detailed',
+          '/scorecard/{domain}/portfolio/assets',
+          '/footprint/{domain}/inventory/complete'
+        ],
+        web_ui_evidence: 'Web UI shows individual asset scores and detailed breakdowns',
+        criticality: 'high'
+      },
+      {
+        category: 'issue_analysis',
+        capability: 'issue_timeline_analysis',
+        description: 'Historical issue trends and resolution tracking',
+        expected_endpoints: [
+          '/companies/{domain}/issues/timeline',
+          '/companies/{domain}/history/issues',
+          '/scorecard/{domain}/trends/issues'
+        ],
+        web_ui_evidence: 'Web UI displays issue discovery dates and resolution status',
+        criticality: 'medium'
+      },
+      {
+        category: 'issue_analysis',
+        capability: 'detailed_remediation_guidance',
+        description: 'Specific remediation steps and technical guidance per issue',
+        expected_endpoints: [
+          '/companies/{domain}/issues/{issue_id}/remediation',
+          '/guidance/remediation/{issue_type}',
+          '/issues/{issue_id}/technical_details'
+        ],
+        web_ui_evidence: 'Web UI provides detailed technical remediation guidance',
+        criticality: 'high'
+      },
+      {
+        category: 'scorecard_features',
+        capability: 'peer_comparison_analysis',
+        description: 'Industry peer comparison and benchmarking data',
+        expected_endpoints: [
+          '/companies/{domain}/peers/comparison',
+          '/benchmarks/{domain}/industry',
+          '/scorecard/{domain}/competitive_analysis'
+        ],
+        web_ui_evidence: 'Web UI shows industry percentile rankings and peer comparisons',
+        criticality: 'medium'
+      },
+      {
+        category: 'scorecard_features',
+        capability: 'executive_dashboard_metrics',
+        description: 'Executive summary metrics and KPI dashboards',
+        expected_endpoints: [
+          '/companies/{domain}/executive/summary',
+          '/scorecard/{domain}/kpis',
+          '/dashboard/{domain}/executive'
+        ],
+        web_ui_evidence: 'Web UI provides executive-level summary dashboards',
+        criticality: 'low'
+      }
+    ];
+  }
+
+  private filterCapabilitiesByFocus(capabilities: any[], focusArea: string): any[] {
+    if (focusArea === 'comprehensive') {
+      return capabilities;
+    }
+    return capabilities.filter(cap => cap.category === focusArea);
+  }
+
+  private async testCapabilityAPIAccess(capability: any, domain: string, gapAnalysis: any): Promise<void> {
+    this.log(`Testing capability: ${capability.capability}`);
+    
+    const gapEntry = {
+      capability: capability.capability,
+      description: capability.description,
+      category: capability.category,
+      criticality: capability.criticality,
+      web_ui_evidence: capability.web_ui_evidence,
+      api_accessible: false,
+      tested_endpoints: [] as any[],
+      working_endpoints: [] as any[],
+      potential_workarounds: [] as string[]
+    };
+    
+    // Test each expected endpoint
+    for (const endpointTemplate of capability.expected_endpoints) {
+      const endpoint = endpointTemplate.replace('{domain}', domain).replace('{ip}', '1.1.1.1').replace('{issue_id}', '12345');
+      
+      try {
+        const response = await this.makeRequestWithTimeout(endpoint, 'GET', null, 5000);
+        const dataPoints = this.countDataPoints(response);
+        
+        const endpointResult = {
+          endpoint: endpoint,
+          status: 'accessible',
+          data_points: dataPoints,
+          has_meaningful_data: dataPoints > 0,
+          response_structure: this.analyzeResponseStructure(response)
+        };
+        
+        gapEntry.tested_endpoints.push(endpointResult);
+        
+        if (dataPoints > 0) {
+          gapEntry.working_endpoints.push(endpointResult);
+          gapEntry.api_accessible = true;
+        }
+        
+        this.log(`✅ ${endpoint}: ${dataPoints} data points`);
+        
+      } catch (error: any) {
+        const endpointResult = {
+          endpoint: endpoint,
+          status: 'failed',
+          error_category: this.categorizeEndpointError(error),
+          error_message: error.message
+        };
+        
+        gapEntry.tested_endpoints.push(endpointResult);
+        this.log(`❌ ${endpoint}: ${error.message}`);
+      }
+    }
+    
+    // If no endpoints work, suggest potential workarounds
+    if (!gapEntry.api_accessible) {
+      gapEntry.potential_workarounds = this.suggestCapabilityWorkarounds(capability);
+    }
+    
+    gapAnalysis.identified_gaps.push(gapEntry);
+  }
+
+  private getSimulationPatterns(targetFeature: string, experimentalMode: boolean): any[] {
+    const basePatterns = [
+      {
+        pattern_name: 'aggregated_data_approach',
+        description: 'Combine multiple API calls to replicate web UI data',
+        target_features: ['detailed_ip_issues', 'comprehensive_asset_view', 'all_features'],
+        endpoints: [
+          '/companies/{domain}/issues',
+          '/companies/{domain}/factors', 
+          '/footprint/{domain}/assets/ips',
+          '/footprint/{domain}/assets/domains'
+        ],
+        aggregation_logic: 'cross_reference_and_filter'
+      },
+      {
+        pattern_name: 'hierarchical_discovery',
+        description: 'Use parent-child relationships to find detailed data',
+        target_features: ['comprehensive_asset_view', 'advanced_scoring', 'all_features'],
+        endpoints: [
+          '/parent-domains/{domain}/domains',
+          '/parent-domains/{domain}/ips',
+          '/companies/{domain}/subsidiaries'
+        ],
+        aggregation_logic: 'hierarchical_traversal',
+        method: 'POST'
+      },
+      {
+        pattern_name: 'temporal_data_mining',
+        description: 'Mine historical data endpoints for comprehensive insights',
+        target_features: ['advanced_scoring', 'all_features'],
+        endpoints: [
+          '/companies/{domain}/history',
+          '/companies/{domain}/scores/historical',
+          '/scorecard/{domain}/timeline'
+        ],
+        aggregation_logic: 'temporal_analysis'
+      }
+    ];
+    
+    if (experimentalMode) {
+      basePatterns.push(
+        {
+          pattern_name: 'undocumented_endpoint_exploration',
+          description: 'Test potential undocumented endpoints based on web UI patterns',
+          target_features: ['detailed_ip_issues', 'all_features'],
+          endpoints: [
+            '/api/v1/companies/{domain}/assets/detailed',
+            '/internal/{domain}/security/comprehensive',
+            '/web/{domain}/assets/full-report',
+            '/scorecard-api/{domain}/detailed-analysis'
+          ],
+          aggregation_logic: 'experimental_discovery'
+        },
+        {
+          pattern_name: 'reverse_engineered_patterns',
+          description: 'Test API patterns reverse-engineered from web UI behavior',
+          target_features: ['detailed_ip_issues', 'comprehensive_asset_view', 'all_features'],
+          endpoints: [
+            '/graphql',
+            '/api/internal/scorecard/{domain}',
+            '/v2/companies/{domain}/full-profile',
+            '/platform/{domain}/analytics'
+          ],
+          aggregation_logic: 'reverse_engineering'
+        }
+      );
+    }
+    
+    // Filter patterns by target feature
+    return basePatterns.filter(pattern => 
+      pattern.target_features.includes(targetFeature) || targetFeature === 'all_features'
+    );
+  }
+
+  private async testSimulationPattern(pattern: any, domain: string, results: any): Promise<void> {
+    this.log(`Testing simulation pattern: ${pattern.pattern_name}`);
+    
+    const attemptResult = {
+      pattern_name: pattern.pattern_name,
+      description: pattern.description,
+      aggregation_logic: pattern.aggregation_logic,
+      endpoints_tested: [] as any[],
+      successful_endpoints: [] as any[],
+      aggregated_data_available: false,
+      data_quality_score: 0,
+      replication_success: false
+    };
+    
+    let totalDataPoints = 0;
+    let workingEndpoints = 0;
+    
+    // Test each endpoint in the pattern
+    for (const endpointTemplate of pattern.endpoints) {
+      const endpoint = endpointTemplate.replace('{domain}', domain);
+      const method = pattern.method || 'GET';
+      
+      try {
+        const testBody = method === 'POST' ? {} : null;
+        const response = await this.makeRequestWithTimeout(endpoint, method, testBody, 8000);
+        const dataPoints = this.countDataPoints(response);
+        
+        const endpointResult = {
+          endpoint: endpoint,
+          method: method,
+          status: 'success',
+          data_points: dataPoints,
+          response_structure: this.analyzeResponseStructure(response)
+        };
+        
+        attemptResult.endpoints_tested.push(endpointResult);
+        
+        if (dataPoints > 0) {
+          attemptResult.successful_endpoints.push(endpointResult);
+          totalDataPoints += dataPoints;
+          workingEndpoints++;
+        }
+        
+        this.log(`✅ ${endpoint}: ${dataPoints} data points`);
+        
+      } catch (error: any) {
+        const endpointResult = {
+          endpoint: endpoint,
+          method: method,
+          status: 'failed',
+          error_category: this.categorizeEndpointError(error),
+          error_message: error.message
+        };
+        
+        attemptResult.endpoints_tested.push(endpointResult);
+        this.log(`❌ ${endpoint}: ${error.message}`);
+      }
+    }
+    
+    // Assess pattern success
+    if (workingEndpoints > 0) {
+      attemptResult.aggregated_data_available = true;
+      attemptResult.data_quality_score = Math.min(100, Math.round((totalDataPoints / pattern.endpoints.length) * 10));
+      
+      // Consider pattern successful if it provides meaningful data aggregation
+      if (workingEndpoints >= 2 || totalDataPoints >= 50) {
+        attemptResult.replication_success = true;
+        results.successful_patterns.push(attemptResult);
+        this.log(`✅ Pattern '${pattern.pattern_name}' successful: ${workingEndpoints} endpoints, ${totalDataPoints} total data points`);
+      } else {
+        results.failed_patterns.push(attemptResult);
+      }
+    } else {
+      results.failed_patterns.push(attemptResult);
+    }
+    
+    results.simulation_attempts.push(attemptResult);
+  }
+
+  private generateWorkaroundStrategies(identifiedGaps: any[]): any[] {
+    const strategies = [];
+    
+    const highPriorityGaps = identifiedGaps.filter(gap => gap.criticality === 'high' && !gap.api_accessible);
+    
+    for (const gap of highPriorityGaps) {
+      switch (gap.capability) {
+        case 'detailed_ip_security_analysis':
+          strategies.push({
+            gap: gap.capability,
+            strategy: 'aggregated_filtering_approach',
+            description: 'Get all domain issues and filter by IP address to approximate detailed IP analysis',
+            implementation: 'Use /companies/{domain}/issues + client-side filtering',
+            effectiveness: 'medium'
+          });
+          break;
+        case 'comprehensive_asset_inventory':
+          strategies.push({
+            gap: gap.capability,
+            strategy: 'multi_endpoint_aggregation',
+            description: 'Combine multiple asset discovery endpoints to build comprehensive inventory',
+            implementation: 'Aggregate /footprint/{domain}/assets/* endpoints',
+            effectiveness: 'high'
+          });
+          break;
+        case 'detailed_remediation_guidance':
+          strategies.push({
+            gap: gap.capability,
+            strategy: 'knowledge_base_integration',
+            description: 'Integrate external remediation knowledge bases with issue data',
+            implementation: 'Map issue types to external remediation databases',
+            effectiveness: 'medium'
+          });
+          break;
+      }
+    }
+    
+    return strategies;
+  }
+
+  private generateDataAggregationStrategies(successfulPatterns: any[]): any[] {
+    const strategies = [];
+    
+    for (const pattern of successfulPatterns) {
+      switch (pattern.aggregation_logic) {
+        case 'cross_reference_and_filter':
+          strategies.push({
+            strategy_name: 'cross_reference_data_fusion',
+            description: 'Cross-reference data from multiple endpoints to create comprehensive views',
+            pattern_source: pattern.pattern_name,
+            implementation_steps: [
+              '1. Fetch data from all working endpoints in parallel',
+              '2. Create correlation keys (domain, IP, issue ID)',  
+              '3. Merge and deduplicate correlated records',
+              '4. Apply business logic for data prioritization'
+            ],
+            data_sources: pattern.successful_endpoints.map((e: any) => e.endpoint),
+            estimated_completeness: '70-85%'
+          });
+          break;
+        case 'hierarchical_traversal':
+          strategies.push({
+            strategy_name: 'hierarchical_data_discovery',
+            description: 'Use parent-child relationships to discover and organize comprehensive data',
+            pattern_source: pattern.pattern_name,
+            implementation_steps: [
+              '1. Start with parent domain endpoints',
+              '2. Discover child assets and relationships',
+              '3. Traverse hierarchy to collect detailed data',
+              '4. Build complete organizational asset tree'
+            ],
+            data_sources: pattern.successful_endpoints.map((e: any) => e.endpoint),
+            estimated_completeness: '60-75%'
+          });
+          break;
+        case 'temporal_analysis':
+          strategies.push({
+            strategy_name: 'temporal_data_synthesis',
+            description: 'Analyze historical data trends to infer current comprehensive state',
+            pattern_source: pattern.pattern_name,
+            implementation_steps: [
+              '1. Collect historical data snapshots',
+              '2. Analyze trends and patterns over time',
+              '3. Project current state from historical trends',
+              '4. Validate projections with current data points'
+            ],
+            data_sources: pattern.successful_endpoints.map((e: any) => e.endpoint),
+            estimated_completeness: '55-70%'
+          });
+          break;
+      }
+    }
+    
+    return strategies;
+  }
+
+  private suggestCapabilityWorkarounds(capability: any): string[] {
+    const workarounds = [];
+    
+    switch (capability.capability) {
+      case 'detailed_ip_security_analysis':
+        workarounds.push('Use general domain issues endpoint with IP filtering');
+        workarounds.push('Combine asset discovery with factor analysis for IP context');
+        workarounds.push('Implement client-side aggregation of IP-related data points');
+        break;
+      case 'comprehensive_asset_inventory':
+        workarounds.push('Aggregate multiple asset discovery endpoints');
+        workarounds.push('Use pagination to overcome API result limits');
+        workarounds.push('Combine footprint and company endpoints for complete view');
+        break;
+      case 'detailed_remediation_guidance':
+        workarounds.push('Map issue types to external remediation knowledge bases');
+        workarounds.push('Use issue factor information to infer remediation approaches');
+        workarounds.push('Implement custom remediation logic based on issue patterns');
+        break;
+      case 'peer_comparison_analysis':
+        workarounds.push('Collect industry benchmark data from external sources');
+        workarounds.push('Use factor scores to approximate peer positioning');
+        workarounds.push('Implement custom benchmarking against known industry standards');
+        break;
+      default:
+        workarounds.push('Implement custom aggregation logic using available endpoints');
+        workarounds.push('Consider external data sources to fill gaps');
+        workarounds.push('Use approximation techniques based on available data');
+    }
+    
+    return workarounds;
+  }
+
+  private generateGapAnalysisRecommendations(gapAnalysis: any): string[] {
+    const recommendations = [];
+    const parityScore = gapAnalysis.feature_parity_score;
+    
+    if (parityScore >= 80) {
+      recommendations.push('✅ Excellent web UI-API parity - most capabilities accessible via API');
+      recommendations.push('💡 Focus on optimizing existing API integrations');
+      recommendations.push('🔄 Implement data aggregation for remaining gaps');
+    } else if (parityScore >= 60) {
+      recommendations.push('⚠️ Good API coverage with some web UI gaps');
+      recommendations.push('🛠️ Implement workaround strategies for high-priority gaps');
+      recommendations.push('📊 Consider hybrid approach using available data sources');
+    } else if (parityScore >= 40) {
+      recommendations.push('🔴 Significant gaps between web UI and API capabilities');
+      recommendations.push('🔀 Prioritize workarounds for critical business functions');
+      recommendations.push('📞 Contact SecurityScorecard for API capability expansion');
+    } else {
+      recommendations.push('🚨 Major limitations in API vs web UI feature parity');
+      recommendations.push('🏗️ Consider web scraping or alternative integration approaches');
+      recommendations.push('💼 Evaluate business impact of limited API capabilities');
+    }
+    
+    const criticalGaps = gapAnalysis.identified_gaps.filter((gap: any) => 
+      gap.criticality === 'high' && !gap.api_accessible
+    ).length;
+    
+    if (criticalGaps > 0) {
+      recommendations.push(`⚠️ ${criticalGaps} critical capabilities not accessible via API`);
+      recommendations.push('📋 Review workaround strategies for critical gaps');
+    }
+    
+    return recommendations;
+  }
+
+  private generateWebUIGapReport(gapAnalysis: any): string {
+    let report = `# 🌐 WEB INTERFACE GAP ANALYSIS: ${gapAnalysis.domain}\n\n`;
+    
+    // Overview
+    report += `## 📊 ANALYSIS OVERVIEW\n\n`;
+    report += `**Focus Area**: ${gapAnalysis.focus_area.replace('_', ' ').toUpperCase()}\n`;
+    report += `**Feature Parity Score**: ${gapAnalysis.feature_parity_score}%\n`;
+    report += `**Capabilities Analyzed**: ${gapAnalysis.identified_gaps.length}\n`;
+    report += `**API Accessible**: ${gapAnalysis.identified_gaps.filter((g: any) => g.api_accessible).length}\n`;
+    report += `**Gaps Identified**: ${gapAnalysis.identified_gaps.filter((g: any) => !g.api_accessible).length}\n`;
+    report += `**Analysis Date**: ${gapAnalysis.timestamp}\n\n`;
+    
+    // Gap breakdown
+    const criticalGaps = gapAnalysis.identified_gaps.filter((g: any) => g.criticality === 'high' && !g.api_accessible);
+    const mediumGaps = gapAnalysis.identified_gaps.filter((g: any) => g.criticality === 'medium' && !g.api_accessible);
+    const accessibleCapabilities = gapAnalysis.identified_gaps.filter((g: any) => g.api_accessible);
+    
+    if (criticalGaps.length > 0) {
+      report += `## 🚨 CRITICAL GAPS (${criticalGaps.length})\n\n`;
+      criticalGaps.forEach((gap: any, index: number) => {
+        report += `### ${index + 1}. ${gap.capability.replace(/_/g, ' ').toUpperCase()}\n`;
+        report += `**Description**: ${gap.description}\n`;
+        report += `**Web UI Evidence**: ${gap.web_ui_evidence}\n`;
+        report += `**Tested Endpoints**: ${gap.tested_endpoints.length}\n`;
+        report += `**Working Endpoints**: ${gap.working_endpoints.length}\n`;
+        if (gap.potential_workarounds.length > 0) {
+          report += `**Potential Workarounds**:\n`;
+          gap.potential_workarounds.forEach((w: string) => report += `   • ${w}\n`);
+        }
+        report += '\n';
+      });
+    }
+    
+    if (mediumGaps.length > 0) {
+      report += `## ⚠️ MEDIUM PRIORITY GAPS (${mediumGaps.length})\n\n`;
+      mediumGaps.forEach((gap: any, index: number) => {
+        report += `**${index + 1}. ${gap.capability.replace(/_/g, ' ').toUpperCase()}**\n`;
+        report += `   • ${gap.description}\n`;
+        report += `   • ${gap.tested_endpoints.length} endpoints tested, ${gap.working_endpoints.length} working\n\n`;
+      });
+    }
+    
+    if (accessibleCapabilities.length > 0) {
+      report += `## ✅ API ACCESSIBLE CAPABILITIES (${accessibleCapabilities.length})\n\n`;
+      accessibleCapabilities.forEach((capability: any, index: number) => {
+        report += `**${index + 1}. ${capability.capability.replace(/_/g, ' ').toUpperCase()}**\n`;
+        report += `   • Working endpoints: ${capability.working_endpoints.length}\n`;
+        capability.working_endpoints.slice(0, 2).forEach((endpoint: any) => {
+          report += `   • \`${endpoint.endpoint}\` (${endpoint.data_points} data points)\n`;
+        });
+        report += '\n';
+      });
+    }
+    
+    // Workaround strategies
+    if (gapAnalysis.workaround_strategies.length > 0) {
+      report += `## 🛠️ WORKAROUND STRATEGIES (${gapAnalysis.workaround_strategies.length})\n\n`;
+      gapAnalysis.workaround_strategies.forEach((strategy: any, index: number) => {
+        const effectivenessIcon = strategy.effectiveness === 'high' ? '🟢' : 
+                                 strategy.effectiveness === 'medium' ? '🟡' : '🔴';
+        report += `### ${index + 1}. ${strategy.strategy.replace(/_/g, ' ').toUpperCase()} ${effectivenessIcon}\n`;
+        report += `**Target Gap**: ${strategy.gap.replace(/_/g, ' ')}\n`;
+        report += `**Description**: ${strategy.description}\n`;
+        report += `**Implementation**: ${strategy.implementation}\n`;
+        report += `**Effectiveness**: ${strategy.effectiveness.toUpperCase()}\n\n`;
+      });
+    }
+    
+    // Recommendations
+    report += `## 💡 STRATEGIC RECOMMENDATIONS\n\n`;
+    gapAnalysis.recommendations.forEach((rec: string) => {
+      report += `${rec}\n`;
+    });
+    
+    report += `\n---\n`;
+    report += `📊 **Gap Analysis Summary**: ${gapAnalysis.feature_parity_score}% feature parity between web UI and API. `;
+    report += `Use this analysis to plan integration architecture and identify capability limitations.`;
+    
+    return report;
+  }
+
+  private generateWebUISimulationReport(results: any): string {
+    let report = `# 🔍 WEB UI ACCESS SIMULATION: ${results.domain}\n\n`;
+    
+    // Overview
+    report += `## 📊 SIMULATION OVERVIEW\n\n`;
+    report += `**Target Feature**: ${results.target_feature.replace('_', ' ').toUpperCase()}\n`;
+    report += `**Experimental Mode**: ${results.experimental_mode ? 'Enabled' : 'Disabled'}\n`;
+    report += `**Success Rate**: ${results.success_rate}%\n`;
+    report += `**Patterns Attempted**: ${results.simulation_attempts.length}\n`;
+    report += `**Successful Patterns**: ${results.successful_patterns.length}\n`;
+    report += `**Failed Patterns**: ${results.failed_patterns.length}\n`;
+    report += `**Simulation Date**: ${results.timestamp}\n\n`;
+    
+    // Successful patterns
+    if (results.successful_patterns.length > 0) {
+      report += `## ✅ SUCCESSFUL SIMULATION PATTERNS (${results.successful_patterns.length})\n\n`;
+      results.successful_patterns.forEach((pattern: any, index: number) => {
+        report += `### ${index + 1}. ${pattern.pattern_name.replace(/_/g, ' ').toUpperCase()}\n`;
+        report += `**Description**: ${pattern.description}\n`;
+        report += `**Aggregation Logic**: ${pattern.aggregation_logic.replace('_', ' ')}\n`;
+        report += `**Data Quality Score**: ${pattern.data_quality_score}/100\n`;
+        report += `**Working Endpoints**: ${pattern.successful_endpoints.length}/${pattern.endpoints_tested.length}\n`;
+        
+        // Show top working endpoints
+        pattern.successful_endpoints.slice(0, 3).forEach((endpoint: any) => {
+          report += `   • \`${endpoint.endpoint}\` - ${endpoint.data_points} data points\n`;
+        });
+        report += '\n';
+      });
+    }
+    
+    // Failed patterns (summary)
+    if (results.failed_patterns.length > 0) {
+      report += `## ❌ FAILED PATTERNS (${results.failed_patterns.length})\n\n`;
+      results.failed_patterns.forEach((pattern: any, index: number) => {
+        report += `**${index + 1}. ${pattern.pattern_name.replace(/_/g, ' ').toUpperCase()}**\n`;
+        report += `   • ${pattern.description}\n`;
+        report += `   • Working endpoints: ${pattern.successful_endpoints.length}/${pattern.endpoints_tested.length}\n\n`;
+      });
+    }
+    
+    // Data aggregation strategies
+    if (results.data_aggregation_strategies.length > 0) {
+      report += `## 📊 DATA AGGREGATION STRATEGIES (${results.data_aggregation_strategies.length})\n\n`;
+      results.data_aggregation_strategies.forEach((strategy: any, index: number) => {
+        report += `### ${index + 1}. ${strategy.strategy_name.replace(/_/g, ' ').toUpperCase()}\n`;
+        report += `**Description**: ${strategy.description}\n`;
+        report += `**Estimated Completeness**: ${strategy.estimated_completeness}\n`;
+        report += `**Data Sources**: ${strategy.data_sources.length} endpoints\n`;
+        
+        report += `**Implementation Steps**:\n`;
+        strategy.implementation_steps.forEach((step: string) => {
+          report += `   ${step}\n`;
+        });
+        report += '\n';
+      });
+    }
+    
+    // Recommendations based on results
+    report += `## 💡 IMPLEMENTATION RECOMMENDATIONS\n\n`;
+    
+    if (results.success_rate >= 70) {
+      report += `✅ **Excellent simulation results** - Multiple patterns successfully replicate web UI capabilities\n`;
+      report += `🚀 **Recommended approach**: Implement successful aggregation strategies\n`;
+      report += `🎯 **Priority**: Focus on highest data quality patterns first\n\n`;
+    } else if (results.success_rate >= 40) {
+      report += `⚠️ **Moderate simulation success** - Some patterns work but with limitations\n`;
+      report += `🔀 **Recommended approach**: Combine successful patterns for better coverage\n`;
+      report += `🛠️ **Priority**: Implement workarounds for failed critical patterns\n\n`;
+    } else {
+      report += `🔴 **Limited simulation success** - Few patterns successfully replicate web UI\n`;
+      report += `💡 **Recommended approach**: Focus on alternative integration strategies\n`;
+      report += `📞 **Priority**: Consider contacting SecurityScorecard for enhanced API access\n\n`;
+    }
+    
+    if (results.experimental_mode && results.successful_patterns.length > 0) {
+      report += `⚠️ **Experimental Mode Results**: Some successful patterns may use undocumented endpoints\n`;
+      report += `🔒 **Risk Assessment**: Verify endpoint stability before production use\n`;
+      report += `📋 **Recommendation**: Test experimental patterns thoroughly in development\n\n`;
+    }
+    
+    report += `## 🔗 NEXT STEPS\n\n`;
+    report += `• Implement the ${results.successful_patterns.length} successful aggregation patterns\n`;
+    report += `• Test data completeness against web UI benchmarks\n`;
+    report += `• Monitor pattern stability over time\n`;
+    report += `• Consider hybrid approaches for maximum coverage\n\n`;
+    
+    report += `---\n`;
+    report += `🎯 **Simulation Summary**: ${results.success_rate}% success rate with ${results.data_aggregation_strategies.length} viable strategies for replicating web UI capabilities via API.`;
+    
+    return report;
   }
 
   /**
