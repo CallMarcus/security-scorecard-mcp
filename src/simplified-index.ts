@@ -55,7 +55,7 @@ class SimplifiedSecurityScorecardServer {
         tools: [
           {
             name: "security_dashboard",
-            description: "📊 COMPLETE SECURITY OVERVIEW: Get comprehensive security status including score, grade, top risks, asset summary, and key metrics. Answers: 'How secure are we?' 'Show me our security posture' 'Give me a security summary'",
+            description: "📊 SECURITY STATUS: Get security score, grade, and key metrics. INTELLIGENT RESPONSES: Use 'minimal' for simple questions like 'what's nestle.com score/grade?' (10-20 tokens). Use 'standard' for security overview (200-300 tokens). Use 'detailed' for comprehensive analysis (800+ tokens).",
             inputSchema: {
               type: "object",
               properties: {
@@ -63,6 +63,12 @@ class SimplifiedSecurityScorecardServer {
                   type: "string", 
                   description: "Company domain to analyze", 
                   default: this.config.defaultDomain 
+                },
+                response_mode: {
+                  type: "string",
+                  enum: ["minimal", "standard", "detailed"],
+                  default: "minimal",
+                  description: "Response detail: minimal (score/grade only), standard (overview), detailed (full analysis)"
                 }
               },
               required: ["domain"]
@@ -70,7 +76,7 @@ class SimplifiedSecurityScorecardServer {
           },
           {
             name: "analyze_security_risks",
-            description: "🚨 COMPREHENSIVE RISK ANALYSIS: Deep dive into all security risks with severity prioritization, business impact assessment, and remediation effort estimates. Answers: 'What are our biggest risks?' 'What should we fix first?' 'Show me critical security issues'",
+            description: "🚨 SECURITY RISKS: Analyze security risks and issues. INTELLIGENT RESPONSES: Use 'minimal' for simple questions like 'top 3 issues' (50-100 tokens). Use 'standard' for risk overview (300-500 tokens). Use 'detailed' for comprehensive analysis.",
             inputSchema: {
               type: "object",
               properties: {
@@ -84,6 +90,12 @@ class SimplifiedSecurityScorecardServer {
                   enum: ["critical", "all", "quick-wins"],
                   default: "all",
                   description: "Focus area: critical (high-impact only), all (comprehensive), quick-wins (low-effort high-impact)"
+                },
+                response_mode: {
+                  type: "string",
+                  enum: ["minimal", "standard", "detailed"],
+                  default: "minimal",
+                  description: "Response detail: minimal (top issues only), standard (risk overview), detailed (full analysis)"
                 }
               },
               required: ["domain"]
@@ -91,7 +103,7 @@ class SimplifiedSecurityScorecardServer {
           },
           {
             name: "create_improvement_plan",
-            description: "🎯 ACTIONABLE IMPROVEMENT ROADMAP: Generate strategic security improvement plan with ROI analysis, timeline, and specific next steps. Answers: 'How do we improve our security?' 'Create a security plan' 'What should we do to get to grade A?'",
+            description: "🎯 IMPROVEMENT PLAN: Generate security improvement recommendations. INTELLIGENT RESPONSES: Use 'minimal' for simple questions like 'what should I fix first?' (50-100 tokens). Use 'standard' for improvement summary (300-500 tokens). Use 'detailed' for full roadmap.",
             inputSchema: {
               type: "object",
               properties: {
@@ -111,6 +123,12 @@ class SimplifiedSecurityScorecardServer {
                   enum: ["30-days", "90-days", "6-months"],
                   default: "90-days",
                   description: "Timeline for improvement plan"
+                },
+                response_mode: {
+                  type: "string",
+                  enum: ["minimal", "standard", "detailed"],
+                  default: "minimal",
+                  description: "Response detail: minimal (next actions only), standard (improvement summary), detailed (full roadmap)"
                 }
               },
               required: ["domain"]
@@ -118,7 +136,7 @@ class SimplifiedSecurityScorecardServer {
           },
           {
             name: "discover_assets",
-            description: "🔍 COMPLETE ASSET INVENTORY: Comprehensive asset discovery with security context, risk levels, and vulnerability details for all domains and IPs. Answers: 'What assets do we have?' 'Which assets are most vulnerable?' 'Show me our infrastructure security'",
+            description: "🔍 ASSET INVENTORY: Discover domains and IPs with security context. INTELLIGENT RESPONSES: Use 'minimal' for simple questions like 'how many assets?' (20-50 tokens). Use 'standard' for asset overview (200-400 tokens). Use 'detailed' for comprehensive inventory.",
             inputSchema: {
               type: "object",
               properties: {
@@ -131,6 +149,12 @@ class SimplifiedSecurityScorecardServer {
                   type: "boolean",
                   default: true,
                   description: "Include detailed security risk information for each asset"
+                },
+                response_mode: {
+                  type: "string",
+                  enum: ["minimal", "standard", "detailed"],
+                  default: "minimal",
+                  description: "Response detail: minimal (asset counts only), standard (asset overview), detailed (full inventory)"
                 }
               },
               required: ["domain"]
@@ -171,16 +195,16 @@ class SimplifiedSecurityScorecardServer {
       try {
         switch (name) {
           case "security_dashboard":
-            return await this.getSecurityDashboard(args.domain as string);
+            return await this.getSecurityDashboard(args.domain as string, args.response_mode as string || "minimal");
           
           case "analyze_security_risks":
-            return await this.analyzeSecurityRisks(args.domain as string, args.focus as string);
+            return await this.analyzeSecurityRisks(args.domain as string, args.focus as string, args.response_mode as string || "minimal");
           
           case "create_improvement_plan":
-            return await this.createImprovementPlan(args.domain as string, args.target_grade as string, args.timeline as string);
+            return await this.createImprovementPlan(args.domain as string, args.target_grade as string, args.timeline as string, args.response_mode as string || "minimal");
           
           case "discover_assets":
-            return await this.discoverAssets(args.domain as string, args.include_risk_details as boolean);
+            return await this.discoverAssets(args.domain as string, args.include_risk_details as boolean, args.response_mode as string || "minimal");
           
           case "query_security_data":
             return await this.querySecurityData(args.endpoint as string, args.method as string, args.params);
@@ -202,10 +226,10 @@ class SimplifiedSecurityScorecardServer {
   }
 
   /**
-   * COMPREHENSIVE SECURITY DASHBOARD
-   * One-stop security overview with all key metrics
+   * INTELLIGENT SECURITY DASHBOARD
+   * Minimal, standard, or detailed responses based on query complexity
    */
-  private async getSecurityDashboard(domain: string): Promise<any> {
+  private async getSecurityDashboard(domain: string, responseMode: string = "minimal"): Promise<any> {
     const [scorecard, factors, findings, assets] = await Promise.all([
       this.client.getCompanyScorecard(domain).catch(() => null),
       this.client.getCompanyFactors(domain).catch(() => null),
@@ -245,6 +269,33 @@ class SimplifiedSecurityScorecardServer {
       next_review_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
     };
 
+    // Intelligent response based on mode
+    if (responseMode === "minimal") {
+      return {
+        content: [{
+          type: "text",
+          text: `${domain}: Score ${dashboard.executive_summary.overall_score}/100, Grade ${dashboard.executive_summary.security_grade}`
+        }]
+      };
+    }
+    
+    if (responseMode === "standard") {
+      return {
+        content: [{
+          type: "text",
+          text: `# ${domain} Security Overview\n\n` +
+                `**Score**: ${dashboard.executive_summary.overall_score}/100 (Grade ${dashboard.executive_summary.security_grade})\n` +
+                `**Risk Level**: ${dashboard.executive_summary.risk_level}\n` +
+                `**Assets**: ${dashboard.executive_summary.total_assets} (${dashboard.key_metrics.critical_findings} critical issues, ${dashboard.key_metrics.high_findings} high issues)\n\n` +
+                `**Top 3 Risk Areas**:\n` +
+                dashboard.top_risk_factors.slice(0, 3).map((factor, i) => 
+                  `${i + 1}. ${factor.factor_name.replace(/_/g, ' ').toUpperCase()}: ${factor.issue_count} issues`
+                ).join('\n')
+        }]
+      };
+    }
+    
+    // Detailed mode (original comprehensive response)
     return {
       content: [
         {
@@ -277,10 +328,10 @@ class SimplifiedSecurityScorecardServer {
   }
 
   /**
-   * COMPREHENSIVE RISK ANALYSIS
-   * Deep dive into all security risks with prioritization
+   * INTELLIGENT RISK ANALYSIS
+   * Minimal, standard, or detailed responses based on query complexity
    */
-  private async analyzeSecurityRisks(domain: string, focus: string = 'all'): Promise<any> {
+  private async analyzeSecurityRisks(domain: string, focus: string = 'all', responseMode: string = "minimal"): Promise<any> {
     const [findings, factors, assets] = await Promise.all([
       getFindingsByCategory(domain, this.config.apiToken).catch(() => null),
       this.client.getCompanyFactors(domain).catch(() => null),
@@ -316,6 +367,35 @@ class SimplifiedSecurityScorecardServer {
       };
     }).sort((a, b) => b.priority_rank - a.priority_rank);
 
+    // Intelligent response based on mode
+    if (responseMode === "minimal") {
+      const topRisks = enhancedRisks.slice(0, 3);
+      return {
+        content: [{
+          type: "text",
+          text: `Top 3 issues: ` + topRisks.map(risk => 
+            `${risk.factor.replace(/_/g, ' ')} (${risk.critical_count + risk.high_count} critical/high)`
+          ).join(', ')
+        }]
+      };
+    }
+    
+    if (responseMode === "standard") {
+      const topRisks = enhancedRisks.slice(0, 5);
+      return {
+        content: [{
+          type: "text",
+          text: `# ${domain} Security Risks\n\n` +
+                `**Total Issues**: ${enhancedRisks.reduce((sum, r) => sum + r.issue_count, 0)} (${enhancedRisks.reduce((sum, r) => sum + r.critical_count, 0)} critical)\n\n` +
+                `**Priority Risks**:\n` +
+                topRisks.map((risk, i) => 
+                  `${i + 1}. **${risk.factor.replace(/_/g, ' ').toUpperCase()}**: ${risk.issue_count} issues (${risk.business_impact} impact)`
+                ).join('\n')
+        }]
+      };
+    }
+    
+    // Detailed mode (original comprehensive response)
     return {
       content: [
         {
@@ -346,10 +426,10 @@ class SimplifiedSecurityScorecardServer {
   }
 
   /**
-   * ACTIONABLE IMPROVEMENT PLAN
-   * Strategic roadmap with specific next steps
+   * INTELLIGENT IMPROVEMENT PLAN
+   * Minimal, standard, or detailed responses based on query complexity
    */
-  private async createImprovementPlan(domain: string, targetGrade: string = 'A', timeline: string = '90-days'): Promise<any> {
+  private async createImprovementPlan(domain: string, targetGrade: string = 'A', timeline: string = '90-days', responseMode: string = "minimal"): Promise<any> {
     const [scorecard, findings, factors] = await Promise.all([
       this.client.getCompanyScorecard(domain).catch(() => null),
       getFindingsByCategory(domain, this.config.apiToken).catch(() => null),
@@ -362,6 +442,32 @@ class SimplifiedSecurityScorecardServer {
     
     const plan = this.generateImprovementRoadmap(findings, factors, targetScore, timeline);
 
+    // Intelligent response based on mode
+    if (responseMode === "minimal") {
+      return {
+        content: [{
+          type: "text",
+          text: `Next actions: ` + plan.immediate_actions.slice(0, 3).join(', ') + ` (Need ${scoreGap} points to reach grade ${targetGrade})`
+        }]
+      };
+    }
+    
+    if (responseMode === "standard") {
+      return {
+        content: [{
+          type: "text",
+          text: `# ${domain} Improvement Plan\n\n` +
+                `**Current**: ${currentScore}/100 (${this.getGradeFromScore(currentScore)}) → **Target**: ${targetScore}/100 (${targetGrade})\n` +
+                `**Gap**: ${scoreGap} points, **Timeline**: ${timeline}\n\n` +
+                `**Immediate Actions**:\n` +
+                plan.immediate_actions.map((action, i) => `${i + 1}. ${action}`).join('\n') + '\n\n' +
+                `**Quick Wins**:\n` +
+                plan.quick_wins.slice(0, 3).map((win, i) => `${i + 1}. ${win}`).join('\n')
+        }]
+      };
+    }
+    
+    // Detailed mode (original comprehensive response)
     return {
       content: [
         {
@@ -400,10 +506,10 @@ class SimplifiedSecurityScorecardServer {
   }
 
   /**
-   * COMPLETE ASSET DISCOVERY
-   * Comprehensive asset inventory with security context
+   * INTELLIGENT ASSET DISCOVERY
+   * Minimal, standard, or detailed responses based on query complexity
    */
-  private async discoverAssets(domain: string, includeRiskDetails: boolean = true): Promise<any> {
+  private async discoverAssets(domain: string, includeRiskDetails: boolean = true, responseMode: string = "minimal"): Promise<any> {
     const assets = await getAssetInventory(domain, this.config.apiToken);
     
     const assetReport = {
@@ -420,6 +526,38 @@ class SimplifiedSecurityScorecardServer {
       }))
     };
 
+    // Intelligent response based on mode
+    if (responseMode === "minimal") {
+      return {
+        content: [{
+          type: "text",
+          text: `${assets.total_assets} assets: ${assets.domains.length} domains, ${assets.ip_addresses.length} IPs (${assets.summary.total_issues} total issues)`
+        }]
+      };
+    }
+    
+    if (responseMode === "standard") {
+      const highRiskAssets = [...assetReport.domain_assets, ...assetReport.ip_assets]
+        .filter(asset => asset.security_priority === 'HIGH')
+        .slice(0, 5);
+      
+      return {
+        content: [{
+          type: "text",
+          text: `# ${domain} Assets\n\n` +
+                `**Total**: ${assets.total_assets} assets (${assets.domains.length} domains, ${assets.ip_addresses.length} IPs)\n` +
+                `**Security Issues**: ${assets.summary.total_issues} total\n\n` +
+                (highRiskAssets.length > 0 ? 
+                  `**High-Risk Assets**:\n` +
+                  highRiskAssets.map(asset => 
+                    `• ${asset.asset_name}: ${asset.issues_count} issues (${asset.critical_issues} critical)`
+                  ).join('\n')
+                : `**Status**: No high-risk assets found`)
+        }]
+      };
+    }
+    
+    // Detailed mode (original comprehensive response)
     return {
       content: [
         {
