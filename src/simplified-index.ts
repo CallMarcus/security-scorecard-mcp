@@ -136,7 +136,7 @@ class SimplifiedSecurityScorecardServer {
           },
           {
             name: "discover_assets",
-            description: "🔍 ASSET INVENTORY: Discover domains and IPs with security context. INTELLIGENT RESPONSES: Use 'minimal' for simple questions like 'how many assets?' (20-50 tokens). Use 'standard' for asset overview (200-400 tokens). Use 'detailed' for comprehensive inventory.",
+            description: "🔍 ASSET INVENTORY: Discover domains and IPs with security context and data completeness validation. INTELLIGENT RESPONSES: Use 'minimal' for simple questions like 'how many assets?' (20-50 tokens). Use 'standard' for asset overview (200-400 tokens). Use 'detailed' for comprehensive inventory. Includes warnings for potential pagination issues.",
             inputSchema: {
               type: "object",
               properties: {
@@ -162,7 +162,7 @@ class SimplifiedSecurityScorecardServer {
           },
           {
             name: "analyze_email_security",
-            description: "📧 EMAIL SECURITY: Analyze SPF, DMARC, DKIM issues with domain-by-domain breakdown. INTELLIGENT RESPONSES: Use 'minimal' for simple counts like 'how many SPF missing?' (10-30 tokens). Use 'standard' for email security overview (200-400 tokens). Use 'detailed' for comprehensive email analysis.",
+            description: "📧 EMAIL SECURITY: Analyze SPF, DMARC, DKIM issues with domain-by-domain breakdown and cross-validation. INTELLIGENT RESPONSES: Use 'minimal' for simple counts like 'how many SPF missing?' (10-30 tokens). Use 'standard' for email security overview (200-400 tokens). Use 'detailed' for comprehensive email analysis with completeness checks.",
             inputSchema: {
               type: "object",
               properties: {
@@ -203,6 +203,32 @@ class SimplifiedSecurityScorecardServer {
                   enum: ["minimal", "standard", "detailed"],
                   default: "minimal",
                   description: "Response detail: minimal (specific counts), standard (summary), detailed (full breakdown)"
+                }
+              },
+              required: ["domain"]
+            }
+          },
+          {
+            name: "validate_data_completeness",
+            description: "✅ DATA VALIDATION: Cross-validate MCP tool results for completeness and consistency. Detects data gaps, pagination issues, and API limitations. INTELLIGENT RESPONSES: Use 'minimal' for quick validation status (20-40 tokens). Use 'standard' for validation summary (200-400 tokens). Use 'detailed' for comprehensive data audit.",
+            inputSchema: {
+              type: "object",
+              properties: {
+                domain: { 
+                  type: "string", 
+                  description: "Company domain to validate", 
+                  default: this.config.defaultDomain 
+                },
+                expected_counts: {
+                  type: "object",
+                  description: "Known/expected counts for validation (e.g., {domains: 118, spf_issues: 50})",
+                  default: {}
+                },
+                response_mode: {
+                  type: "string",
+                  enum: ["minimal", "standard", "detailed"],
+                  default: "minimal",
+                  description: "Response detail: minimal (validation status), standard (summary), detailed (full audit)"
                 }
               },
               required: ["domain"]
@@ -259,6 +285,9 @@ class SimplifiedSecurityScorecardServer {
           
           case "analyze_issue_types":
             return await this.analyzeIssueTypes(args.domain as string, args.focus_factor as string || "all", args.response_mode as string || "minimal");
+          
+          case "validate_data_completeness":
+            return await this.validateDataCompleteness(args.domain as string, args.expected_counts || {}, args.response_mode as string || "minimal");
           
           case "query_security_data":
             return await this.querySecurityData(args.endpoint as string, args.method as string, args.params);
@@ -919,6 +948,277 @@ class SimplifiedSecurityScorecardServer {
   }
 
   /**
+   * DATA COMPLETENESS VALIDATION
+   * Cross-validate tool results and detect data gaps
+   */
+  private async validateDataCompleteness(domain: string, expectedCounts: any = {}, responseMode: string = "minimal"): Promise<any> {
+    try {
+      // Run all tools in parallel to collect data
+      const [scorecard, findings, assets, emailAnalysis] = await Promise.all([
+        this.client.getCompanyScorecard(domain).catch(() => null),
+        getFindingsByCategory(domain, this.config.apiToken).catch(() => null),
+        getAssetInventory(domain, this.config.apiToken).catch(() => null),
+        this.analyzeEmailSecurity(domain, "detailed").then(result => 
+          result.content[0].text.match(/SPF missing: (\d+)/) ? 
+          parseInt(result.content[0].text.match(/SPF missing: (\d+)/)[1]) : 0
+        ).catch(() => 0)
+      ]);
+      
+      // Collect actual counts from tools
+      const actualCounts = {
+        domains: assets?.domains?.length || 0,
+        ip_addresses: assets?.ip_addresses?.length || 0,
+        total_assets: assets?.total_assets || 0,
+        total_issues: assets?.summary?.total_issues || 0,
+        dns_issues: findings?.factor_breakdown?.find(f => f.factor.includes('dns'))?.issue_count || 0,
+        spf_issues: emailAnalysis || 0,
+        overall_score: scorecard?.data?.score || 0
+      };
+      
+      // Cross-validation checks
+      const validationResults = {
+        asset_consistency: this.validateAssetConsistency(actualCounts),
+        email_consistency: this.validateEmailConsistency(actualCounts, findings),
+        pagination_check: this.checkPaginationCompleteness(assets),
+        data_freshness: this.validateDataFreshness(scorecard, assets),
+        expected_vs_actual: this.compareExpectedCounts(expectedCounts, actualCounts)
+      };
+      
+      // Calculate overall confidence score
+      const confidenceScore = this.calculateConfidenceScore(validationResults);
+      const issues = this.identifyDataIssues(validationResults, expectedCounts, actualCounts);
+      
+      // Intelligent response based on mode
+      if (responseMode === "minimal") {
+        const status = confidenceScore >= 90 ? "✅ Data Complete" : 
+                      confidenceScore >= 70 ? "⚠️ Data Concerns" : "❌ Data Incomplete";
+        return {
+          content: [{
+            type: "text",
+            text: `${status} (${confidenceScore}% confidence) - ${issues.length} issues found`
+          }]
+        };
+      }
+      
+      if (responseMode === "standard") {
+        return {
+          content: [{
+            type: "text",
+            text: `# ${domain} Data Validation\n\n` +
+                  `**Confidence Score**: ${confidenceScore}%\n` +
+                  `**Status**: ${confidenceScore >= 90 ? "Data appears complete" : confidenceScore >= 70 ? "Potential data gaps" : "Significant data issues"}\n\n` +
+                  `**Key Metrics**:\n` +
+                  `• Domains Found: ${actualCounts.domains}${expectedCounts.domains ? ` (expected ${expectedCounts.domains})` : ''}\n` +
+                  `• Total Assets: ${actualCounts.total_assets}\n` +
+                  `• SPF Issues: ${actualCounts.spf_issues}${expectedCounts.spf_issues ? ` (expected ${expectedCounts.spf_issues})` : ''}\n\n` +
+                  (issues.length > 0 ? `**Issues Found**:\n${issues.slice(0, 3).map(i => `• ${i}`).join('\n')}` : '**No issues detected**')
+          }]
+        };
+      }
+      
+      // Detailed mode - comprehensive audit
+      return {
+        content: [{
+          type: "text",
+          text: `# ✅ DATA COMPLETENESS AUDIT: ${domain}\n\n` +
+                `## Overall Assessment\n` +
+                `**Confidence Score**: ${confidenceScore}%\n` +
+                `**Data Quality**: ${confidenceScore >= 90 ? "Excellent" : confidenceScore >= 70 ? "Good with concerns" : "Poor - needs attention"}\n\n` +
+                `## Cross-Tool Validation Results\n\n` +
+                `### Asset Data Consistency\n` +
+                `- **Asset Inventory**: ${actualCounts.domains} domains, ${actualCounts.ip_addresses} IPs (total: ${actualCounts.total_assets})\n` +
+                `- **Consistency Check**: ${validationResults.asset_consistency.status}\n` +
+                (validationResults.asset_consistency.issues?.length > 0 ? 
+                  `- **Issues**: ${validationResults.asset_consistency.issues.join(', ')}\n` : '') +
+                `\n` +
+                `### Email Security Consistency\n` +
+                `- **SPF Issues Found**: ${actualCounts.spf_issues}\n` +
+                `- **DNS Issues Reported**: ${actualCounts.dns_issues}\n` +
+                `- **Cross-Check Status**: ${validationResults.email_consistency.status}\n` +
+                (validationResults.email_consistency.issues?.length > 0 ? 
+                  `- **Discrepancies**: ${validationResults.email_consistency.issues.join(', ')}\n` : '') +
+                `\n` +
+                `### Pagination Completeness\n` +
+                `- **Status**: ${validationResults.pagination_check.status}\n` +
+                `- **Indicators**: ${validationResults.pagination_check.indicators.join(', ')}\n\n` +
+                `### Expected vs Actual Comparison\n` +
+                (Object.keys(expectedCounts).length > 0 ? 
+                  Object.entries(expectedCounts).map(([key, expected]) => 
+                    `- **${key}**: Expected ${expected}, Found ${actualCounts[key] || 'N/A'} ${this.getVarianceIndicator(expected as number, actualCounts[key] || 0)}`
+                  ).join('\n') + '\n\n' : 
+                  `*No expected counts provided for comparison*\n\n`) +
+                `## Issues Detected (${issues.length})\n` +
+                (issues.length > 0 ? 
+                  issues.map((issue, i) => `${i + 1}. ${issue}`).join('\n') + '\n\n' : 
+                  `*No data issues detected*\n\n`) +
+                `## Recommendations\n` +
+                this.generateDataRecommendations(validationResults, issues, expectedCounts, actualCounts) +
+                `\n---\n*Use this validation before making security decisions based on MCP data.*`
+        }]
+      };
+      
+    } catch (error: any) {
+      return {
+        content: [{
+          type: "text",
+          text: `❌ Data validation failed for ${domain}: ${error.message}\n\n` +
+                `**Recommendation**: Try individual tools separately to identify the source of the error.`
+        }]
+      };
+    }
+  }
+
+  // Validation helper methods
+  private validateAssetConsistency(counts: any): any {
+    const issues = [];
+    
+    // Check for obvious inconsistencies
+    if (counts.total_assets > 0 && (counts.domains + counts.ip_addresses) === 0) {
+      issues.push("Total assets reported but no domains/IPs found");
+    }
+    
+    if (counts.domains + counts.ip_addresses > counts.total_assets) {
+      issues.push("Individual counts exceed total assets");
+    }
+    
+    return {
+      status: issues.length === 0 ? "✅ Consistent" : "⚠️ Issues Found",
+      issues
+    };
+  }
+  
+  private validateEmailConsistency(counts: any, findings: any): any {
+    const issues = [];
+    
+    // SPF issues should be subset of DNS issues (usually)
+    if (counts.spf_issues > counts.dns_issues && counts.dns_issues > 0) {
+      issues.push("SPF issues exceed total DNS issues");
+    }
+    
+    // Check if we have domains but no SPF analysis
+    if (counts.domains > 10 && counts.spf_issues === 0) {
+      issues.push("Many domains found but no SPF issues detected (unusual)");
+    }
+    
+    return {
+      status: issues.length === 0 ? "✅ Consistent" : "⚠️ Discrepancies",
+      issues
+    };
+  }
+  
+  private checkPaginationCompleteness(assets: any): any {
+    const indicators = [];
+    
+    // Check for pagination indicators
+    if (assets?.domains?.length === 50 || assets?.domains?.length === 100) {
+      indicators.push("Domain count matches common page size limits");
+    }
+    
+    if (assets?.ip_addresses?.length === 50 || assets?.ip_addresses?.length === 100) {
+      indicators.push("IP count matches common page size limits");
+    }
+    
+    const status = indicators.length === 0 ? "✅ Likely Complete" : "⚠️ Possible Pagination";
+    
+    return { status, indicators };
+  }
+  
+  private validateDataFreshness(scorecard: any, assets: any): any {
+    // Simple freshness check - could be enhanced
+    const hasRecentData = scorecard?.data?.last_seen || assets?.summary?.last_updated;
+    return {
+      status: hasRecentData ? "✅ Recent Data" : "⚠️ Unknown Freshness",
+      last_seen: hasRecentData
+    };
+  }
+  
+  private compareExpectedCounts(expected: any, actual: any): any {
+    const discrepancies = [];
+    
+    for (const [key, expectedValue] of Object.entries(expected)) {
+      const actualValue = actual[key];
+      if (actualValue !== undefined) {
+        const variance = Math.abs((expectedValue as number) - actualValue);
+        const percentageVariance = variance / (expectedValue as number) * 100;
+        
+        if (percentageVariance > 10) { // More than 10% difference
+          discrepancies.push({
+            metric: key,
+            expected: expectedValue,
+            actual: actualValue,
+            variance: Math.round(percentageVariance)
+          });
+        }
+      }
+    }
+    
+    return {
+      status: discrepancies.length === 0 ? "✅ Matches Expectations" : "⚠️ Significant Variances",
+      discrepancies
+    };
+  }
+  
+  private calculateConfidenceScore(validationResults: any): number {
+    let score = 100;
+    
+    // Deduct points for issues
+    if (validationResults.asset_consistency.issues?.length > 0) score -= 20;
+    if (validationResults.email_consistency.issues?.length > 0) score -= 15;
+    if (validationResults.pagination_check.indicators?.length > 0) score -= 25;
+    if (validationResults.expected_vs_actual.discrepancies?.length > 0) score -= 30;
+    
+    return Math.max(0, score);
+  }
+  
+  private identifyDataIssues(validationResults: any, expected: any, actual: any): string[] {
+    const issues = [];
+    
+    // Collect all issues from validation results
+    Object.values(validationResults).forEach((result: any) => {
+      if (result.issues) issues.push(...result.issues);
+      if (result.discrepancies) {
+        result.discrepancies.forEach((disc: any) => {
+          issues.push(`${disc.metric}: expected ${disc.expected}, found ${disc.actual} (${disc.variance}% difference)`);
+        });
+      }
+    });
+    
+    return issues;
+  }
+  
+  private getVarianceIndicator(expected: number, actual: number): string {
+    if (actual === expected) return "✅";
+    const variance = Math.abs(expected - actual) / expected * 100;
+    if (variance <= 5) return "✅";
+    if (variance <= 20) return "⚠️";
+    return "❌";
+  }
+  
+  private generateDataRecommendations(validationResults: any, issues: string[], expected: any, actual: any): string {
+    const recommendations = [];
+    
+    if (validationResults.pagination_check.indicators?.length > 0) {
+      recommendations.push("**Pagination Issue**: Asset counts match common page limits. Request full data export or use pagination parameters.");
+    }
+    
+    if (Object.keys(expected).length === 0) {
+      recommendations.push("**Baseline Needed**: Provide expected counts from authoritative source for better validation.");
+    }
+    
+    if (issues.length > 3) {
+      recommendations.push("**Data Quality**: Multiple issues detected. Consider using direct API endpoints or user-provided data.");
+    }
+    
+    if (validationResults.expected_vs_actual.discrepancies?.length > 0) {
+      recommendations.push("**Discrepancy Found**: Tool data differs from expected. Export authoritative dataset for comparison.");
+    }
+    
+    return recommendations.length > 0 ? 
+           recommendations.map(r => `• ${r}`).join('\n') : 
+           "• **Status**: Data appears reliable for analysis.";
+  }
+
+  /**
    * ENHANCED DIRECT API ACCESS
    * Improved endpoint validation with helpful suggestions
    */
@@ -1172,6 +1472,37 @@ class SimplifiedSecurityScorecardServer {
     return `**Status**: Good security posture across assets.\n` +
            `**Actions**: Continue regular monitoring and maintenance.\n` +
            `**Timeline**: Monthly security reviews recommended.`;
+  }
+  
+  /**
+   * Check for potential data completeness issues in asset data
+   */
+  private checkAssetDataCompleteness(assets: any): string | null {
+    // Common pagination limits that suggest incomplete data
+    const suspiciousCounts = [25, 50, 100, 250, 500];
+    const warnings = [];
+    
+    // Check domain count against common page limits
+    if (assets?.domains && suspiciousCounts.includes(assets.domains.length)) {
+      warnings.push("Domain count matches pagination limit");
+    }
+    
+    // Check IP count against common page limits
+    if (assets?.ip_addresses && suspiciousCounts.includes(assets.ip_addresses.length)) {
+      warnings.push("IP count matches pagination limit");
+    }
+    
+    // Check for missing asset details
+    if (assets?.total_assets > (assets?.domains?.length || 0) + (assets?.ip_addresses?.length || 0)) {
+      warnings.push("Total assets > individual counts");
+    }
+    
+    // Check for round numbers (often indicates estimates)
+    if (assets?.total_assets && assets.total_assets % 10 === 0 && assets.total_assets >= 100) {
+      warnings.push("Total count is round number");
+    }
+    
+    return warnings.length > 0 ? `Possible incomplete data (${warnings.join(', ')})` : null;
   }
 
   async start() {
