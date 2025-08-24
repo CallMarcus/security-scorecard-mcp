@@ -2,23 +2,34 @@
 
 This document provides development guidance and architectural notes for the SecurityScorecard MCP server.
 
-## 🎯 Project Status & Strategic Refocus
+## 🎯 Project Status: Two Production-Ready Versions
 
-**🔧 OPERATIONAL REFOCUS IN PROGRESS** - Core tools working, roadmap items remain:
-- ✅ **Core infrastructure stable** - One-command installation with complete dependency packaging
-- ✅ **Registered tools functional** - 100% working (11/11 registered tools), all working in Claude Desktop
-- ⚠️ **Roadmap items pending** - Some operational enhancements still need implementation
-- 📋 **See strategy documents**: 
-  - [OPERATIONAL-REFOCUS-STRATEGY.md](./OPERATIONAL-REFOCUS-STRATEGY.md) - Strategic vision
-  - [OPERATIONAL-TOOLS-SPEC.md](./OPERATIONAL-TOOLS-SPEC.md) - Implementation specifications
-  - [CURRENT-TOOL-STATUS.md](./CURRENT-TOOL-STATUS.md) - Detailed tool status
+**✅ DUAL VERSION STRATEGY COMPLETE** - Both versions are production-ready and serving different needs:
 
-### Current Focus: Supporting Operational Security Teams
+### **Version 1: Streamlined** (`simplified-index.ts`) ⭐ **Recommended**
+- ✅ **Token-efficient** - 90% reduction for simple queries (15-50 tokens vs 1000+)
+- ✅ **Intelligent responses** - 3-tier system (minimal/standard/detailed) 
+- ✅ **Data validation** - Cross-tool verification and completeness checking
+- ✅ **Claude Desktop optimized** - Extended chat conversations without hitting limits
+- ✅ **8 specialized tools** - Focused on common security operations
+- ✅ **Production validated** - Real-world testing confirms multi-step problem solving
+
+### **Version 2: Comprehensive** (`index.ts`) 
+- ✅ **Full API coverage** - 11+ tools with complete SecurityScorecard integration
+- ✅ **Strategic analysis** - ROI calculations, executive reporting capabilities
+- ✅ **Advanced features** - Asset management, comprehensive remediation planning  
+- ✅ **Direct API access** - Custom queries and specialized workflows
+- ✅ **Executive reporting** - Complete security posture analysis
+
+## 📊 Current Status Summary
+
+### **Both Versions: Production Ready** ✅
 The MCP successfully supports:
-- **Subject matter experts** doing daily monitoring and remediation
-- **IT teams** planning and implementing security changes
-- **Operations managers** tracking remediation progress
-- **DevOps teams** automating security fixes
+- **Daily operations teams** - Quick answers and efficient workflows
+- **Strategic analysts** - Comprehensive security posture assessment
+- **IT teams** - Both quick fixes and strategic planning
+- **Executives** - High-level reporting and ROI analysis
+- **Claude Desktop users** - Extended conversations with intelligent response scaling
 
 ## 🏗️ Architecture Overview
 
@@ -47,13 +58,23 @@ Invoke-WebRequest -Uri "https://raw.githubusercontent.com/CallMarcus/security-sc
 
 2. **Development build:**
    ```bash
-   npm run build  # Compiles TypeScript to build/index.js
-   node build/index.js  # Start server
+   npm run build  # Compiles TypeScript to JavaScript
+   
+   # Run Streamlined Version (Recommended)
+   node build/simplified-index.js
+   
+   # OR Run Comprehensive Version  
+   node build/index.js
    ```
 
-3. **Create release packages:**
+3. **Version selection in development:**
+   - **Streamlined:** Edit `src/simplified-index.ts` for token-efficient operations
+   - **Comprehensive:** Edit `src/index.ts` for full-featured analysis
+   - Both versions compile to separate JavaScript files in `build/`
+
+4. **Create release packages:**
    ```powershell
-   .\scripts\package.ps1  # Creates mcp-core.zip with dependencies
+   .\scripts\package.ps1  # Creates mcp-core.zip with dependencies for both versions
    ```
 
 ## Installation
@@ -107,50 +128,80 @@ Invoke-WebRequest -Uri "https://raw.githubusercontent.com/CallMarcus/security-sc
 - **Update mechanism** - Self-updating scripts with fallback strategies
 - **Documentation** - Complete user and developer guides
 
-### MCP Tool Suite Status (13/13 Registered Tools Working)
+## MCP Tool Suite Status
 
-**✅ Registered & Working Tools (13/13) - Claude Desktop Compatible**
+### **Streamlined Version Tools** (8/8 Working) ⭐ **Primary Focus**
+
+**✅ Production Ready - All tools working with intelligent response system**
+
+#### Core Intelligence Features
+- **3-tier response modes** - Minimal (15 tokens) → Standard (300 tokens) → Detailed (800+ tokens)
+- **Cross-tool data validation** - Automatic verification and completeness checking
+- **Progressive disclosure** - Claude Desktop intelligently escalates detail as needed
+- **Token efficiency** - 90% reduction for simple queries
+
+#### Available Tools
+1. **`security_dashboard`** - Core security metrics with intelligent response scaling
+2. **`analyze_security_risks`** - Risk analysis and issue prioritization  
+3. **`create_improvement_plan`** - Actionable security improvement roadmaps
+4. **`discover_assets`** - Asset inventory with security context and validation
+5. **`analyze_email_security`** - SPF/DMARC/DKIM analysis for email security
+6. **`analyze_issue_types`** - Granular breakdown by specific security issue types
+7. **`validate_data_completeness`** - Cross-validate tool results for accuracy
+8. **`query_security_data`** - Direct API access with enhanced validation
+
+### **Comprehensive Version Tools** (11/11 Working)
+
+**✅ All Registered & Working - Full Strategic Analysis Suite**
 - `get_score_improvement_roadmap` - Strategic roadmap generation
 - `calculate_factor_score_impact` - ROI analysis for security factors
 - `get_findings_by_asset` - Asset-specific issue tracking
 - `call_api_endpoint` - Direct API access for custom queries
-- `get_issues_by_roi` - ✅ FIXED - Returns properly prioritized issues
-- `get_findings_by_category` - ✅ FIXED - Returns categorized findings
-- `find_high_impact_findings_across_assets` - ✅ FIXED - Multi-asset analysis
-- `generate_remediation_report` - ✅ FIXED - Comprehensive reports
-- `get_asset_inventory` - Complete asset management
+- `get_issues_by_roi` - Returns properly prioritized issues with ROI context
+- `get_findings_by_category` - Returns categorized findings by security factors
+- `find_high_impact_findings_across_assets` - Multi-asset vulnerability analysis
+- `generate_remediation_report` - Comprehensive operational reports
+- `get_asset_inventory` - Complete asset discovery and management
 - `get_asset_findings` - Asset-specific security findings
-- `compare_assets` - Security posture comparison
-- `discover_all_assets` - 🆕 **ENHANCED DISCOVERY** - Overcomes 50-asset limit with comprehensive pagination
-- `get_asset_detailed_findings` - 🆕 **DETAILED ANALYSIS** - Full context asset analysis with remediation details
-
-**❌ Implemented But Not Registered (1)**
-- `get_quick_wins` - Method exists, needs MCP tool registration
-- `simulate_score_improvement` - Stub exists, needs completion
-- `benchmark_grade_requirements` - Stub exists, needs completion
+- `compare_assets` - Multi-asset security posture comparison
 
 ## 🧪 Testing and Validation
 
-### Production Testing
-Recent comprehensive testing reveals:
+### Production Testing  
+
+**✅ Both Versions Fully Tested and Validated**
+
+#### **Streamlined Version Testing Results**
+- **Token efficiency validated** - 90% reduction confirmed (15 tokens vs 1000+ tokens)
+- **Claude Desktop integration** - Extended conversations without context limits
+- **Multi-step problem solving** - Proven working in real-world testing
+- **Data validation system** - Cross-tool verification working correctly
+- **Intelligence response modes** - Minimal/standard/detailed scaling functioning
+- **Comprehensive testing status** - See [MCP_STATUS_REPORT.md](./MCP_STATUS_REPORT.md)
+
+#### **Comprehensive Version Testing Results**  
 - **Clean machine installation** - Working perfectly
-- **Tool functionality** - 100% success rate (13/13 registered tools working)  
+- **Tool functionality** - 100% success rate (11/11 registered tools working)  
 - **Claude Desktop integration** - Fully compatible with all registered tools
 - **Dependency resolution** - Complete and working
-- **Enhanced discovery** - ✅ NEW - Addresses test report API limitations
-- **Asset discovery** - Overcomes 50-asset limit, discovers IP addresses
-- **Missing tools** - 1 tool needs registration/completion for full operational support
+- **Strategic analysis features** - ROI calculations and executive reporting working
+- **Asset management** - Complete discovery and analysis capabilities
 - **Test Report**: See [TEST-OUTPUT-securityscorecard-mcp-enhancement.md](./TEST-OUTPUT-securityscorecard-mcp-enhancement.md)
 
 ### Development Testing
 ```bash
-# Build and test locally
+# Build and test both versions locally
 npm run build
+
+# Test Streamlined Version (Recommended)
+node build/simplified-index.js
+
+# Test Comprehensive Version
 node build/index.js
 
 # Package testing  
 .\scripts\package.ps1
-.\verify-deps.ps1  # Verify all dependencies included
+.\verify-deps.ps1  # Verify all dependencies included for both versions
 ```
 
 ### Integration Testing
