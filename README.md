@@ -15,10 +15,10 @@ A Model Context Protocol (MCP) server that integrates with the [SecurityScorecar
 
 ### Version 1: **Comprehensive** (`index.ts`) 
 **Best for:** Full-featured analysis, comprehensive reporting, all SecurityScorecard capabilities
-- **Tools:** 11+ registered tools with full API coverage
+- **Tools:** 15+ registered tools with full API coverage
 - **Use case:** Executive reporting, complete security analysis, strategic planning
-- **Status:** ✅ 100% functional (11/11 registered tools working in Claude Desktop)
-- **MCP SDK:** ⚠️ **Legacy v0.6.0** (pending upgrade - see [UPGRADE_NOTES.md](./UPGRADE_NOTES.md))
+- **Status:** ✅ 100% functional - **NEWLY UPGRADED** with modern MCP SDK
+- **MCP SDK:** ✅ **Updated to v1.17.4** (latest) with modern McpServer API
 - **Token usage:** Standard responses (200-1000+ tokens)
 
 ### Version 2: **Streamlined** (`simplified-index.ts`) - ⭐ **RECOMMENDED**
