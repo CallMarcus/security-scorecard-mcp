@@ -18,6 +18,7 @@ A Model Context Protocol (MCP) server that integrates with the [SecurityScorecar
 - **Tools:** 11+ registered tools with full API coverage
 - **Use case:** Executive reporting, complete security analysis, strategic planning
 - **Status:** ✅ 100% functional (11/11 registered tools working in Claude Desktop)
+- **MCP SDK:** ⚠️ **Legacy v0.6.0** (pending upgrade - see [UPGRADE_NOTES.md](./UPGRADE_NOTES.md))
 - **Token usage:** Standard responses (200-1000+ tokens)
 
 ### Version 2: **Streamlined** (`simplified-index.ts`) - ⭐ **RECOMMENDED**
@@ -25,6 +26,7 @@ A Model Context Protocol (MCP) server that integrates with the [SecurityScorecar
 - **Tools:** 8 specialized tools with intelligent response modes
 - **Use case:** Operational teams, quick queries, efficient Claude Desktop usage
 - **Status:** ✅ Production ready with intelligent response system
+- **MCP SDK:** ✅ **Updated to v1.17.4** (latest) with modern McpServer API
 - **Token usage:** 90% reduction for simple queries (15-50 tokens vs 1000+ tokens)
 - **Special features:** Minimal/standard/detailed response modes, cross-tool validation
 
