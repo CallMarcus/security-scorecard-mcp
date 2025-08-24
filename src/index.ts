@@ -1,16 +1,12 @@
 #!/usr/bin/env node
 
-import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js";
 import { getFindingsByCategory } from "./get_findings_by_category.js";
 import { getEndpointDetails } from "./api_reference.js";
 import { getAssetInventory, getAssetFindings, compareAssets } from "./asset_management.js";
-import {
-  CallToolRequestSchema,
-  ErrorCode,
-  ListToolsRequestSchema,
-  McpError,
-} from "@modelcontextprotocol/sdk/types.js";
+import { z } from "zod";
 
 // Base URL for the Security Scorecard API
 const API_BASE_URL = "https://api.securityscorecard.io";
@@ -124,7 +120,7 @@ interface DetailedAssetIssues {
 
 
 export class ScoreImpactSecurityScorecardServer {
-  private server: Server;
+  private server: McpServer;
   private config: {
     apiToken: string;
     defaultDomain: string;
@@ -142,17 +138,10 @@ export class ScoreImpactSecurityScorecardServer {
   private pageSize: number;
 
   constructor() {
-    this.server = new Server(
-      {
-        name: "score-impact-securityscorecard-server-live",
-        version: "4.0.2", // Incremented version for the fix
-      },
-      {
-        capabilities: {
-          tools: {},
-        },
-      }
-    );
+    this.server = new McpServer({
+      name: "score-impact-securityscorecard-server-live",
+      version: "4.0.2", // Incremented version for the fix
+    });
 
     this.config = {
       apiToken: process.env.SECURITY_SCORECARD_API_TOKEN || "",
@@ -180,7 +169,7 @@ export class ScoreImpactSecurityScorecardServer {
     this.lastRefill = Date.now();
     this.pageSize = parseInt(process.env.SCORECARD_PAGE_SIZE || "100", 10);
 
-    this.setupToolHandlers();
+    this.setupTools();
   }
 
   /**
@@ -5304,6 +5293,83 @@ export class ScoreImpactSecurityScorecardServer {
     return Object.entries(severities)
       .map(([sev, count]) => `${count} ${sev}`)
       .join(', ');
+  }
+
+  // New MCP SDK v1.17.4 Tool Registration 
+  private setupTools() {
+    // Tool 1: get_score_improvement_roadmap
+    this.server.registerTool("get_score_improvement_roadmap", {
+      title: "Score Improvement Roadmap",
+      description: "🎯 STRATEGIC: Get a roadmap to improve from the current grade to a target grade, with ROI prioritization.",
+      inputSchema: {
+        domain: z.string().describe("The company domain to analyze").default(this.config.defaultDomain),
+        target_grade: z.enum(["C", "B", "A"]).describe("The target grade to achieve").default("A")
+      }
+    }, async (args) => {
+      try {
+        const { domain, target_grade } = args;
+        const result = await this.getScoreImprovementRoadmap(domain, target_grade);
+        return {
+          content: [{
+            type: "text",
+            text: result
+          }]
+        };
+      } catch (error) {
+        throw new McpError(ErrorCode.InternalError, `Failed to get score improvement roadmap: ${error}`);
+      }
+    });
+
+    // Tool 2: calculate_factor_score_impact  
+    this.server.registerTool("calculate_factor_score_impact", {
+      title: "Factor Score Impact Analysis",
+      description: "💰 ROI ANALYSIS: Calculate which security factors have the biggest impact on the overall score based on real data.",
+      inputSchema: {
+        domain: z.string().describe("The company domain to analyze").default(this.config.defaultDomain)
+      }
+    }, async (args) => {
+      try {
+        const { domain } = args;
+        const result = await this.calculateFactorScoreImpact(domain);
+        return {
+          content: [{
+            type: "text",
+            text: result
+          }]
+        };
+      } catch (error) {
+        throw new McpError(ErrorCode.InternalError, `Failed to calculate factor score impact: ${error}`);
+      }
+    });
+
+    // Tool 3: get_issues_by_roi
+    this.server.registerTool("get_issues_by_roi", {
+      title: "Issues by ROI",
+      description: "🚀 PRIORITY: Get a list of issue types ranked by ROI (Score Impact vs. Implementation Effort).",
+      inputSchema: {
+        domain: z.string().describe("The company domain to analyze").default(this.config.defaultDomain),
+        top_n: z.number().describe("Number of top ROI issues to return").default(10),
+        status: z.enum(["active", "historical"]).describe("Issue status to query").default("active")
+      }
+    }, async (args) => {
+      try {
+        const { domain, top_n, status } = args;
+        const result = await this.getIssuesByROI(domain, top_n, status);
+        return {
+          content: [{
+            type: "text", 
+            text: result
+          }]
+        };
+      } catch (error) {
+        throw new McpError(ErrorCode.InternalError, `Failed to get issues by ROI: ${error}`);
+      }
+    });
+
+    // TODO: Add remaining tools following the same pattern
+    // Tools to migrate: find_high_impact_findings_across_assets, get_findings_by_asset, 
+    // get_findings_by_category, generate_remediation_report, get_asset_inventory,
+    // get_asset_findings, compare_assets, call_api_endpoint, and others...
   }
 
   async run() {
