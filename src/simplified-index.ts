@@ -18,10 +18,12 @@ class SimplifiedSecurityScorecardServer {
   private config: SecurityScorecardConfig;
 
   constructor() {
-    // Initialize new McpServer
+    // Initialize new McpServer with MCP 2025-06-18 schema compliance
     this.server = new McpServer({
       name: "security-scorecard-simplified",
-      version: "1.0.0",
+      version: "4.1.0", // Updated for MCP 2025-06-18 schema compliance
+      // Protocol version alignment with latest schema
+      protocolVersion: "2025-06-18"
     });
 
     this.config = {
@@ -39,13 +41,26 @@ class SimplifiedSecurityScorecardServer {
   }
 
   private setupTools() {
-    // Register security_dashboard tool
+    // Register security_dashboard tool - Enhanced with MCP 2025-06-18 schema
     this.server.registerTool("security_dashboard", {
-      title: "Security Dashboard",
-      description: "📊 SECURITY STATUS: Get security score, grade, and key metrics. INTELLIGENT RESPONSES: Use 'minimal' for simple questions like 'what's nestle.com score/grade?' (10-20 tokens). Use 'standard' for security overview (200-300 tokens). Use 'detailed' for comprehensive analysis (800+ tokens).",
+      title: "Security Dashboard Overview",
+      description: "📊 SECURITY STATUS: Get comprehensive security score, grade, and key metrics with intelligent response modes. Supports minimal responses for quick queries and detailed analysis for comprehensive security overviews.",
+      // Enhanced metadata for better tool discovery
+      annotations: {
+        category: "security-overview",
+        complexity: "low-to-high",
+        dataSource: "SecurityScorecard API",
+        outputFormat: "structured-report",
+        responseTime: "fast"
+      },
       inputSchema: {
-        domain: z.string().describe("Company domain to analyze").default(this.config.defaultDomain),
-        response_mode: z.enum(["minimal", "standard", "detailed"]).describe("Response detail level").default("minimal")
+        domain: z.string()
+          .min(1, "Domain is required")
+          .describe("Company domain to analyze (e.g., example.com)")
+          .default(this.config.defaultDomain),
+        response_mode: z.enum(["minimal", "standard", "detailed"])
+          .describe("Response detail level: minimal (10-20 tokens), standard (200-300 tokens), detailed (800+ tokens)")
+          .default("minimal")
       }
     }, async (args) => {
       const { domain, response_mode = "minimal" } = args;
@@ -59,7 +74,7 @@ class SimplifiedSecurityScorecardServer {
           return {
             content: [{
               type: "text",
-              text: `${domain}: Score ${score}/100, Grade ${grade}`
+              text: `${domain}: Score ${score}/100, Grade ${grade}\n\n---\n*Generated: ${new Date().toISOString()} | Schema: 2025-06-18*`
             }]
           };
         }
@@ -73,7 +88,7 @@ class SimplifiedSecurityScorecardServer {
           return {
             content: [{
               type: "text",
-              text: `# Security Overview: ${domain}\n\n**Current Status:** Score ${score}/100, Grade ${grade}\n\n**Top 3 Risk Areas:** ${topRisks}\n\n**Status:** ${score >= 80 ? '✅ Good' : score >= 60 ? '⚠️ Needs attention' : '❌ Critical'}`
+              text: `# Security Overview: ${domain}\n\n**Current Status:** Score ${score}/100, Grade ${grade}\n\n**Top 3 Risk Areas:** ${topRisks}\n\n**Status:** ${score >= 80 ? '✅ Good' : score >= 60 ? '⚠️ Needs attention' : '❌ Critical'}\n\n---\n*Generated: ${new Date().toISOString()} | Mode: ${response_mode} | Schema: 2025-06-18*`
             }]
           };
         }
@@ -94,6 +109,9 @@ class SimplifiedSecurityScorecardServer {
         if (score < 60) analysis += `- 🚨 **Critical**: Immediate security attention required\n`;
         if (score < 80) analysis += `- ⚠️ **Priority**: Focus on lowest-scoring security factors\n`;
         analysis += `- 📈 **Target**: Aim for Grade A (80+ score) for optimal security posture`;
+        
+        // Add enhanced metadata footer
+        analysis += `\n\n---\n*Generated: ${new Date().toISOString()} | Mode: ${response_mode} | Domain: ${domain} | Schema: 2025-06-18*`;
 
         return {
           content: [{
@@ -107,14 +125,29 @@ class SimplifiedSecurityScorecardServer {
       }
     });
 
-    // Register analyze_security_risks tool
+    // Register analyze_security_risks tool - Enhanced with MCP 2025-06-18 schema  
     this.server.registerTool("analyze_security_risks", {
-      title: "Security Risk Analysis", 
-      description: "🚨 SECURITY RISKS: Analyze security risks and issues. INTELLIGENT RESPONSES: Use 'minimal' for simple questions like 'top 3 issues' (50-100 tokens). Use 'standard' for risk overview (300-500 tokens). Use 'detailed' for comprehensive analysis.",
+      title: "Security Risk Analysis & Prioritization", 
+      description: "🚨 SECURITY RISKS: Comprehensive security risk analysis with intelligent prioritization. Analyzes critical vulnerabilities, risk patterns, and provides actionable remediation guidance with flexible response modes.",
+      // Enhanced metadata for better tool discovery
+      annotations: {
+        category: "security-analysis",
+        complexity: "medium",
+        dataSource: "SecurityScorecard API",
+        outputFormat: "prioritized-analysis",
+        responseTime: "medium"
+      },
       inputSchema: {
-        domain: z.string().describe("Company domain to analyze").default(this.config.defaultDomain),
-        focus: z.enum(["critical", "all", "quick-wins"]).describe("Focus area").default("all"),
-        response_mode: z.enum(["minimal", "standard", "detailed"]).describe("Response detail level").default("minimal")
+        domain: z.string()
+          .min(1, "Domain is required")
+          .describe("Company domain to analyze (e.g., example.com)")
+          .default(this.config.defaultDomain),
+        focus: z.enum(["critical", "all", "quick-wins"])
+          .describe("Focus area: critical (high/critical issues only), all (complete analysis), quick-wins (easy fixes)")
+          .default("all"),
+        response_mode: z.enum(["minimal", "standard", "detailed"])
+          .describe("Response detail level: minimal (50-100 tokens), standard (300-500 tokens), detailed (comprehensive)")
+          .default("minimal")
       }
     }, async (args) => {
       const { domain, focus = "all", response_mode = "minimal" } = args;
@@ -130,7 +163,7 @@ class SimplifiedSecurityScorecardServer {
           return {
             content: [{
               type: "text", 
-              text: `Top 3 issues: ${topIssues.join(", ")}`
+              text: `Top 3 issues: ${topIssues.join(", ")}\n\n---\n*Generated: ${new Date().toISOString()} | Focus: ${focus} | Schema: 2025-06-18*`
             }]
           };
         }
@@ -151,6 +184,9 @@ class SimplifiedSecurityScorecardServer {
           analysis += `- Factors with critical/high issues: ${criticalFactors.length}\n`;
           analysis += `- Immediate attention required: ${factorBreakdown.filter(f => f.critical_count > 0).length}\n`;
         }
+        
+        // Add enhanced metadata footer
+        analysis += `\n\n---\n*Generated: ${new Date().toISOString()} | Focus: ${focus} | Mode: ${response_mode} | Schema: 2025-06-18*`;
 
         return {
           content: [{
