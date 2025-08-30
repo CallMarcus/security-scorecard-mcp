@@ -5,6 +5,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { getFindingsByCategory } from "./get_findings_by_category.js";
 import { getAssetInventory } from "./asset_management.js";
 import { createSecurityScorecardClient } from "./api/client.js";
+import { ApiReferenceClient } from "./integration/api-reference-client.js";
 import { z } from "zod";
 
 interface SecurityScorecardConfig {
@@ -16,6 +17,7 @@ class SimplifiedSecurityScorecardServer {
   private server: McpServer;
   private client: any;
   private config: SecurityScorecardConfig;
+  private apiReferenceClient: ApiReferenceClient;
 
   constructor() {
     // Initialize new McpServer with MCP 2025-06-18 schema compliance
@@ -37,6 +39,10 @@ class SimplifiedSecurityScorecardServer {
     }
 
     this.client = createSecurityScorecardClient(this.config.apiToken);
+    
+    // Initialize API reference client for endpoint discovery
+    this.apiReferenceClient = new ApiReferenceClient();
+    
     this.setupTools();
   }
 
@@ -336,6 +342,82 @@ class SimplifiedSecurityScorecardServer {
 
       } catch (error) {
         throw new Error(`Failed to analyze email security for ${domain}: ${error}`);
+      }
+    });
+
+    // Register API discovery tool for endpoint search
+    this.server.registerTool("api_discovery", {
+      title: "SecurityScorecard API Discovery",
+      description: "🔍 API DISCOVERY: Search and discover SecurityScorecard API endpoints from 591 available endpoints. Find exact endpoints for your security analysis needs with intelligent search, filtering, and cURL examples.",
+      annotations: {
+        category: "api-discovery",
+        complexity: "low",
+        dataSource: "scorecard-api-reference",
+        outputFormat: "structured-endpoints",
+        responseTime: "fast"
+      },
+      inputSchema: {
+        query: z.string()
+          .min(1, "Search query is required")
+          .describe("Search query for API endpoints (e.g., 'security score', 'vulnerabilities', 'company data')"),
+        tag: z.string()
+          .describe("Filter by API tag/category (e.g., 'Companies', 'Portfolios', 'Issues')")
+          .optional(),
+        method: z.enum(["GET", "POST", "PUT", "DELETE", "PATCH"])
+          .describe("Filter by HTTP method")
+          .optional(),
+        limit: z.number()
+          .min(1)
+          .max(20)
+          .describe("Maximum number of results to return")
+          .default(8)
+      }
+    }, async (args) => {
+      const { query, tag, method, limit = 8 } = args;
+      
+      try {
+        const results = this.apiReferenceClient.search(query, { tag, method, limit });
+        
+        if (results.length === 0) {
+          return {
+            content: [{
+              type: "text",
+              text: `# 🔍 API Discovery Results\n\n❌ No endpoints found for query: "${query}"\n\n**Suggestions:**\n- Try broader terms like "company", "security", "score"\n- Use specific API categories: "Companies", "Portfolios", "Issues"\n- Search for HTTP methods: "GET", "POST"\n\n**Available:** 591 total SecurityScorecard API endpoints`
+            }]
+          };
+        }
+
+        let response = `# 🔍 API Discovery Results\n\n**Query:** "${query}"\n**Found:** ${results.length} endpoints\n\n`;
+        
+        results.forEach((result, index) => {
+          const { endpoint } = result;
+          response += `## ${index + 1}. ${endpoint.method} ${endpoint.path}\n`;
+          response += `**Summary:** ${endpoint.summary}\n`;
+          response += `**Category:** ${endpoint.tag}\n`;
+          
+          if (endpoint.requiredPathParams.length > 0) {
+            response += `**Required Parameters:** ${endpoint.requiredPathParams.join(", ")}\n`;
+          }
+          
+          response += `**cURL Example:**\n\`\`\`bash\ncurl -H "Authorization: Token YOUR_API_TOKEN" \\\n  "https://api.securityscorecard.io${endpoint.path}"\n\`\`\`\n\n`;
+        });
+
+        response += `---\n*Searched ${this.apiReferenceClient.search("", {}).length} total endpoints | Generated: ${new Date().toISOString()}*`;
+
+        return {
+          content: [{
+            type: "text",
+            text: response
+          }]
+        };
+
+      } catch (error) {
+        return {
+          content: [{
+            type: "text", 
+            text: `# ❌ API Discovery Error\n\n**Query:** "${query}"\n**Error:** ${error}\n\n**Troubleshooting:**\n- Ensure scorecard-api-reference is available\n- Check SCORECARD_API_REFERENCE_PATH environment variable\n- Run setup-api-integration.sh if needed`
+          }]
+        };
       }
     });
 

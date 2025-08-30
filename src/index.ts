@@ -6,6 +6,7 @@ import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js";
 import { getFindingsByCategory } from "./get_findings_by_category.js";
 import { getEndpointDetails } from "./api_reference.js";
 import { getAssetInventory, getAssetFindings, compareAssets } from "./asset_management.js";
+import { ApiReferenceClient } from "./integration/api-reference-client.js";
 import { z } from "zod";
 
 // Base URL for the Security Scorecard API
@@ -138,6 +139,7 @@ export class ScoreImpactSecurityScorecardServer {
   private tokens: number;
   private lastRefill: number;
   private pageSize: number;
+  private apiReferenceClient: ApiReferenceClient;
 
   constructor() {
     this.server = new McpServer({
@@ -172,6 +174,9 @@ export class ScoreImpactSecurityScorecardServer {
     this.tokens = this.burstLimit;
     this.lastRefill = Date.now();
     this.pageSize = parseInt(process.env.SCORECARD_PAGE_SIZE || "100", 10);
+    
+    // Initialize API reference client for endpoint discovery
+    this.apiReferenceClient = new ApiReferenceClient();
 
     this.setupTools();
   }
@@ -997,6 +1002,123 @@ export class ScoreImpactSecurityScorecardServer {
         };
       } catch (error) {
         throw new McpError(ErrorCode.InternalError, `Failed to diagnose API coverage: ${error}`);
+      }
+    });
+
+    // Tool 16: api_discovery - NEW: Search 591 SecurityScorecard API endpoints
+    this.server.registerTool("api_discovery", {
+      title: "SecurityScorecard API Discovery",
+      description: "🔍 API DISCOVERY: Search and discover SecurityScorecard API endpoints from 591 available endpoints. Find specific APIs for vulnerability scanning, compliance checks, risk assessment, and more through natural language queries.",
+      annotations: {
+        category: "api-discovery",
+        complexity: "low",
+        dataSource: "SecurityScorecard API Documentation",
+        outputFormat: "structured-endpoints",
+        responseTime: "fast"
+      },
+      inputSchema: {
+        query: z.string()
+          .min(3, "Query must be at least 3 characters")
+          .describe("Natural language query to find API endpoints (e.g., 'vulnerability scanning', 'compliance audit', 'risk assessment')")
+          .default("security endpoints"),
+        method: z.enum(["GET", "POST", "PUT", "DELETE", "PATCH"])
+          .describe("Filter by HTTP method")
+          .optional(),
+        category: z.enum(["security", "compliance", "risk", "assets", "portfolios", "findings", "audit"])
+          .describe("Filter by API category or tag")
+          .optional(),
+        limit: z.number()
+          .min(1).max(20)
+          .describe("Maximum number of results to return")
+          .default(8),
+        include_docs: z.boolean()
+          .describe("Include detailed endpoint documentation")
+          .default(false)
+      }
+    }, async (args) => {
+      try {
+        const { query, method, category, limit = 8, include_docs = false } = args;
+        
+        const searchResults = this.apiReferenceClient.search(query, {
+          method,
+          tag: category,
+          limit
+        });
+
+        if (searchResults.length === 0) {
+          return {
+            content: [{
+              type: "text",
+              text: `# 🔍 API Discovery Results\n\nNo endpoints found for query: "${query}"\n\n💡 **Suggestions:**\n- Try broader terms like "security", "compliance", or "risk"\n- Check available categories: security, compliance, risk, assets, portfolios\n- Use different HTTP methods: GET, POST, PUT, DELETE\n\n---\n*Generated: ${new Date().toISOString()} | Query: "${query}" | Schema: 2025-06-18*`
+            }]
+          };
+        }
+
+        let analysis = `# 🔍 API Discovery Results\n\n**Query:** "${query}"\n**Found:** ${searchResults.length} endpoints\n\n`;
+
+        searchResults.forEach((result, index) => {
+          const { endpoint } = result;
+          analysis += `## ${index + 1}. ${endpoint.method} ${endpoint.path}\n`;
+          analysis += `- **Summary:** ${endpoint.summary}\n`;
+          analysis += `- **Category:** ${endpoint.tag}\n`;
+          analysis += `- **Operation ID:** ${endpoint.operationId}\n`;
+          
+          if (endpoint.requiredPathParams.length > 0) {
+            analysis += `- **Required Params:** ${endpoint.requiredPathParams.join(', ')}\n`;
+          }
+          
+          if (endpoint.queryParams.length > 0) {
+            analysis += `- **Query Params:** ${endpoint.queryParams.join(', ')}\n`;
+          }
+          
+          analysis += `- **Documentation:** ${endpoint.file}\n\n`;
+          
+          if (include_docs && index < 3) { // Only show docs for top 3 results
+            try {
+              const docContent = this.apiReferenceClient.getEndpointDoc(endpoint.file);
+              const curlMatch = docContent.match(/## Minimal cURL\n```bash\n([\s\S]*?)```/);
+              if (curlMatch) {
+                analysis += `**Example cURL:**\n\`\`\`bash\n${curlMatch[1].trim()}\n\`\`\`\n\n`;
+              }
+            } catch (error) {
+              // Skip if documentation not found
+            }
+          }
+        });
+
+        // Add search suggestions
+        if (searchResults.length < 3) {
+          analysis += `## 💡 Search Suggestions\n\n`;
+          analysis += `Try these related queries:\n`;
+          
+          const suggestions = [
+            `"${query} endpoints"`,
+            `"${category || 'security'} APIs"`,
+            `"${method || 'GET'} ${query}"`
+          ];
+          
+          suggestions.forEach(suggestion => {
+            analysis += `- ${suggestion}\n`;
+          });
+        }
+        
+        // Add metadata footer
+        analysis += `\n---\n*Generated: ${new Date().toISOString()} | Query: "${query}" | Results: ${searchResults.length} | Schema: 2025-06-18*`;
+
+        return {
+          content: [{
+            type: "text",
+            text: analysis
+          }]
+        };
+      } catch (error) {
+        // Graceful fallback if API reference not available
+        return {
+          content: [{
+            type: "text",
+            text: `# ⚠️ API Discovery Unavailable\n\n**Error:** ${error}\n\n💡 **Note:** API discovery requires the scorecard-api-reference repository to be available at ../scorecard-api-reference/\n\n**Current available tools:**\n- security_dashboard\n- analyze_security_risks\n- create_improvement_plan\n- [... other existing tools]\n\n---\n*Generated: ${new Date().toISOString()} | Schema: 2025-06-18*`
+          }]
+        };
       }
     });
   }
