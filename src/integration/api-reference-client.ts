@@ -96,6 +96,9 @@ export class ApiReferenceClient {
     const extractor = await this.getEmbedder();
     const result = await extractor(query, { pooling: 'mean', normalize: true });
     const raw = result?.data;
+    const isNumericArrayLike = (candidate: unknown): candidate is ArrayLike<number> => (
+      ArrayBuffer.isView(candidate) && !(candidate instanceof DataView)
+    );
 
     if (Array.isArray(raw)) {
       const flatten = (value: unknown): number[] => {
@@ -104,6 +107,17 @@ export class ApiReferenceClient {
         }
         if (Array.isArray(value)) {
           return value.flatMap(inner => flatten(inner));
+        }
+        if (value && typeof value === 'object') {
+          if (isNumericArrayLike(value)) {
+            return Array.from(value);
+          }
+          if ('data' in value) {
+            const inner = (value as { data?: unknown }).data;
+            if (isNumericArrayLike(inner)) {
+              return Array.from(inner);
+            }
+          }
         }
         return [];
       };
@@ -114,14 +128,14 @@ export class ApiReferenceClient {
       }
     }
 
-    if (raw && ArrayBuffer.isView(raw)) {
-      return Array.from(raw as Float32Array);
+    if (isNumericArrayLike(raw)) {
+      return Array.from(raw);
     }
 
     if (raw && typeof raw === 'object' && 'data' in raw) {
       const inner = (raw as { data: Float32Array }).data;
-      if (inner && ArrayBuffer.isView(inner)) {
-        return Array.from(inner as Float32Array);
+      if (isNumericArrayLike(inner)) {
+        return Array.from(inner);
       }
     }
 
