@@ -22,13 +22,39 @@ A Model Context Protocol (MCP) server that integrates with the [SecurityScorecar
 - **Token usage:** Standard responses (200-1000+ tokens)
 
 ### Version 2: **Streamlined** (`simplified-index.ts`) - ⭐ **RECOMMENDED**
-**Best for:** Daily operations, quick answers, Claude Desktop efficiency  
+**Best for:** Daily operations, quick answers, Claude Desktop efficiency
 - **Tools:** 8 specialized tools with intelligent response modes
 - **Use case:** Operational teams, quick queries, efficient Claude Desktop usage
 - **Status:** ✅ Production ready with intelligent response system
 - **MCP SDK:** ✅ **Updated to v1.17.4** (latest) with modern McpServer API
 - **Token usage:** 90% reduction for simple queries (15-50 tokens vs 1000+ tokens)
 - **Special features:** Minimal/standard/detailed response modes, cross-tool validation
+
+### 🔍 Smarter API Discovery with Hybrid Search
+- **Semantic + keyword scoring** ensure natural-language questions match the right endpoints even when wording differs.
+- **Adjustable weighting** via `API_DISCOVERY_KEYWORD_WEIGHT` and `API_DISCOVERY_SEMANTIC_WEIGHT` environment variables for both MCP server builds.
+- **Rich metadata** now shows hybrid, semantic, and keyword relevance plus the exact text used to compute embeddings so you can understand why a result surfaced.
+
+Example response excerpt:
+
+```
+# 🔍 API Discovery Results
+**Query:** "credential rotation"
+**Found:** 2 endpoints
+**Weighting:** keyword 0.35, semantic 0.65
+
+## 1. POST /v1/users/reset-password
+**Summary:** Trigger account recovery email for locked users
+**Relevance:** Hybrid 0.71 (Semantic 0.71, Keyword 0.00)
+**Semantic Context:**
+Trigger account recovery email for locked users
+POST /v1/users/reset-password
+Tag: Accounts
+
+## 2. GET /v1/credential-policies
+**Summary:** List credential rotation policies for compliance teams
+**Relevance:** Hybrid 0.63 (Semantic 0.42, Keyword 0.95)
+```
 
 ## 🎯 Choose Your Version
 
