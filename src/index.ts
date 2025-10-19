@@ -140,6 +140,14 @@ export class ScoreImpactSecurityScorecardServer {
   private lastRefill: number;
   private pageSize: number;
   private apiReferenceClient: ApiReferenceClient;
+  private apiDiscoveryWeights = {
+    keyword: Number.isFinite(Number(process.env.API_DISCOVERY_KEYWORD_WEIGHT))
+      ? Number(process.env.API_DISCOVERY_KEYWORD_WEIGHT)
+      : 0.35,
+    semantic: Number.isFinite(Number(process.env.API_DISCOVERY_SEMANTIC_WEIGHT))
+      ? Number(process.env.API_DISCOVERY_SEMANTIC_WEIGHT)
+      : 0.65,
+  };
 
   constructor() {
     this.server = new McpServer({
@@ -1039,10 +1047,12 @@ export class ScoreImpactSecurityScorecardServer {
       try {
         const { query, method, category, limit = 8, include_docs = false } = args;
         
-        const searchResults = this.apiReferenceClient.search(query, {
+        const searchResults = await this.apiReferenceClient.hybridSearch(query, {
           method,
           tag: category,
-          limit
+          limit,
+          keywordWeight: this.apiDiscoveryWeights.keyword,
+          semanticWeight: this.apiDiscoveryWeights.semantic
         });
 
         if (searchResults.length === 0) {
@@ -1054,7 +1064,10 @@ export class ScoreImpactSecurityScorecardServer {
           };
         }
 
-        let analysis = `# 🔍 API Discovery Results\n\n**Query:** "${query}"\n**Found:** ${searchResults.length} endpoints\n\n`;
+        const totalEndpoints = this.apiReferenceClient.getEndpointCount();
+        let analysis = `# 🔍 API Discovery Results\n\n**Query:** "${query}"\n**Found:** ${searchResults.length} endpoints\n`;
+        analysis += `**Weighting:** keyword ${this.apiDiscoveryWeights.keyword.toFixed(2)}, semantic ${this.apiDiscoveryWeights.semantic.toFixed(2)}\n`;
+        analysis += `**Indexed:** ${totalEndpoints} total endpoints\n\n`;
 
         searchResults.forEach((result, index) => {
           const { endpoint } = result;
@@ -1062,11 +1075,18 @@ export class ScoreImpactSecurityScorecardServer {
           analysis += `- **Summary:** ${endpoint.summary}\n`;
           analysis += `- **Category:** ${endpoint.tag}\n`;
           analysis += `- **Operation ID:** ${endpoint.operationId}\n`;
-          
+          const semanticScore = result.semanticScore ?? 0;
+          const keywordScore = result.keywordScore ?? 0;
+          analysis += `- **Relevance:** Hybrid ${result.score.toFixed(2)} (Semantic ${semanticScore.toFixed(2)}, Keyword ${keywordScore.toFixed(2)})\n`;
+
+          if (result.semanticText) {
+            analysis += `- **Semantic Context:**\n\`\`\`text\n${result.semanticText}\n\`\`\`\n`;
+          }
+
           if (endpoint.requiredPathParams.length > 0) {
             analysis += `- **Required Params:** ${endpoint.requiredPathParams.join(', ')}\n`;
           }
-          
+
           if (endpoint.queryParams.length > 0) {
             analysis += `- **Query Params:** ${endpoint.queryParams.join(', ')}\n`;
           }
@@ -1090,7 +1110,7 @@ export class ScoreImpactSecurityScorecardServer {
         if (searchResults.length < 3) {
           analysis += `## 💡 Search Suggestions\n\n`;
           analysis += `Try these related queries:\n`;
-          
+
           const suggestions = [
             `"${query} endpoints"`,
             `"${category || 'security'} APIs"`,
@@ -1103,7 +1123,7 @@ export class ScoreImpactSecurityScorecardServer {
         }
         
         // Add metadata footer
-        analysis += `\n---\n*Generated: ${new Date().toISOString()} | Query: "${query}" | Results: ${searchResults.length} | Schema: 2025-06-18*`;
+        analysis += `\n---\n*Hybrid search across ${totalEndpoints} endpoints | Generated: ${new Date().toISOString()} | Query: "${query}" | Results: ${searchResults.length} | Schema: 2025-06-18*`;
 
         return {
           content: [{

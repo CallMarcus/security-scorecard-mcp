@@ -1,0 +1,3 @@
+{"tag":"Accounts","method":"POST","path":"/v1/users/reset-password","operationId":"resetUserPassword","summary":"Trigger account recovery email for locked users","file":"accounts/reset-password.md","hasBody":true,"requiredPathParams":[],"queryParams":["user_id"]}
+{"tag":"Security","method":"GET","path":"/v1/credential-policies","operationId":"listCredentialPolicies","summary":"List credential rotation policies for compliance teams","file":"security/credential-policies.md","hasBody":false,"requiredPathParams":[],"queryParams":[]}
+{"tag":"Assets","method":"GET","path":"/v1/assets","operationId":"getAssetInventory","summary":"Retrieve inventory of active assets","file":"assets/get-assets.md","hasBody":false,"requiredPathParams":[],"queryParams":["page"]}

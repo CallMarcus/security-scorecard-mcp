@@ -18,6 +18,14 @@ class SimplifiedSecurityScorecardServer {
   private client: any;
   private config: SecurityScorecardConfig;
   private apiReferenceClient: ApiReferenceClient;
+  private apiDiscoveryWeights = {
+    keyword: Number.isFinite(Number(process.env.API_DISCOVERY_KEYWORD_WEIGHT))
+      ? Number(process.env.API_DISCOVERY_KEYWORD_WEIGHT)
+      : 0.35,
+    semantic: Number.isFinite(Number(process.env.API_DISCOVERY_SEMANTIC_WEIGHT))
+      ? Number(process.env.API_DISCOVERY_SEMANTIC_WEIGHT)
+      : 0.65
+  };
 
   constructor() {
     // Initialize new McpServer with MCP 2025-06-18 schema compliance
@@ -376,8 +384,14 @@ class SimplifiedSecurityScorecardServer {
       const { query, tag, method, limit = 8 } = args;
       
       try {
-        const results = this.apiReferenceClient.search(query, { tag, method, limit });
-        
+        const results = await this.apiReferenceClient.hybridSearch(query, {
+          tag,
+          method,
+          limit,
+          keywordWeight: this.apiDiscoveryWeights.keyword,
+          semanticWeight: this.apiDiscoveryWeights.semantic
+        });
+
         if (results.length === 0) {
           return {
             content: [{
@@ -387,22 +401,32 @@ class SimplifiedSecurityScorecardServer {
           };
         }
 
-        let response = `# 🔍 API Discovery Results\n\n**Query:** "${query}"\n**Found:** ${results.length} endpoints\n\n`;
-        
+        const totalEndpoints = this.apiReferenceClient.getEndpointCount();
+        let response = `# 🔍 API Discovery Results\n\n**Query:** "${query}"\n**Found:** ${results.length} endpoints\n`;
+        response += `**Weighting:** keyword ${this.apiDiscoveryWeights.keyword.toFixed(2)}, semantic ${this.apiDiscoveryWeights.semantic.toFixed(2)}\n`;
+        response += `**Indexed:** ${totalEndpoints} total endpoints\n\n`;
+
         results.forEach((result, index) => {
           const { endpoint } = result;
           response += `## ${index + 1}. ${endpoint.method} ${endpoint.path}\n`;
           response += `**Summary:** ${endpoint.summary}\n`;
           response += `**Category:** ${endpoint.tag}\n`;
-          
+          const semanticScore = result.semanticScore ?? 0;
+          const keywordScore = result.keywordScore ?? 0;
+          response += `**Relevance:** Hybrid ${result.score.toFixed(2)} (Semantic ${semanticScore.toFixed(2)}, Keyword ${keywordScore.toFixed(2)})\n`;
+
+          if (result.semanticText) {
+            response += `**Semantic Context:**\n\`\`\`text\n${result.semanticText}\n\`\`\`\n`;
+          }
+
           if (endpoint.requiredPathParams.length > 0) {
             response += `**Required Parameters:** ${endpoint.requiredPathParams.join(", ")}\n`;
           }
-          
+
           response += `**cURL Example:**\n\`\`\`bash\ncurl -H "Authorization: Token YOUR_API_TOKEN" \\\n  "https://api.securityscorecard.io${endpoint.path}"\n\`\`\`\n\n`;
         });
 
-        response += `---\n*Searched ${this.apiReferenceClient.search("", {}).length} total endpoints | Generated: ${new Date().toISOString()}*`;
+        response += `---\n*Hybrid search across ${totalEndpoints} endpoints | Generated: ${new Date().toISOString()}*`;
 
         return {
           content: [{
