@@ -98,7 +98,20 @@ export class ApiReferenceClient {
     const raw = result?.data;
 
     if (Array.isArray(raw)) {
-      return raw.flatMap((value: unknown) => typeof value === 'number' ? value : []);
+      const flatten = (value: unknown): number[] => {
+        if (typeof value === 'number') {
+          return [value];
+        }
+        if (Array.isArray(value)) {
+          return value.flatMap(inner => flatten(inner));
+        }
+        return [];
+      };
+
+      const flattened = raw.flatMap(item => flatten(item));
+      if (flattened.length > 0) {
+        return flattened;
+      }
     }
 
     if (raw && ArrayBuffer.isView(raw)) {
