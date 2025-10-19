@@ -12,6 +12,7 @@
     "test": "node --test tests/*.test.js",
     "test:ts": "node --test tests/*.test.ts",
     "api:generate": "python build_simple_client.py",
+    "api:embed": "node --loader ts-node/esm src/integration/api-reference-embeddings.ts",
     "api:test": "npm run test",
     "api:validate": "node examples/basic_usage.js",
     "api:update": "python split_swagger.py && python build_simple_client.py",

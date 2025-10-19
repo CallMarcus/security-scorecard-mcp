@@ -235,6 +235,16 @@ const issuesInfo = await getEndpointDetails("/companies/{domain}/issues");
 
 These utilities power the endpoint testing script and are used by the remediation report builder to note which API resources were queried.
 
+### API Reference embeddings
+
+Semantic search over the generated API catalog uses cached embeddings stored at `docs/api/index-embeddings.json`. When the source index (`docs/api/index.jsonl`) changes, regenerate the vectors to keep search results accurate:
+
+```bash
+npm run api:embed
+```
+
+The script loads each endpoint definition, derives a compact text summary (including summary, HTTP method, path, and tag), and feeds it through `@xenova/transformers`' MiniLM model. Existing embeddings are reused when the derived text has not changed, so reruns are fast for incremental updates.
+
 ## ✅ Success Indicators
 
 When the installation completes successfully, you should see:
