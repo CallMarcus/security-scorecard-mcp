@@ -30,8 +30,8 @@ if (-not (Test-Path ".\build\simplified-index.js")) {
 }
 
 Write-Host "Build successful"
-Write-Host "✅ Simplified MCP server (5 tools) ready at: build\simplified-index.js"
-Write-Host "🔄 Original MCP server (31 tools) also available at: build\index.js"
+Write-Host "[OK] Simplified MCP server (8 tools) ready at: build\simplified-index.js"
+Write-Host "[OK] Original MCP server (11+ tools) also available at: build\index.js"
 
 # Check if Claude Desktop config exists
 $claudeConfigPath = "$env:APPDATA\Claude\claude_desktop_config.json"
