@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git branch:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nfix: replace emojis with ASCII in setup_simple.ps1\n\nReplace UTF-8 emojis with ASCII markers to fix display issues in PowerShell.\nAlso update tool counts to reflect current state:\n- Simplified: 8 tools (not 5)\n- Original: 11+ tools (not 31)\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(git push:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
