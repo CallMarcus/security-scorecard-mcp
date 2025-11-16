@@ -152,9 +152,7 @@ export class ScoreImpactSecurityScorecardServer {
   constructor() {
     this.server = new McpServer({
       name: "score-impact-securityscorecard-server-live",
-      version: "4.1.0", // Updated for MCP 2025-06-18 schema compliance
-      // Protocol version alignment with latest schema
-      protocolVersion: "2025-06-18"
+      version: "4.1.0"
     });
 
     this.config = {
@@ -603,13 +601,6 @@ export class ScoreImpactSecurityScorecardServer {
     this.server.registerTool("get_score_improvement_roadmap", {
       title: "Security Score Improvement Roadmap",
       description: "🎯 STRATEGIC: Generate a comprehensive roadmap to improve security posture from current grade to target grade, with ROI-based prioritization and actionable recommendations.",
-      // Enhanced metadata for better tool discovery
-      annotations: {
-        category: "security-analysis",
-        complexity: "high",
-        dataSource: "SecurityScorecard API",
-        outputFormat: "structured-report"
-      },
       inputSchema: {
         domain: z.string()
           .min(1, "Domain is required")
@@ -656,12 +647,6 @@ export class ScoreImpactSecurityScorecardServer {
     this.server.registerTool("calculate_factor_score_impact", {
       title: "Security Factor Score Impact Analysis",
       description: "💰 ROI ANALYSIS: Calculate which security factors have the biggest impact on the overall score based on real data. Provides detailed analysis with scoring weights and improvement recommendations.",
-      annotations: {
-        category: "security-analysis",
-        complexity: "medium",
-        dataSource: "SecurityScorecard API",
-        outputFormat: "structured-analysis"
-      },
       inputSchema: {
         domain: z.string()
           .min(1, "Domain is required")
@@ -1017,13 +1002,6 @@ export class ScoreImpactSecurityScorecardServer {
     this.server.registerTool("api_discovery", {
       title: "SecurityScorecard API Discovery",
       description: "🔍 API DISCOVERY: Search and discover SecurityScorecard API endpoints from 591 available endpoints. Find specific APIs for vulnerability scanning, compliance checks, risk assessment, and more through natural language queries.",
-      annotations: {
-        category: "api-discovery",
-        complexity: "low",
-        dataSource: "SecurityScorecard API Documentation",
-        outputFormat: "structured-endpoints",
-        responseTime: "fast"
-      },
       inputSchema: {
         query: z.string()
           .min(3, "Query must be at least 3 characters")

@@ -28,12 +28,9 @@ class SimplifiedSecurityScorecardServer {
   };
 
   constructor() {
-    // Initialize new McpServer with MCP 2025-06-18 schema compliance
     this.server = new McpServer({
       name: "security-scorecard-simplified",
-      version: "4.1.0", // Updated for MCP 2025-06-18 schema compliance
-      // Protocol version alignment with latest schema
-      protocolVersion: "2025-06-18"
+      version: "4.1.0"
     });
 
     this.config = {
@@ -59,14 +56,6 @@ class SimplifiedSecurityScorecardServer {
     this.server.registerTool("security_dashboard", {
       title: "Security Dashboard Overview",
       description: "📊 SECURITY STATUS: Get comprehensive security score, grade, and key metrics with intelligent response modes. Supports minimal responses for quick queries and detailed analysis for comprehensive security overviews.",
-      // Enhanced metadata for better tool discovery
-      annotations: {
-        category: "security-overview",
-        complexity: "low-to-high",
-        dataSource: "SecurityScorecard API",
-        outputFormat: "structured-report",
-        responseTime: "fast"
-      },
       inputSchema: {
         domain: z.string()
           .min(1, "Domain is required")
@@ -143,14 +132,6 @@ class SimplifiedSecurityScorecardServer {
     this.server.registerTool("analyze_security_risks", {
       title: "Security Risk Analysis & Prioritization", 
       description: "🚨 SECURITY RISKS: Comprehensive security risk analysis with intelligent prioritization. Analyzes critical vulnerabilities, risk patterns, and provides actionable remediation guidance with flexible response modes.",
-      // Enhanced metadata for better tool discovery
-      annotations: {
-        category: "security-analysis",
-        complexity: "medium",
-        dataSource: "SecurityScorecard API",
-        outputFormat: "prioritized-analysis",
-        responseTime: "medium"
-      },
       inputSchema: {
         domain: z.string()
           .min(1, "Domain is required")
@@ -357,13 +338,6 @@ class SimplifiedSecurityScorecardServer {
     this.server.registerTool("api_discovery", {
       title: "SecurityScorecard API Discovery",
       description: "🔍 API DISCOVERY: Search and discover SecurityScorecard API endpoints from 591 available endpoints. Find exact endpoints for your security analysis needs with intelligent search, filtering, and cURL examples.",
-      annotations: {
-        category: "api-discovery",
-        complexity: "low",
-        dataSource: "scorecard-api-reference",
-        outputFormat: "structured-endpoints",
-        responseTime: "fast"
-      },
       inputSchema: {
         query: z.string()
           .min(1, "Search query is required")
