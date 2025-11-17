@@ -70,8 +70,8 @@ class SimplifiedSecurityScorecardServer {
       
       try {
         const scoreResponse = await this.client.getCompanyScore(domain);
-        const score = scoreResponse.score || 0;
-        const grade = scoreResponse.grade || 'F';
+        const score = scoreResponse.data?.score || 0;
+        const grade = scoreResponse.data?.grade || 'F';
 
         if (response_mode === "minimal") {
           return {
@@ -84,8 +84,8 @@ class SimplifiedSecurityScorecardServer {
 
         if (response_mode === "standard") {
           const factorsResponse = await this.client.getCompanyFactors(domain);
-          const topRisks = factorsResponse.entries ? 
-            factorsResponse.entries.slice(0, 3).map((f: any) => `${f.name}: ${f.score}/100`).join(", ") : 
+          const topRisks = factorsResponse.data?.entries ?
+            factorsResponse.data.entries.slice(0, 3).map((f: any) => `${f.name}: ${f.score}/100`).join(", ") :
             "No risk data available";
 
           return {
@@ -100,10 +100,10 @@ class SimplifiedSecurityScorecardServer {
         const factorsResponse = await this.client.getCompanyFactors(domain);
         let analysis = `# 📊 Comprehensive Security Dashboard: ${domain}\n\n`;
         analysis += `**Overall Security Score:** ${score}/100 (Grade ${grade})\n\n`;
-        
-        if (factorsResponse.entries) {
+
+        if (factorsResponse.data?.entries) {
           analysis += `## Security Factor Breakdown\n\n`;
-          factorsResponse.entries.forEach((factor: any) => {
+          factorsResponse.data.entries.forEach((factor: any) => {
             analysis += `- **${factor.name}:** ${factor.score}/100\n`;
           });
         }
@@ -215,7 +215,7 @@ class SimplifiedSecurityScorecardServer {
       
       try {
         const scoreResponse = await this.client.getCompanyScore(domain);
-        const currentScore = scoreResponse.score || 0;
+        const currentScore = scoreResponse.data?.score || 0;
         const findings = await getFindingsByCategory(domain, this.config.apiToken);
         const factorBreakdown = findings.factor_breakdown || [];
         

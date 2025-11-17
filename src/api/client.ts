@@ -129,6 +129,13 @@ export class SecurityScorecardApiClient {
   // === COMPANY SCORECARD METHODS ===
 
   /**
+   * Get company score by domain
+   */
+  async getCompanyScore(domain: string): Promise<ApiResponse<any>> {
+    return this.makeRequest('GET', `/companies/${domain}/score`);
+  }
+
+  /**
    * Get company scorecard by domain
    */
   async getCompanyScorecard(domain: string): Promise<ApiResponse<any>> {
