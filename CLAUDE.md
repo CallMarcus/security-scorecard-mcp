@@ -11,7 +11,7 @@ The project provides **two server implementations**:
 1. **Streamlined** (`simplified-index.ts`) - **CURRENT SETUP** - 8 specialized tools for operational workflows with 90% token reduction
 2. **Comprehensive** (`index.ts`) - Full-featured with 11+ tools including executive reporting (not currently in use)
 
-Both implementations use the MCP SDK v1.17.4+ with the modern `McpServer` API and MCP 2025-06-18 schema compliance.
+Both implementations use the MCP SDK v1.25.1+ with the modern `McpServer` API and MCP 2025-06-18 schema compliance.
 
 ## Current Setup
 
