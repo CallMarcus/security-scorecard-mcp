@@ -9,12 +9,15 @@
 - `sort` (optional, string) — stringified object with value for column to sort by and operator
 - `page` (optional, number) — page number, 0 is the first page
 - `limit` (optional, number) — page size, the amount of items per page (max: 200)
-- `search` (optional, string) — word or phrase to search findings for
+- `search` (optional, string) — word or phrase to search for
 - `vendor_domain` (optional, string) — Vendor domains whoes report is needed comma separated
 - `tiers` (optional, string) — Tiers comma separated
 - `incident_likelihoods` (optional, string) — incident likelihood comma separated
+- `report_incident_likelihoods` (optional, string) — incident likelihood by report comma separated
 - `business_impacts` (optional, string) — business impacts comma separated
 - `published_at` (optional, string) — published at filter, accept stringified object with date value and operator
+- `hide_report_body` (optional, string) — pass true if we dont need the report body
+- `is_legacy_report` (optional, string) — pass false if we dont need the legacy reports
 
 ## Responses
 ### 200
@@ -41,10 +44,16 @@ A list of likelihood report data
           "customer_domain": {
             "type": "string"
           },
+          "customer_id": {
+            "type": "string"
+          },
           "vendor_name": {
             "type": "string"
           },
           "vendor_domain": {
+            "type": "string"
+          },
+          "vendor_id": {
             "type": "string"
           },
           "created_at": {
@@ -65,11 +74,20 @@ A list of likelihood report data
           "published_by": {
             "type": "string"
           },
+          "report_incident_likelihood": {
+            "type": "string"
+          },
+          "incident_likelihood_score": {
+            "type": "number"
+          },
           "incident_likelihood": {
             "type": "string"
           },
           "business_impact": {
             "type": "string"
+          },
+          "is_legacy_report": {
+            "type": "boolean"
           },
           "tier": {
             "type": "string"

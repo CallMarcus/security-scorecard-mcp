@@ -1,5 +1,10 @@
 import { readFileSync } from 'fs';
-import { resolve } from 'path';
+import { resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+// ES module equivalent of __dirname
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 export interface ApiEndpoint {
   tag: string;
@@ -34,10 +39,10 @@ export class ApiReferenceClient {
   private embedderPromise: Promise<any> | null = null;
 
   constructor() {
-    // Flexible path resolution for scorecard-api-reference
-    const apiRefPath = process.env.SCORECARD_API_REFERENCE_PATH
-      || resolve(process.cwd(), '../scorecard-api-reference')
-      || '/mnt/c/Claude/scorecard-api-reference';
+    // Self-contained: API reference data is now in this repository
+    // Use project root (two levels up from src/integration/)
+    const projectRoot = resolve(__dirname, '../..');
+    const apiRefPath = process.env.SCORECARD_API_REFERENCE_PATH || projectRoot;
 
     this.indexPath = resolve(apiRefPath, 'docs/api/index.jsonl');
     this.docsRoot = resolve(apiRefPath, 'docs');

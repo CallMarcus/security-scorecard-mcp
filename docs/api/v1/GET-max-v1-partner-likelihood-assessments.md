@@ -6,16 +6,19 @@
 - **operationId:** `getV1PartnerLikelihoodAssessments`
 
 ## Query Parameters
+- `search` (optional, string) — word or phrase to search for
 - `sort` (optional, string) — stringified object with value for column to sort by and operator
 - `page` (optional, number) — page number, 0 is the first page
 - `limit` (optional, number) — page size, the amount of items per page (max: 200)
 - `vendor_domain` (optional, string) — Vendor domains whoes report is needed comma separated
 - `tiers` (optional, string) — Tiers comma separated
 - `incident_likelihoods` (optional, string) — incident likelihood comma separated
+- `report_incident_likelihoods` (optional, string) — report incident likelihood comma separated
 - `business_impacts` (optional, string) — business impacts comma separated
 - `customer_domain` (optional, string) — Customer Domain whoes report is needed comma separated
 - `published` (optional, string) — If true returns published reports, false returns draft reports and no value return all reports
 - `published_at` (optional, string) — published at filter, accept stringified object with date value and operator
+- `hide_report_body` (optional, string) — pass true if we dont need the report body
 
 ## Responses
 ### 200
@@ -42,10 +45,16 @@ A list of likelihood report data
           "customer_domain": {
             "type": "string"
           },
+          "customer_id": {
+            "type": "string"
+          },
           "vendor_name": {
             "type": "string"
           },
           "vendor_domain": {
+            "type": "string"
+          },
+          "vendor_id": {
             "type": "string"
           },
           "created_at": {
@@ -66,11 +75,20 @@ A list of likelihood report data
           "published_by": {
             "type": "string"
           },
+          "report_incident_likelihood": {
+            "type": "string"
+          },
+          "incident_likelihood_score": {
+            "type": "number"
+          },
           "incident_likelihood": {
             "type": "string"
           },
           "business_impact": {
             "type": "string"
+          },
+          "is_legacy_report": {
+            "type": "boolean"
           },
           "tier": {
             "type": "string"

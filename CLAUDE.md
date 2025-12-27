@@ -43,19 +43,25 @@ npm test
 
 ### API Reference Management
 
-The project includes a hybrid search system (semantic + keyword) for API endpoint discovery:
+The project includes a **self-contained** API reference system with hybrid search (semantic + keyword) for endpoint discovery. All API documentation and embeddings are stored locally in `docs/api/`.
 
 ```bash
-# Regenerate API embeddings after updating docs/api/index.jsonl
-npm run api:embed
+# Fetch latest Swagger spec from SecurityScorecard (interactive)
+npm run api:fetch
 
-# Generate API reference from swagger
+# Regenerate docs from api-docs.json
 npm run api:generate
 
-# Update both swagger and API reference
+# Regenerate semantic embeddings
+npm run api:embed
+
+# Full update: regenerate docs + embeddings
 npm run api:update
 
-# Full development workflow (update API + build)
+# Complete workflow: fetch + update + build
+npm run api:full
+
+# Development workflow (update + build)
 npm run dev:api
 ```
 
@@ -204,6 +210,7 @@ Optional:
 - `DEBUG_MODE` - Set to "true" for verbose logging
 - `API_DISCOVERY_KEYWORD_WEIGHT` - Weight for keyword search (default: 0.35)
 - `API_DISCOVERY_SEMANTIC_WEIGHT` - Weight for semantic search (default: 0.65)
+- `SCORECARD_API_REFERENCE_PATH` - Override path to API docs (default: uses local `docs/api/`)
 - `REQUEST_CACHE_TTL_MS` - Cache duration in milliseconds (default: 300000)
 - `REQUESTS_PER_INTERVAL` - Rate limit: requests per interval (default: 5)
 - `REQUEST_INTERVAL_MS` - Rate limit: interval length in ms (default: 1000)
@@ -344,9 +351,18 @@ src/
 ├── asset_management.ts               # Asset inventory utilities
 └── api_reference.ts                  # Endpoint metadata lookup
 
+docs/api/                             # Self-contained API reference
+├── index.jsonl                       # Searchable endpoint index (628 endpoints)
+├── index-embeddings.json             # Semantic embeddings cache
+└── {tag}/*.md                        # Per-endpoint documentation
+
+tools/
+├── update_api_spec.sh                # Fetch latest Swagger from SecurityScorecard
+└── split_swagger.py                  # Generate docs from Swagger spec
+
 tests/                                # Test files (both .js and .ts)
-docs/api/                             # API reference documentation
 build/                                # Compiled JavaScript output
+api-docs.json                         # Source Swagger 2.0 specification
 ```
 
 ## Common Patterns

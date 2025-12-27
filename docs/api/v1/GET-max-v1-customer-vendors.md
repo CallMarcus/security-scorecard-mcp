@@ -15,6 +15,7 @@
 - `tier` (optional, string) — Search using tier
 - `lifecycle` (optional, string) — Search using lifecycle
 - `engagement` (optional, string) — Search using engagement
+- `grade` (optional, string) — Search by grade
 - `incident_likelihood` (optional, string) — Search by incident likelihood
 - `incident_likelihood_trend` (optional, string) — Incident likelihood trend
 - `business_impact` (optional, string) — Business impact
@@ -22,7 +23,12 @@
 - `previous_assessment` (optional, string) — Previous assessment
 - `risk_status` (optional, string) — Risk status
 - `vendor_added_at` (optional, string) — Date the vendor was added, accept stringified object with date value and operator
-- `search` (optional, string) — word or phrase to search findings for
+- `has_active_breach` (optional, string) — Filter vendors by has active breach, accept true or false
+- `search` (optional, string) — word or phrase to search for
+- `quarter` (optional, string) — Filter vendors by incident likelihood in a specific quarter (format: 2025-Q1)
+- `quarterly_incident_likelihood` (optional, string) — Filter vendors by quarterly incident likelihood level
+- `month` (optional, string) — Filter vendors by score grade in a specific month (format: 2025-01)
+- `monthly_grade` (optional, string) — Filter vendors by monthly score grade
 
 ## Responses
 ### 200
@@ -60,19 +66,11 @@ Gets the list of vendors
             "type": "string",
             "description": "Tier "
           },
-          "lifecycle": {
-            "type": "string",
-            "description": "Lifecycle"
-          },
           "risk_status": {
             "type": "array",
             "items": {
               "type": "string"
             }
-          },
-          "engagement": {
-            "type": "string",
-            "description": "Engagement status"
           },
           "incident_likelihood": {
             "type": "string",
@@ -119,6 +117,10 @@ Gets the list of vendors
             "type": "string",
             "description": "Vendor Name"
           },
+          "grade": {
+            "type": "string",
+            "description": "Grade"
+          },
           "breach_id": {
             "type": "string",
             "description": "latest vendor breach id which has not been overrriden for the customer"
@@ -126,6 +128,10 @@ Gets the list of vendors
           "breach_date": {
             "type": "string",
             "description": "latest vendor breach date"
+          },
+          "has_active_breach": {
+            "type": "boolean",
+            "description": "Vendor has active breach"
           }
         },
         "required": [
@@ -135,9 +141,7 @@ Gets the list of vendors
           "customer_domain",
           "business_impact",
           "tier",
-          "lifecycle",
           "risk_status",
-          "engagement",
           "incident_likelihood",
           "custom_tags",
           "assessment_trend",
@@ -145,7 +149,9 @@ Gets the list of vendors
           "previous_assessment",
           "vendor_name",
           "vendor_added_at",
-          "customer_name"
+          "customer_name",
+          "grade",
+          "has_active_breach"
         ],
         "additionalProperties": false
       }

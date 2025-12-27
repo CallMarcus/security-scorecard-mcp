@@ -31,7 +31,7 @@
 - `edited_at` (optional, string) — get the findings that have ben edited at a specific date
 - `triaged_at` (optional, string) — get the findings that have ben triaged in a specific date range
 - `tiers` (optional, string) — The tiers to filter the findings. Optional, defaults to all tiers.
-- `search` (optional, string) — word or phrase to search findings for
+- `search` (optional, string) — word or phrase to search for
 
 ## Responses
 ### 200

@@ -131,6 +131,9 @@ Represents a custom dashboard for user
     "managed_scorecard": {
       "type": "string"
     },
+    "customer_id": {
+      "type": "string"
+    },
     "roles": {
       "type": "array",
       "items": {

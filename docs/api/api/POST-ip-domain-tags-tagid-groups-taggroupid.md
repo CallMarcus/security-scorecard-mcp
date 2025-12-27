@@ -39,8 +39,7 @@ tag group schema
     },
     "tags": {
       "type": "array",
-      "description": "array of tag ids",
-      "items": {}
+      "description": "array of tag ids"
     },
     "description": {
       "type": "string",
