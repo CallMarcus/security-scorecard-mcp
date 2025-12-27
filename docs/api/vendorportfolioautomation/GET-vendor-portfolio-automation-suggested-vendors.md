@@ -303,6 +303,40 @@ A page in a list of VendorPortfolioAutomationSuggestions
             "type": "number",
             "description": "Number of contacts the current vendor has"
           },
+          "custom_fields": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^[\\da-z-]{16,}$",
+                  "description": "Custom field value ID"
+                },
+                "field_type": {
+                  "type": "string",
+                  "description": "Type of the custom field"
+                },
+                "field_label": {
+                  "type": "string",
+                  "description": "Label of the custom field"
+                },
+                "data": {
+                  "type": "string",
+                  "description": "Value of the custom field"
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "field_type",
+                "field_label",
+                "data"
+              ]
+            },
+            "description": "Custom field values for this vendor"
+          },
           "suggestion_confidence": {
             "type": "integer",
             "default": -1,

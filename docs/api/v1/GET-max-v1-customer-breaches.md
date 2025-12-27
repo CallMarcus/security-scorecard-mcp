@@ -115,12 +115,9 @@ Gets the list of breaches
           "vendor_name",
           "breach_id",
           "description",
-          "link",
           "published_date",
-          "customers",
           "report",
           "triaged",
-          "is_active_breach",
           "edited_at",
           "triaged_at"
         ],

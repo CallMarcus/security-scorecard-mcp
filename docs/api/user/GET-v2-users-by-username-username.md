@@ -255,6 +255,23 @@ a person that uses any system at SecurityScorecard
             },
             "language": {
               "type": "string"
+            },
+            "ai_assistant": {
+              "type": "object",
+              "properties": {
+                "conversation_id": {
+                  "type": "string"
+                },
+                "agent_id": {
+                  "type": "string"
+                },
+                "timestamp": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}[ T]\\d{2}:\\d{2}:\\d{2}\\.{0,1}\\d*Z$"
+                }
+              },
+              "additionalProperties": false
             }
           },
           "additionalProperties": false

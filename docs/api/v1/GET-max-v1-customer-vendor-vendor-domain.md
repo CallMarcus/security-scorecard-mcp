@@ -39,19 +39,11 @@ Gets the vendor details
       "type": "string",
       "description": "Tier "
     },
-    "lifecycle": {
-      "type": "string",
-      "description": "Lifecycle"
-    },
     "risk_status": {
       "type": "array",
       "items": {
         "type": "string"
       }
-    },
-    "engagement": {
-      "type": "string",
-      "description": "Engagement status"
     },
     "incident_likelihood": {
       "type": "string",
@@ -98,6 +90,10 @@ Gets the vendor details
       "type": "string",
       "description": "Vendor Name"
     },
+    "grade": {
+      "type": "string",
+      "description": "Grade"
+    },
     "breach_id": {
       "type": "string",
       "description": "latest vendor breach id which has not been overrriden for the customer"
@@ -105,6 +101,10 @@ Gets the vendor details
     "breach_date": {
       "type": "string",
       "description": "latest vendor breach date"
+    },
+    "has_active_breach": {
+      "type": "boolean",
+      "description": "Vendor has active breach"
     }
   },
   "required": [
@@ -114,9 +114,7 @@ Gets the vendor details
     "customer_domain",
     "business_impact",
     "tier",
-    "lifecycle",
     "risk_status",
-    "engagement",
     "incident_likelihood",
     "custom_tags",
     "assessment_trend",
@@ -124,7 +122,9 @@ Gets the vendor details
     "previous_assessment",
     "vendor_name",
     "vendor_added_at",
-    "customer_name"
+    "customer_name",
+    "grade",
+    "has_active_breach"
   ],
   "additionalProperties": false
 }
