@@ -21,7 +21,7 @@ Write-Host "Installing dependencies..."
 npm install
 
 Write-Host "Building TypeScript..."
-npm run build
+npm run build:fast
 
 # Verify build was successful
 if (-not (Test-Path ".\build\simplified-index.js")) {
