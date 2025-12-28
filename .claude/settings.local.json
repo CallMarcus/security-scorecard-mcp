@@ -54,7 +54,12 @@
       "Bash(build_simple_client.py )",
       "Bash(swagger_json_parser.py )",
       "Bash(tools/split_swagger.py)",
-      "Bash(npm run build:fast:*)"
+      "Bash(npm run build:fast:*)",
+      "Bash(git remote set-url:*)",
+      "Bash(jq:*)",
+      "Bash(node:*)",
+      "Bash(npx --yes esbuild:*)",
+      "Bash(gh auth:*)"
     ],
     "deny": [],
     "ask": []
