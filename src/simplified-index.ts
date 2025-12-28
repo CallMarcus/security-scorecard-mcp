@@ -439,12 +439,17 @@ class SimplifiedSecurityScorecardServer {
         if (include_schema && results.length > 0) {
           const topResult = results[0];
           const schemaExtractor = getApiSchemaExtractor();
-          const schemaDesc = schemaExtractor.getSchemaDescription(topResult.endpoint.operationId);
+          // Try operationId first, fall back to method+path
+          const schemaDesc = schemaExtractor.getSchemaDescription(
+            topResult.endpoint.operationId,
+            topResult.endpoint.method,
+            topResult.endpoint.path
+          );
 
           if (schemaDesc) {
             response += `## Schema Details (Top Result)\n\n${schemaDesc}\n\n`;
           } else {
-            response += `## Schema Details\n\n*Schema not found for ${topResult.endpoint.operationId}*\n\n`;
+            response += `## Schema Details\n\n*Schema not found for ${topResult.endpoint.method} ${topResult.endpoint.path}*\n\n`;
           }
         }
 

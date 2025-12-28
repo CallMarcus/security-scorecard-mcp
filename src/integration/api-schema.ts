@@ -160,9 +160,17 @@ export class ApiSchemaExtractor {
 
   /**
    * Get a simplified schema description for an endpoint
+   * Tries operationId first, then falls back to method+path lookup
    */
-  getSchemaDescription(operationId: string): string | null {
-    const schema = this.getSchemaByOperationId(operationId);
+  getSchemaDescription(operationId: string, method?: string, path?: string): string | null {
+    // Try operationId lookup first
+    let schema = this.getSchemaByOperationId(operationId);
+
+    // If not found and method+path provided, try path lookup
+    if (!schema && method && path) {
+      schema = this.getSchemaByPath(method, path);
+    }
+
     if (!schema) return null;
 
     const lines: string[] = [];

@@ -230,18 +230,34 @@ export class ApiReferenceClient {
     const methodText = (endpoint.method || '').toLowerCase();
     const paramsText = [...endpoint.requiredPathParams, ...endpoint.queryParams].join(' ').toLowerCase();
 
+    // Helpers for matching - original tokens use looser matching, synonyms use strict word boundary
+    const matchesLoose = (text: string, token: string): boolean => {
+      // Substring match - good for original user tokens
+      return text.includes(token);
+    };
+
+    const matchesStrict = (text: string, token: string): boolean => {
+      // Word boundary match - prevents "score" matching "scorecard"
+      const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      // Word boundary at start, allow hyphen/underscore/s continuation
+      return new RegExp(`\\b${escaped}(?:[-_s]|es\\b|\\b)`).test(text);
+    };
+
     let score = 0;
 
     for (const token of tokens) {
       const isOriginal = rawTokens.includes(token);
       const weight = isOriginal ? 1.0 : 0.5; // Synonyms worth half
 
+      // Original tokens use loose matching (user intent), synonyms use strict (avoid false positives)
+      const matches = isOriginal ? matchesLoose : matchesStrict;
+
       // Field-weighted scoring
-      if (pathText.includes(token)) score += 3 * weight;      // Path most important
-      if (operationIdText.includes(token)) score += 2 * weight;
-      if (summaryText.includes(token)) score += 1.5 * weight;
-      if (paramsText.includes(token)) score += 1 * weight;
-      if (tagText.includes(token)) score += 0.8 * weight;
+      if (matches(pathText, token)) score += 3 * weight;      // Path most important
+      if (matches(operationIdText, token)) score += 2 * weight;
+      if (matches(summaryText, token)) score += 1.5 * weight;
+      if (matches(paramsText, token)) score += 1 * weight;
+      if (matches(tagText, token)) score += 0.8 * weight;
     }
 
     // Bonus for exact tag match
