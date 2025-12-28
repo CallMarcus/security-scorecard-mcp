@@ -132,14 +132,27 @@ The codebase maintains two complete MCP server implementations that share common
 
 This system helps find the correct syntax for complex SecurityScorecard API calls when the specialized tools don't cover your needs.
 
-- `api-reference-client.ts` - Hybrid search (semantic + keyword) over API endpoints
-  - **Usage:** Automatically invoked by `query_security_data` tool when you ask questions like "How do I get credential rotation policies?"
-  - Returns endpoint path, HTTP method, required parameters, and documentation
-  - Ranks results by relevance (hybrid score combining semantic understanding + keyword matching)
+- `api-reference-client.ts` - Enhanced hybrid search (semantic + keyword) over API endpoints
+  - **Usage:** Automatically invoked by `query_security_data` and `api_discovery` tools
+  - Returns endpoint path, HTTP method, required parameters, confidence score, and documentation
+  - **Features (2025-12-28 update):**
+    - Synonym expansion (30+ mappings: score↔grade, issue↔finding, asset↔domain, etc.)
+    - Field-boosted scoring (path > operationId > summary > params > tag)
+    - Version/deprecation bias (prefers /v2/ endpoints, downweights deprecated)
+    - Confidence scores (0-1 based on score, signal overlap, margin)
+    - Keyword-only fallback when semantic model unavailable
+    - Structured JSON output for programmatic use
 
-- `api-reference-embeddings.ts` - Generates and caches embeddings for semantic search
-  - Enables natural language queries: "credential rotation" → finds `/v1/credential-policies`
+- `api-reference-embeddings.ts` - Generates enriched embeddings for semantic search
+  - Embedding text includes: summary, method+path, tag, description, params, body indicator
   - Pre-computed for performance (cached in `docs/api/index-embeddings.json`)
+  - Run `npm run api:embed` after updating `docs/api/index.jsonl`
+
+- `api-schema.ts` - Schema extraction from api-docs.json (Swagger 2.0)
+  - `getSchemaByOperationId()` - Get request/response schema for an operation
+  - `getSchemaByPath()` - Get schema by HTTP method + path
+  - `getSchemaDescription()` - Get human-readable schema summary
+  - Used by `api_discovery` with `include_schema: true` parameter
 
 **When to rely on API discovery:**
 - You need an endpoint that isn't covered by the 8 specialized tools
@@ -352,8 +365,9 @@ src/
 ├── api/
 │   └── client.ts                     # SecurityScorecard API client
 ├── integration/
-│   ├── api-reference-client.ts       # Hybrid search for API discovery
-│   └── api-reference-embeddings.ts   # Embedding generation script
+│   ├── api-reference-client.ts       # Enhanced hybrid search for API discovery
+│   ├── api-reference-embeddings.ts   # Embedding generation with enriched text
+│   └── api-schema.ts                 # Schema extraction from Swagger spec
 ├── types/
 │   └── api.ts                        # Shared TypeScript types
 ├── get_findings_by_category.ts       # Factor-based finding organization
@@ -362,16 +376,16 @@ src/
 
 docs/api/                             # Self-contained API reference
 ├── index.jsonl                       # Searchable endpoint index (628 endpoints)
-├── index-embeddings.json             # Semantic embeddings cache
+├── index-embeddings.json             # Semantic embeddings cache (enriched)
 └── {tag}/*.md                        # Per-endpoint documentation
 
 tools/
-├── update_api_spec.sh                # Fetch latest Swagger from SecurityScorecard
-└── split_swagger.py                  # Generate docs from Swagger spec
+└── update_api_spec.sh                # Fetch latest Swagger from SecurityScorecard
 
 tests/                                # Test files (both .js and .ts)
 build/                                # Compiled JavaScript output
 api-docs.json                         # Source Swagger 2.0 specification
+split_swagger.py                      # Generate docs from Swagger spec
 ```
 
 ## Common Patterns
@@ -483,22 +497,25 @@ For operational security work, the most frequently used tools are:
 - Tools: 8 specialized operational tools
 
 **When you need to find an API endpoint:**
-1. Use the `query_security_data` tool with a natural language description
-2. API discovery will search for matching endpoints using hybrid search
-3. The tool will suggest the correct syntax and execute the call
-4. If no match found, check `docs/api/` for manual reference
+1. Use `api_discovery` tool with a search query - returns structured JSON with confidence scores
+2. Use `query_security_data` with `validate_only: true` to verify endpoint syntax
+3. API discovery uses synonym expansion, field boosting, and version bias
+4. Results include confidence scores and alternative suggestions
+5. Use `include_schema: true` in `api_discovery` for request/response schema details
 
 **When extending functionality:**
 1. Add tools to `simplified-index.ts` (not `index.ts`)
 2. Implement all 3 response modes (minimal/standard/detailed)
 3. Focus on operational utility over executive reporting
 4. Use API discovery in `query_security_data` for complex endpoint needs
-5. Write tests before submitting PRs
+5. Run `npm run api:embed` after changing `docs/api/index.jsonl`
+6. Write tests before submitting PRs
 
 **Key files for operational work:**
 - `src/simplified-index.ts` - Main server with 8 tools (CURRENT)
 - `src/api/client.ts` - SecurityScorecard API client methods
-- `src/integration/api-reference-client.ts` - API discovery (hybrid search)
+- `src/integration/api-reference-client.ts` - Enhanced API discovery with synonyms, field boosting
+- `src/integration/api-schema.ts` - Schema extraction from Swagger spec
 - `src/get_findings_by_category.ts` - Factor-based finding organization
 - `src/asset_management.ts` - Asset inventory utilities
-- `docs/api/index-embeddings.json` - Cached semantic embeddings for discovery
+- `docs/api/index-embeddings.json` - Cached semantic embeddings (enriched)
