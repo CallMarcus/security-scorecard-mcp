@@ -7,9 +7,13 @@ import { pipeline as createPipeline } from '@xenova/transformers';
 interface ApiIndexEntry {
   operationId: string;
   summary?: string;
+  description?: string;
   path: string;
   method: string;
   tag?: string;
+  requiredPathParams?: string[];
+  queryParams?: string[];
+  hasBody?: boolean;
 }
 
 interface EmbeddingRecord {
@@ -28,11 +32,47 @@ const apiIndexPath = path.resolve(projectRoot, 'docs/api/index.jsonl');
 const embeddingsPath = path.resolve(projectRoot, 'docs/api/index-embeddings.json');
 
 function createTextRepresentation(entry: ApiIndexEntry): string {
-  const parts = [
-    entry.summary?.trim() ?? '',
-    `${entry.method.toUpperCase()} ${entry.path}`,
-    entry.tag ? `Tag: ${entry.tag}` : '',
-  ].filter(Boolean);
+  const parts: string[] = [];
+
+  // Summary (primary search signal)
+  if (entry.summary?.trim()) {
+    parts.push(entry.summary.trim());
+  }
+
+  // Method and path (critical for matching)
+  parts.push(`${entry.method.toUpperCase()} ${entry.path}`);
+
+  // Tag/category
+  if (entry.tag) {
+    parts.push(`Tag: ${entry.tag}`);
+  }
+
+  // Description (first 150 chars for context)
+  if (entry.description?.trim()) {
+    const desc = entry.description.trim();
+    const firstLine = desc.split(/[.\n]/)[0]?.trim();
+    if (firstLine && firstLine !== entry.summary?.trim()) {
+      parts.push(`Description: ${firstLine.slice(0, 150)}`);
+    }
+  }
+
+  // Required path parameters (helps match queries like "get company by domain")
+  if (entry.requiredPathParams?.length) {
+    parts.push(`Required params: ${entry.requiredPathParams.join(', ')}`);
+  }
+
+  // Query parameters (helps match filter/pagination queries)
+  if (entry.queryParams?.length) {
+    const queryList = entry.queryParams.slice(0, 8).join(', ');
+    const suffix = entry.queryParams.length > 8 ? '...' : '';
+    parts.push(`Query params: ${queryList}${suffix}`);
+  }
+
+  // Body indicator
+  if (entry.hasBody) {
+    parts.push('Accepts request body');
+  }
+
   return parts.join('\n');
 }
 

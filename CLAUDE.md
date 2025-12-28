@@ -26,8 +26,11 @@ Both implementations use the MCP SDK v1.25.1+ with the modern `McpServer` API an
 ### Building and Running
 
 ```bash
-# Build TypeScript to JavaScript
+# Build TypeScript to JavaScript (may run out of memory on some systems)
 npm run build
+
+# Fast build using esbuild (recommended - low memory, 164ms)
+npm run build:fast
 
 # Run the streamlined server (recommended)
 npm start
@@ -40,6 +43,12 @@ npm run start:original
 # Run tests
 npm test
 ```
+
+### Known Issues (2025-12-27)
+
+**TypeScript OOM**: `npm run build` (tsc) runs out of memory even with 8GB heap. Use `npm run build:fast` (esbuild) instead - builds in ~130ms.
+
+**Bug Fixed (Verified)**: `security_dashboard` and `create_improvement_plan` tools were calling `this.client.getCompanyScore()` which was missing from the compiled JS. Fixed by changing to `getCompanyFactorSummary()` which uses `/companies/{domain}/summary-factors` endpoint. Tested and confirmed working: `security_dashboard domain=neste.com` returns "Score 96/100, Grade A".
 
 ### API Reference Management
 

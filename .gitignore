@@ -1,13 +1,43 @@
-# dependencies
+# Dependencies
 node_modules/
 
-# variables
+# Environment variables
 .env
+.env.local
 
-# build artifacts
+# Build artifacts
 build/
-scripts/build*
+*.tsbuildinfo
 
-# release archives
-mcp-core.zip
-mcp-docs.zip
+# Release archives
+*.zip
+
+# Generated/extracted data
+extracted_*.json
+validation_results*.json
+
+# Backup files
+*.backup
+*.bak
+
+# Test artifacts
+test-debug-logs/
+*.test-output
+
+# IDE/Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Logs
+*.log
+npm-debug.log*

@@ -23,12 +23,51 @@ export interface ApiSearchResult {
   keywordScore: number;
   semanticScore?: number;
   semanticText?: string;
+  confidence?: number;  // 0-1 confidence score
   weights?: {
     keyword: number;
     semantic: number;
   };
   endpoint: ApiEndpoint;
 }
+
+export interface HybridSearchResponse {
+  results: ApiSearchResult[];
+  searchMode: 'hybrid' | 'keyword-only';
+  semanticDisabledReason?: string;
+}
+
+// Synonym map for common security/API terms
+const SYNONYMS: Record<string, string[]> = {
+  // Security terms
+  'score': ['grade', 'rating', 'scorecard'],
+  'grade': ['score', 'rating'],
+  'issue': ['finding', 'vulnerability', 'problem', 'risk'],
+  'finding': ['issue', 'vulnerability'],
+  'vulnerability': ['issue', 'finding', 'vuln', 'cve'],
+  'risk': ['issue', 'threat', 'exposure'],
+  'threat': ['risk', 'attack', 'malware'],
+
+  // Asset terms
+  'asset': ['company', 'domain', 'hostname', 'ip', 'footprint'],
+  'company': ['organization', 'domain', 'vendor'],
+  'domain': ['company', 'hostname', 'website'],
+  'vendor': ['company', 'third-party', 'supplier'],
+  'footprint': ['asset', 'infrastructure', 'digital-footprint'],
+
+  // Action terms
+  'get': ['list', 'fetch', 'retrieve', 'show'],
+  'list': ['get', 'all', 'fetch'],
+  'create': ['add', 'new', 'post'],
+  'update': ['edit', 'modify', 'patch', 'put'],
+  'delete': ['remove', 'destroy'],
+
+  // Data terms
+  'history': ['historical', 'trend', 'timeline'],
+  'factor': ['category', 'criteria', 'metric'],
+  'portfolio': ['collection', 'group', 'watchlist'],
+  'report': ['export', 'download', 'pdf'],
+};
 
 export class ApiReferenceClient {
   private indexPath: string;
@@ -166,33 +205,74 @@ export class ApiReferenceClient {
     return dot / (Math.sqrt(normA) * Math.sqrt(normB));
   }
 
-  private calculateScore(endpoint: ApiEndpoint, query: string, tag?: string, method?: string): number {
-    const tokens = query.toLowerCase().split(/[\s\/:\-_]+/).filter(t => t);
-    const searchText = [
-      endpoint.summary || '',
-      endpoint.path || '',
-      endpoint.operationId || '',
-      endpoint.tag || '',
-      endpoint.method || ''
-    ].join(' ').toLowerCase();
+  private expandWithSynonyms(tokens: string[]): string[] {
+    const expanded = new Set<string>(tokens);
+    for (const token of tokens) {
+      const synonyms = SYNONYMS[token];
+      if (synonyms) {
+        for (const syn of synonyms) {
+          expanded.add(syn);
+        }
+      }
+    }
+    return Array.from(expanded);
+  }
 
-    let score = tokens.reduce((sum, token) => {
-      const matches = (searchText.match(new RegExp(token, 'g')) || []).length;
-      return sum + matches;
-    }, 0);
+  private calculateScore(endpoint: ApiEndpoint, query: string, tag?: string, method?: string): number {
+    const rawTokens = query.toLowerCase().split(/[\s\/:\-_]+/).filter(t => t);
+    const tokens = this.expandWithSynonyms(rawTokens);
+
+    // Build searchable text with field weighting
+    const pathText = (endpoint.path || '').toLowerCase();
+    const summaryText = (endpoint.summary || '').toLowerCase();
+    const operationIdText = (endpoint.operationId || '').toLowerCase();
+    const tagText = (endpoint.tag || '').toLowerCase();
+    const methodText = (endpoint.method || '').toLowerCase();
+    const paramsText = [...endpoint.requiredPathParams, ...endpoint.queryParams].join(' ').toLowerCase();
+
+    let score = 0;
+
+    for (const token of tokens) {
+      const isOriginal = rawTokens.includes(token);
+      const weight = isOriginal ? 1.0 : 0.5; // Synonyms worth half
+
+      // Field-weighted scoring
+      if (pathText.includes(token)) score += 3 * weight;      // Path most important
+      if (operationIdText.includes(token)) score += 2 * weight;
+      if (summaryText.includes(token)) score += 1.5 * weight;
+      if (paramsText.includes(token)) score += 1 * weight;
+      if (tagText.includes(token)) score += 0.8 * weight;
+    }
 
     // Bonus for exact tag match
-    if (tag && endpoint.tag.toLowerCase() === tag.toLowerCase()) {
+    if (tag && tagText === tag.toLowerCase()) {
       score += 3;
     }
 
-    // Bonus for exact method match  
-    if (method && endpoint.method.toLowerCase() === method.toLowerCase()) {
+    // Bonus for exact method match
+    if (method && methodText === method.toLowerCase()) {
       score += 2;
     }
 
     // Prefer shorter paths (often listing endpoints)
     score += Math.max(0, 3 - endpoint.path.split('/').length);
+
+    // Version bias: prefer v2 endpoints over v1 or unversioned
+    if (pathText.includes('/v2/')) {
+      score += 2;
+    } else if (pathText.includes('/v1/')) {
+      score += 0.5; // Slight penalty vs v2
+    }
+
+    // Deprecation detection: downweight if summary/path hints at deprecation
+    const deprecationHints = ['deprecated', 'legacy', 'old', 'obsolete'];
+    const fullText = `${summaryText} ${pathText} ${operationIdText}`;
+    for (const hint of deprecationHints) {
+      if (fullText.includes(hint)) {
+        score *= 0.5; // Halve score for deprecated endpoints
+        break;
+      }
+    }
 
     return score;
   }
@@ -268,6 +348,18 @@ export class ApiReferenceClient {
     semanticWeight?: number;
     queryEmbedding?: number[];
   } = {}): Promise<ApiSearchResult[]> {
+    const response = await this.hybridSearchWithMetadata(query, options);
+    return response.results;
+  }
+
+  async hybridSearchWithMetadata(query: string, options: {
+    tag?: string;
+    method?: string;
+    limit?: number;
+    keywordWeight?: number;
+    semanticWeight?: number;
+    queryEmbedding?: number[];
+  } = {}): Promise<HybridSearchResponse> {
     const {
       tag,
       method,
@@ -278,7 +370,23 @@ export class ApiReferenceClient {
     } = options;
 
     const keywordResults = this.search(query, { tag, method, limit: Math.max(limit * 2, limit) });
-    const semanticResults = await this.semanticSearch(query, { limit: Math.max(limit * 3, limit), queryEmbedding });
+
+    // Try semantic search with graceful fallback
+    let semanticResults: ApiSearchResult[] = [];
+    let searchMode: 'hybrid' | 'keyword-only' = 'hybrid';
+    let semanticDisabledReason: string | undefined;
+
+    try {
+      semanticResults = await this.semanticSearch(query, { limit: Math.max(limit * 3, limit), queryEmbedding });
+      if (semanticResults.length === 0) {
+        searchMode = 'keyword-only';
+        semanticDisabledReason = 'No embeddings available';
+      }
+    } catch (error) {
+      searchMode = 'keyword-only';
+      semanticDisabledReason = error instanceof Error ? error.message : 'Semantic search unavailable';
+      console.warn(`⚠️  Semantic search disabled: ${semanticDisabledReason}`);
+    }
 
     const combined = new Map<string, ApiSearchResult>();
 
@@ -303,31 +411,56 @@ export class ApiReferenceClient {
     }
 
     if (combined.size === 0) {
-      return [];
+      return { results: [], searchMode, semanticDisabledReason };
     }
 
     const maxKeyword = Math.max(0, ...Array.from(combined.values()).map(r => r.keywordScore || 0));
     const maxSemantic = Math.max(0, ...Array.from(combined.values()).map(r => Math.max(0, r.semanticScore ?? 0)));
 
+    // Adjust weights if semantic is disabled
+    const effectiveKeywordWeight = searchMode === 'keyword-only' ? 1.0 : keywordWeight;
+    const effectiveSemanticWeight = searchMode === 'keyword-only' ? 0.0 : semanticWeight;
+
     const results: ApiSearchResult[] = [];
     for (const result of combined.values()) {
       const keywordComponent = maxKeyword > 0 ? (result.keywordScore || 0) / maxKeyword : 0;
       const semanticComponent = maxSemantic > 0 ? Math.max(0, result.semanticScore ?? 0) / maxSemantic : 0;
-      const score = (keywordComponent * keywordWeight) + (semanticComponent * semanticWeight);
+      const score = (keywordComponent * effectiveKeywordWeight) + (semanticComponent * effectiveSemanticWeight);
 
       results.push({
         ...result,
         score,
         weights: {
-          keyword: keywordWeight,
-          semantic: semanticWeight,
+          keyword: effectiveKeywordWeight,
+          semantic: effectiveSemanticWeight,
         },
       });
     }
 
-    return results
-      .sort((a, b) => b.score - a.score)
-      .slice(0, limit);
+    // Sort by score
+    results.sort((a, b) => b.score - a.score);
+
+    // Calculate confidence scores
+    const topScore = results[0]?.score ?? 0;
+    for (let i = 0; i < results.length; i++) {
+      const result = results[i];
+      const nextScore = results[i + 1]?.score ?? 0;
+      const margin = topScore > 0 ? (result.score - nextScore) / topScore : 0;
+
+      // Confidence based on:
+      // - Normalized score (40%)
+      // - Having both keyword and semantic matches (30%)
+      // - Score margin from next result (30%)
+      const normalizedScore = topScore > 0 ? result.score / topScore : 0;
+      const hasBothSignals = (result.keywordScore > 0 && (result.semanticScore ?? 0) > 0) ? 1 : 0.6;
+      const marginBonus = Math.min(margin * 2, 0.3);
+
+      result.confidence = Math.min(1, (normalizedScore * 0.4) + (hasBothSignals * 0.3) + marginBonus);
+    }
+
+    const sortedResults = results.slice(0, limit);
+
+    return { results: sortedResults, searchMode, semanticDisabledReason };
   }
 
   getEndpointDoc(filePath: string): string {

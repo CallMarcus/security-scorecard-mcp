@@ -6,6 +6,7 @@ import { getFindingsByCategory } from "./get_findings_by_category.js";
 import { getAssetInventory } from "./asset_management.js";
 import { createSecurityScorecardClient } from "./api/client.js";
 import { ApiReferenceClient } from "./integration/api-reference-client.js";
+import { getApiSchemaExtractor } from "./integration/api-schema.js";
 import { z } from "zod";
 
 interface SecurityScorecardConfig {
@@ -69,9 +70,10 @@ class SimplifiedSecurityScorecardServer {
       const { domain, response_mode = "minimal" } = args;
       
       try {
-        const scoreResponse = await this.client.getCompanyScore(domain);
-        const score = scoreResponse.data?.score || 0;
-        const grade = scoreResponse.data?.grade || 'F';
+        // Use summary-factors endpoint which returns grade, score, and all factor data
+        const summaryResponse = await this.client.getCompanyFactorSummary(domain);
+        const score = summaryResponse.data?.score || 0;
+        const grade = summaryResponse.data?.grade || 'F';
 
         if (response_mode === "minimal") {
           return {
@@ -214,8 +216,9 @@ class SimplifiedSecurityScorecardServer {
       const { domain, target_grade = "A", timeline = "90-days", response_mode = "minimal" } = args;
       
       try {
-        const scoreResponse = await this.client.getCompanyScore(domain);
-        const currentScore = scoreResponse.data?.score || 0;
+        // Use summary-factors endpoint which returns grade, score, and all factor data
+        const summaryResponse = await this.client.getCompanyFactorSummary(domain);
+        const currentScore = summaryResponse.data?.score || 0;
         const findings = await getFindingsByCategory(domain, this.config.apiToken);
         const factorBreakdown = findings.factor_breakdown || [];
         
@@ -337,7 +340,7 @@ class SimplifiedSecurityScorecardServer {
     // Register API discovery tool for endpoint search
     this.server.registerTool("api_discovery", {
       title: "SecurityScorecard API Discovery",
-      description: "🔍 API DISCOVERY: Search and discover SecurityScorecard API endpoints from 591 available endpoints. Find exact endpoints for your security analysis needs with intelligent search, filtering, and cURL examples.",
+      description: "Search and discover SecurityScorecard API endpoints. Returns both human-readable summary and structured JSON for programmatic use.",
       inputSchema: {
         query: z.string()
           .min(1, "Search query is required")
@@ -352,13 +355,16 @@ class SimplifiedSecurityScorecardServer {
           .min(1)
           .max(20)
           .describe("Maximum number of results to return")
-          .default(8)
+          .default(8),
+        include_schema: z.boolean()
+          .describe("Include detailed request/response schema for top result")
+          .default(false)
       }
     }, async (args) => {
-      const { query, tag, method, limit = 8 } = args;
-      
+      const { query, tag, method, limit = 8, include_schema = false } = args;
+
       try {
-        const results = await this.apiReferenceClient.hybridSearch(query, {
+        const searchResponse = await this.apiReferenceClient.hybridSearchWithMetadata(query, {
           tag,
           method,
           limit,
@@ -366,41 +372,83 @@ class SimplifiedSecurityScorecardServer {
           semanticWeight: this.apiDiscoveryWeights.semantic
         });
 
+        const { results, searchMode, semanticDisabledReason } = searchResponse;
+        const totalEndpoints = this.apiReferenceClient.getEndpointCount();
+
         if (results.length === 0) {
           return {
             content: [{
               type: "text",
-              text: `# 🔍 API Discovery Results\n\n❌ No endpoints found for query: "${query}"\n\n**Suggestions:**\n- Try broader terms like "company", "security", "score"\n- Use specific API categories: "Companies", "Portfolios", "Issues"\n- Search for HTTP methods: "GET", "POST"\n\n**Available:** 591 total SecurityScorecard API endpoints`
+              text: `# API Discovery Results\n\nNo endpoints found for query: "${query}"\n\n**Suggestions:**\n- Try broader terms like "company", "security", "score"\n- Use specific API categories: "Companies", "Portfolios", "Issues"\n- Search for HTTP methods: "GET", "POST"\n\n**Available:** ${totalEndpoints} total endpoints`
             }]
           };
         }
 
-        const totalEndpoints = this.apiReferenceClient.getEndpointCount();
-        let response = `# 🔍 API Discovery Results\n\n**Query:** "${query}"\n**Found:** ${results.length} endpoints\n`;
-        response += `**Weighting:** keyword ${this.apiDiscoveryWeights.keyword.toFixed(2)}, semantic ${this.apiDiscoveryWeights.semantic.toFixed(2)}\n`;
-        response += `**Indexed:** ${totalEndpoints} total endpoints\n\n`;
+        // Build human-readable response
+        let response = `# API Discovery Results\n\n**Query:** "${query}"\n**Found:** ${results.length} endpoints\n`;
+        response += `**Search mode:** ${searchMode}`;
+        if (semanticDisabledReason) {
+          response += ` (${semanticDisabledReason})`;
+        }
+        response += `\n**Indexed:** ${totalEndpoints} total endpoints\n\n`;
 
-        results.forEach((result, index) => {
+        // Build structured JSON for programmatic use
+        const structuredResults = results.map((result) => {
           const { endpoint } = result;
-          response += `## ${index + 1}. ${endpoint.method} ${endpoint.path}\n`;
-          response += `**Summary:** ${endpoint.summary}\n`;
-          response += `**Category:** ${endpoint.tag}\n`;
-          const semanticScore = result.semanticScore ?? 0;
-          const keywordScore = result.keywordScore ?? 0;
-          response += `**Relevance:** Hybrid ${result.score.toFixed(2)} (Semantic ${semanticScore.toFixed(2)}, Keyword ${keywordScore.toFixed(2)})\n`;
-
-          if (result.semanticText) {
-            response += `**Semantic Context:**\n\`\`\`text\n${result.semanticText}\n\`\`\`\n`;
-          }
-
-          if (endpoint.requiredPathParams.length > 0) {
-            response += `**Required Parameters:** ${endpoint.requiredPathParams.join(", ")}\n`;
-          }
-
-          response += `**cURL Example:**\n\`\`\`bash\ncurl -H "Authorization: Token YOUR_API_TOKEN" \\\n  "https://api.securityscorecard.io${endpoint.path}"\n\`\`\`\n\n`;
+          return {
+            operationId: endpoint.operationId,
+            method: endpoint.method,
+            path: endpoint.path,
+            summary: endpoint.summary,
+            tag: endpoint.tag,
+            requiredParams: endpoint.requiredPathParams,
+            queryParams: endpoint.queryParams,
+            hasBody: endpoint.hasBody,
+            scores: {
+              hybrid: Number(result.score.toFixed(3)),
+              keyword: Number(result.keywordScore.toFixed(3)),
+              semantic: Number((result.semanticScore ?? 0).toFixed(3)),
+              confidence: Number((result.confidence ?? 0).toFixed(3))
+            },
+            curl: `curl -H "Authorization: Token $TOKEN" "https://api.securityscorecard.io${endpoint.path}"`
+          };
         });
 
-        response += `---\n*Hybrid search across ${totalEndpoints} endpoints | Generated: ${new Date().toISOString()}*`;
+        // Add each result to human-readable output
+        results.forEach((result, index) => {
+          const { endpoint } = result;
+          const confidence = result.confidence ?? 0;
+          response += `## ${index + 1}. ${endpoint.method} ${endpoint.path}\n`;
+          response += `**Summary:** ${endpoint.summary}\n`;
+          response += `**Category:** ${endpoint.tag} | **Confidence:** ${(confidence * 100).toFixed(0)}%\n`;
+
+          if (endpoint.requiredPathParams.length > 0) {
+            response += `**Required:** ${endpoint.requiredPathParams.join(", ")}\n`;
+          }
+          if (endpoint.queryParams.length > 0) {
+            response += `**Query params:** ${endpoint.queryParams.slice(0, 5).join(", ")}${endpoint.queryParams.length > 5 ? '...' : ''}\n`;
+          }
+
+          response += `\`\`\`bash\ncurl -H "Authorization: Token $TOKEN" "https://api.securityscorecard.io${endpoint.path}"\n\`\`\`\n\n`;
+        });
+
+        // Add structured JSON block
+        response += `## Structured Results\n\n\`\`\`json\n${JSON.stringify(structuredResults, null, 2)}\n\`\`\`\n\n`;
+
+        // Add schema details for top result if requested
+        if (include_schema && results.length > 0) {
+          const topResult = results[0];
+          const schemaExtractor = getApiSchemaExtractor();
+          const schemaDesc = schemaExtractor.getSchemaDescription(topResult.endpoint.operationId);
+
+          if (schemaDesc) {
+            response += `## Schema Details (Top Result)\n\n${schemaDesc}\n\n`;
+          } else {
+            response += `## Schema Details\n\n*Schema not found for ${topResult.endpoint.operationId}*\n\n`;
+          }
+        }
+
+        response += `---\n*${searchMode} search | ${totalEndpoints} endpoints indexed | ${new Date().toISOString()}*`;
 
         return {
           content: [{
@@ -412,8 +460,8 @@ class SimplifiedSecurityScorecardServer {
       } catch (error) {
         return {
           content: [{
-            type: "text", 
-            text: `# ❌ API Discovery Error\n\n**Query:** "${query}"\n**Error:** ${error}\n\n**Troubleshooting:**\n- Ensure scorecard-api-reference is available\n- Check SCORECARD_API_REFERENCE_PATH environment variable\n- Run setup-api-integration.sh if needed`
+            type: "text",
+            text: `# API Discovery Error\n\n**Query:** "${query}"\n**Error:** ${error}\n\n**Troubleshooting:**\n- Check that docs/api/index.jsonl exists\n- Verify docs/api/index-embeddings.json for semantic search\n- Run npm run api:embed to regenerate embeddings`
           }]
         };
       }
@@ -512,35 +560,94 @@ class SimplifiedSecurityScorecardServer {
     // Register query_security_data tool
     this.server.registerTool("query_security_data", {
       title: "Security Data Query",
-      description: "🔧 DIRECT API ACCESS: Query SecurityScorecard API with enhanced validation and suggestions. Smart endpoint validation with helpful error messages and alternative suggestions.",
+      description: "Direct API access with smart endpoint validation. Uses API discovery to validate endpoints, suggest alternatives, and provide parameter hints.",
       inputSchema: {
         endpoint: z.string().describe("API endpoint to query (e.g., /companies/{domain}/factors)"),
         domain: z.string().describe("Domain to use in endpoint").default(this.config.defaultDomain),
-        method: z.enum(["GET", "POST", "PUT", "DELETE"]).describe("HTTP method").default("GET")
+        method: z.enum(["GET", "POST", "PUT", "DELETE"]).describe("HTTP method").default("GET"),
+        validate_only: z.boolean().describe("Only validate endpoint without calling API").default(false)
       }
     }, async (args) => {
-      const { endpoint, domain, method = "GET" } = args;
-      
+      const { endpoint, domain, method = "GET", validate_only = false } = args;
+
+      // Pre-call validation: search for matching endpoints
+      const searchResponse = await this.apiReferenceClient.hybridSearchWithMetadata(
+        `${method} ${endpoint}`,
+        { method, limit: 5, keywordWeight: this.apiDiscoveryWeights.keyword, semanticWeight: this.apiDiscoveryWeights.semantic }
+      );
+
+      // Check if endpoint path exists in index
+      const exactMatch = searchResponse.results.find(r =>
+        r.endpoint.path.toLowerCase() === endpoint.toLowerCase() &&
+        r.endpoint.method.toUpperCase() === method.toUpperCase()
+      );
+
+      const searchModeNote = searchResponse.searchMode === 'keyword-only'
+        ? `\n*Note: Using keyword-only search (${searchResponse.semanticDisabledReason})*`
+        : '';
+
+      // If validate_only, just return validation results
+      if (validate_only) {
+        if (exactMatch) {
+          const ep = exactMatch.endpoint;
+          return {
+            content: [{
+              type: "text",
+              text: `# Endpoint Validated\n\n**${ep.method} ${ep.path}**\n${ep.summary}\n\n` +
+                    `**Required params:** ${ep.requiredPathParams.join(', ') || 'none'}\n` +
+                    `**Query params:** ${ep.queryParams.join(', ') || 'none'}\n` +
+                    `**Has body:** ${ep.hasBody}${searchModeNote}`
+            }]
+          };
+        } else {
+          const suggestions = searchResponse.results.slice(0, 3).map(r =>
+            `- \`${r.endpoint.method} ${r.endpoint.path}\` - ${r.endpoint.summary}`
+          ).join('\n');
+          return {
+            content: [{
+              type: "text",
+              text: `# Endpoint Not Found\n\n**Requested:** ${method} ${endpoint}\n\n**Similar endpoints:**\n${suggestions}${searchModeNote}`
+            }]
+          };
+        }
+      }
+
       try {
         // Replace {domain} placeholder in endpoint
         const processedEndpoint = endpoint.replace(/{domain}/g, domain);
-        
+
         const { createSecurityScorecardClient } = await import('./api/client.js');
         const client = createSecurityScorecardClient(this.config.apiToken);
         const response = await client.callEndpoint(method, processedEndpoint);
-        
+
+        // Include validation info in successful response
+        let validationNote = '';
+        if (!exactMatch && searchResponse.results.length > 0) {
+          validationNote = `\n\n*Note: Endpoint not in API index. If issues occur, try: ${searchResponse.results[0].endpoint.path}*`;
+        }
+
         return {
           content: [{
             type: "text",
-            text: `# 🔧 API Query Results\n\n**Endpoint:** ${processedEndpoint}\n**Method:** ${method}\n\n\`\`\`json\n${JSON.stringify(response.data, null, 2)}\n\`\`\``
+            text: `# API Query Results\n\n**Endpoint:** ${processedEndpoint}\n**Method:** ${method}${validationNote}\n\n\`\`\`json\n${JSON.stringify(response.data, null, 2)}\n\`\`\``
           }]
         };
 
       } catch (error) {
+        // On error, use discovery to suggest alternatives
+        const errorQuery = `${method} ${endpoint} ${String(error).slice(0, 50)}`;
+        const errorSearch = await this.apiReferenceClient.hybridSearchWithMetadata(errorQuery, { limit: 3 });
+
+        const suggestions = errorSearch.results.map(r => {
+          const ep = r.endpoint;
+          const params = ep.requiredPathParams.length > 0 ? ` (requires: ${ep.requiredPathParams.join(', ')})` : '';
+          return `- \`${ep.method} ${ep.path}\`${params} - ${ep.summary}`;
+        }).join('\n');
+
         return {
           content: [{
             type: "text",
-            text: `# ❌ API Query Failed\n\n**Error:** ${error}\n\n**Suggestions:**\n- Check endpoint syntax\n- Verify domain is correct\n- Try alternative endpoints like /footprint/{domain} or /companies/{domain}`
+            text: `# API Query Failed\n\n**Error:** ${error}\n\n**Suggested alternatives:**\n${suggestions}\n\n**Tips:**\n- Check that required path parameters are provided\n- Verify the domain exists in SecurityScorecard\n- Use \`validate_only: true\` to check endpoint syntax first`
           }]
         };
       }
