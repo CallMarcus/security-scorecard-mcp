@@ -9,7 +9,9 @@
 
 ## Summary
 
-Merges **all 5 active Dependabot PRs** with comprehensive compatibility testing and documentation. All updates have been validated for compatibility with the MCP server.
+Merges **all active Dependabot PRs** (5 individual + 1 grouped update) with comprehensive compatibility testing and documentation. All updates have been validated for compatibility with the MCP server.
+
+**Total Updates**: 13 packages (5 direct dependencies + 8 transitive dependencies)
 
 ## Dependency Updates
 
@@ -26,7 +28,19 @@ Merges **all 5 active Dependabot PRs** with comprehensive compatibility testing 
 
 | Package | Old Version | New Version | Type | Risk |
 |---------|-------------|-------------|------|------|
-| **@types/node** | 24.10.1 | **25.0.3** | Minor | 🟢 Low |
+| **@types/node** | 24.10.1 | **25.0.9** | Minor | 🟢 Low |
+
+### Additional Transitive Dependency Updates
+
+The following transitive dependencies were updated via the grouped Dependabot PR:
+
+| Package | Old Version | New Version | Type | Notes |
+|---------|-------------|-------------|------|-------|
+| **@emnapi/runtime** | 1.7.1 | **1.8.1** | Minor | Sharp dependency |
+| **@hono/node-server** | 1.19.7 | **1.19.9** | Patch | Hono server runtime |
+| **body-parser** | 2.2.1 | **2.2.2** | Patch | Express middleware |
+| **iconv-lite** | 0.7.1 | **0.7.2** | Patch | Character encoding |
+| **+ 4 more** | - | - | Patch | Additional sub-dependencies |
 
 ## Key Highlights
 
@@ -105,13 +119,15 @@ This PR includes comprehensive documentation:
 - `35b768e` docs: add comprehensive Dependabot PR review
 
 ### Dependency Merges
+- `f389670` Merge grouped update (8 packages including transitive deps)
 - `2f456cc` Merge Zod v4.3.5
 - `e5a894c` Merge qs 6.14.1
 - `a4eaa8d` Merge hono 4.11.4
-- `7ad0084` Merge @types/node 25.0.3
+- `7ad0084` Merge @types/node 25.0.3→25.0.9
 - `1f6c0ff` Merge MCP SDK 1.25.2
 
 ### Original Dependabot Commits
+- `3aa3287` deps(deps): bump minor-and-patch group (8 packages)
 - `408a34d` deps(deps): bump zod from 3.25.76 to 4.3.5
 - `9118d7a` deps(deps): bump @modelcontextprotocol/sdk from 1.25.1 to 1.25.2
 - `f4ff7ea` deps(deps-dev): bump @types/node from 24.10.1 to 25.0.3
