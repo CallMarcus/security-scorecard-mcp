@@ -44,10 +44,6 @@ npm run start:original
 npm test
 ```
 
-### Known Issues
-
-**TypeScript OOM**: `npm run build` (tsc) runs out of memory even with 8GB heap. Use `npm run build:fast` (esbuild) instead - builds in ~130ms.
-
 ### API Reference Management
 
 The project includes a **self-contained** API reference system with hybrid search (semantic + keyword) for endpoint discovery. All API documentation and embeddings are stored locally in `docs/api/`.
@@ -107,22 +103,8 @@ The codebase maintains two complete MCP server implementations that share common
 - **API discovery integration** for complex queries via `query_security_data` tool
 - Focus: Daily operations, issue analysis, asset management, email security
 
-**Core Operational Tools (9):**
-1. `security_dashboard` - Score, grade, and key metrics
-2. `analyze_security_risks` - Issue prioritization and risk analysis
-3. `create_improvement_plan` - Actionable remediation roadmaps
-4. `discover_assets` - Asset inventory with security context
-5. `analyze_email_security` - SPF/DMARC/DKIM analysis
-6. `api_discovery` - Search and discover API endpoints with hybrid search
-7. `analyze_issue_types` - Granular issue type breakdowns
-8. `validate_data_completeness` - Cross-tool data verification
-9. `query_security_data` - **Direct API access with discovery assistance**
-
 **`src/index.ts` (Comprehensive) - NOT IN CURRENT USE**
-- 16 registered MCP tools with full SecurityScorecard API coverage
-- Standard response sizes (200-1000+ tokens)
-- Includes ROI calculations, strategic roadmaps, and executive reporting
-- Tools: `get_score_improvement_roadmap`, `calculate_factor_score_impact`, `get_issues_by_roi`, `find_high_impact_findings_across_assets`, `get_findings_by_asset`, `get_findings_by_category`, `generate_remediation_report`, `get_asset_inventory`, `get_asset_findings`, `compare_assets`, `call_api_endpoint`, `discover_all_assets`, `get_asset_detailed_findings`, `get_ip_security_details`, `diagnose_api_coverage`, `api_discovery`
+- 16 tools with full SecurityScorecard API coverage (ROI, strategic roadmaps, executive reporting)
 - Best for: Complete analysis, strategic planning, advanced workflows (when needed)
 
 ### Key Architectural Components
@@ -142,66 +124,14 @@ The codebase maintains two complete MCP server implementations that share common
 
 This system helps find the correct syntax for complex SecurityScorecard API calls when the specialized tools don't cover your needs.
 
-- `api-reference-client.ts` - Enhanced hybrid search (semantic + keyword) over API endpoints
-  - **Usage:** Automatically invoked by `query_security_data` and `api_discovery` tools
-  - Returns endpoint path, HTTP method, required parameters, confidence score, and documentation
-  - **Features (2025-12-28 update):**
-    - Synonym expansion (30+ mappings: score↔grade, issue↔finding, asset↔domain, etc.)
-    - Field-boosted scoring (path > operationId > summary > params > tag)
-    - Version/deprecation bias (prefers /v2/ endpoints, downweights deprecated)
-    - Confidence scores (0-1 based on score, signal overlap, margin)
-    - Keyword-only fallback when semantic model unavailable
-    - Structured JSON output for programmatic use
+- `api-reference-client.ts` - Hybrid search (semantic + keyword) with synonym expansion, field-boosted scoring, version bias, and confidence scores. Invoked by `query_security_data` and `api_discovery` tools.
+- `api-reference-embeddings.ts` - Pre-computed MiniLM embeddings cached in `docs/api/index-embeddings.json`. Run `npm run api:embed` after updating `docs/api/index.jsonl`.
+- `api-schema.ts` - Schema extraction from api-docs.json (Swagger 2.0). Key methods: `getSchemaByOperationId()`, `getSchemaByPath()`, `getSchemaDescription()`.
 
-- `api-reference-embeddings.ts` - Generates enriched embeddings for semantic search
-  - Embedding text includes: summary, method+path, tag, description, params, body indicator
-  - Pre-computed for performance (cached in `docs/api/index-embeddings.json`)
-  - Run `npm run api:embed` after updating `docs/api/index.jsonl`
-
-- `api-schema.ts` - Schema extraction from api-docs.json (Swagger 2.0)
-  - `getSchemaByOperationId()` - Get request/response schema for an operation
-  - `getSchemaByPath()` - Get schema by HTTP method + path
-  - `getSchemaDescription()` - Get human-readable schema summary
-  - Used by `api_discovery` with `include_schema: true` parameter
-
-**When to rely on API discovery:**
-- You need an endpoint that isn't covered by the 9 specialized tools
-- You're unsure of the exact parameter names or query syntax
-- You want to explore what data is available for a specific security domain
-- You need to construct a complex query with multiple filters
-
-**Configurable via environment variables:**
-- `API_DISCOVERY_KEYWORD_WEIGHT` (default: 0.35) - Weight for exact text matching
-- `API_DISCOVERY_SEMANTIC_WEIGHT` (default: 0.65) - Weight for semantic understanding
+**Use API discovery when** the 9 specialized tools don't cover your needs, or you're unsure of endpoint syntax/parameters.
 
 **4. MCP Server Implementation Pattern**
-Both servers follow this structure:
-```typescript
-// Initialize MCP server
-const server = new McpServer({
-  name: "security-scorecard-[variant]",
-  version: "4.1.0"
-});
-
-// Register tools with Zod schemas
-server.registerTool("tool_name", {
-  title: "Display Name",
-  description: "Tool description with usage guidance",
-  annotations: { category, complexity, dataSource, ... },
-  inputSchema: {
-    param: z.string().describe("Parameter description")
-  }
-}, async (args) => {
-  // Implementation
-  return {
-    content: [{ type: "text", text: "..." }]
-  };
-});
-
-// Connect and run
-const transport = new StdioServerTransport();
-await server.connect(transport);
-```
+Both servers use `McpServer` + `registerTool()` with Zod input schemas and `StdioServerTransport`. See `src/simplified-index.ts` for the canonical pattern.
 
 ### Type Definitions
 
@@ -211,24 +141,7 @@ await server.connect(transport);
 
 ### Response Mode Pattern (Streamlined Only)
 
-Tools in `simplified-index.ts` implement a 3-tier response strategy:
-
-```typescript
-if (response_mode === "minimal") {
-  // Compact answer: 15-50 tokens, no markdown headers
-  return { content: [{ type: "text", text: "domain: Score 78/100, Grade C" }] };
-}
-
-if (response_mode === "standard") {
-  // Overview: 200-300 tokens, key insights
-  return { content: [{ type: "text", text: "## Security Overview\n..." }] };
-}
-
-// detailed mode (default for first queries)
-// Comprehensive: 800+ tokens, full analysis with recommendations
-```
-
-Claude Desktop intelligently escalates from minimal → standard → detailed as needed during conversations.
+Tools implement 3 tiers: **minimal** (15-50 tokens, no headers), **standard** (200-300 tokens, key insights), **detailed** (800+ tokens, full analysis). Claude Desktop escalates as needed during conversations.
 
 ## Dependencies
 
@@ -263,109 +176,29 @@ Optional:
 **Default:** Add new operational tools to `simplified-index.ts` (current setup)
 **Only if:** The tool is specifically for executive reporting or strategic analysis, add to `index.ts`
 
-1. Open `src/simplified-index.ts` and add tool registration in the `setupTools()` method:
-```typescript
-this.server.registerTool("tool_name", {
-  title: "Display Name",
-  description: "Clear description focusing on operational use case",
-  annotations: {
-    category: "operational-category",  // e.g., "issue-analysis", "asset-management"
-    complexity: "low|medium|high",
-    dataSource: "SecurityScorecard API"
-  },
-  inputSchema: {
-    // Define parameters with Zod
-    domain: z.string().describe("Company domain"),
-    response_mode: z.enum(["minimal", "standard", "detailed"])
-      .describe("Response detail level")
-      .default("minimal"),  // Always start with minimal
-    optional_param: z.string().optional().describe("Optional parameter")
-  }
-}, async (args) => {
-  const { domain, response_mode = "minimal", optional_param } = args;
-
-  // Implement all 3 response modes for consistency
-  if (response_mode === "minimal") {
-    return { content: [{ type: "text", text: "Compact result" }] };
-  }
-
-  if (response_mode === "standard") {
-    return { content: [{ type: "text", text: "## Standard Overview\n..." }] };
-  }
-
-  // Detailed mode
-  return { content: [{ type: "text", text: "## Comprehensive Analysis\n..." }] };
-});
-```
-2. Add business logic to shared utilities if reusable across both servers (`src/asset_management.ts`, etc.)
-3. Write tests in `tests/` directory
-4. Rebuild: `npm run build:fast`
-5. Update `README.md` tool documentation if user-facing
-
-### Testing API Endpoints Manually
-
-Use the included API test tool to validate endpoints before integration:
-
-```bash
-node build_docs/api_test_tool.js /companies/{domain}/issues?limit=5 \
-  --domain example.com --token YOUR_TOKEN
-```
-
-The tool auto-fills HTTP method from `build_docs/api_reference.json` and displays endpoint descriptions.
+1. Add tool registration in `src/simplified-index.ts` `setupTools()` method (follow existing tools as pattern)
+2. Include all 3 response modes (minimal/standard/detailed) and `annotations` metadata
+3. Add reusable business logic to shared utilities (`src/asset_management.ts`, etc.)
+4. Write tests in `tests/` directory
+5. Rebuild: `npm run build:fast`
 
 ### Extending the API Client
 
-When adding new SecurityScorecard API endpoints:
-
-1. Add method to `src/api/client.ts` in the appropriate category section
-2. Follow the pattern of using `makeRequest<T>()` with typed responses
-3. Document the method with JSDoc comments
-4. Add corresponding test in `tests/api/` directory
-
-Example:
-```typescript
-/**
- * Get company historical scores
- */
-async getCompanyHistory(domain: string, queryParams?: Record<string, any>): Promise<ApiResponse<any>> {
-  return this.makeRequest('GET', `/companies/${domain}/history`, { queryParams });
-}
-```
+Add methods to `src/api/client.ts` using the `makeRequest<T>()` pattern with typed responses. Add corresponding tests in `tests/api/`.
 
 ### Regenerating API Embeddings
 
-After updating the API reference in `docs/api/index.jsonl`:
-
-```bash
-npm run api:embed
-```
-
-This script:
-1. Loads each endpoint definition
-2. Derives semantic text (summary + method + path + tag)
-3. Generates embeddings using MiniLM model via `@xenova/transformers`
-4. Caches results in `docs/api/index-embeddings.json`
-5. Reuses existing embeddings when text hasn't changed (fast incremental updates)
+Run `npm run api:embed` after updating `docs/api/index.jsonl`. Uses MiniLM via `@xenova/transformers`, caches to `docs/api/index-embeddings.json`, and does fast incremental updates for unchanged entries.
 
 ## Tool Response Guidelines
 
-When modifying or adding tools to the **streamlined version** (current setup):
+**Streamlined version** (current setup):
+- Implement all 3 response modes (see Response Mode Pattern above)
+- Include metadata footer: `*Generated: {timestamp}*`
+- Use structured markdown; return actionable validation errors
+- Include data completeness warnings when cross-tool validation shows inconsistencies
 
-1. **Focus on operational utility** - Prioritize actionable security data over strategic analysis
-2. **Implement all 3 response modes** (minimal/standard/detailed):
-   - Minimal: Direct answers for quick queries (15-50 tokens)
-   - Standard: Operational context with key insights (200-300 tokens)
-   - Detailed: Comprehensive analysis with remediation guidance (800+ tokens)
-3. **Always include metadata footer:** `*Generated: {timestamp}*`
-4. **Use structured markdown** for readability (headers, lists, tables)
-5. **Return actionable validation errors** with suggestions for alternative approaches
-6. **Include data completeness warnings** when cross-tool validation shows inconsistencies
-7. **Leverage API discovery** in `query_security_data` to help users find correct endpoint syntax
-
-When modifying the comprehensive version (if needed):
-- Prioritize completeness over token efficiency
-- Include executive-level strategic context and ROI calculations
-- Standard response sizes (200-1000+ tokens)
+**Comprehensive version** (if needed): Prioritize completeness over token efficiency; include executive-level context and ROI calculations.
 
 ## CI/CD
 
@@ -384,185 +217,30 @@ GitHub Actions workflow (`.github/workflows/node.js.yml`) runs on pushes and PRs
 
 ```
 src/
-├── index.ts                          # Comprehensive MCP server (16 tools)
-├── simplified-index.ts               # Streamlined MCP server (9 tools, recommended)
-├── api/
-│   └── client.ts                     # SecurityScorecard API client
-├── integration/
-│   ├── api-reference-client.ts       # Enhanced hybrid search for API discovery
-│   ├── api-reference-embeddings.ts   # Embedding generation with enriched text
-│   └── api-schema.ts                 # Schema extraction from Swagger spec
-├── types/
-│   └── api.ts                        # Shared TypeScript types
-├── get_findings_by_category.ts       # Factor-based finding organization
-├── asset_management.ts               # Asset inventory utilities
-└── api_reference.ts                  # Endpoint metadata lookup
-
-docs/api/                             # Self-contained API reference
-├── index.jsonl                       # Searchable endpoint index (628 endpoints)
-├── index-embeddings.json             # Semantic embeddings cache (enriched)
-└── {tag}/*.md                        # Per-endpoint documentation
-
-examples/                             # Usage examples
-├── basic_usage.ts                    # Basic API usage patterns
-├── mcp_integration.ts                # MCP server integration example
-├── mcp_upgrade_example.ts            # SDK upgrade migration example
-└── test_examples.ts                  # Test helper examples
-
-tools/
-└── update_api_spec.sh                # Fetch latest Swagger from SecurityScorecard
-
-scripts/                              # Maintenance and update scripts
-├── fetch-docs.ps1                    # Fetch API docs (PowerShell)
-├── update.ps1                        # Update workflow (PowerShell)
-└── update.sh                         # Update workflow (Bash)
-
-tests/                                # Test files (both .js and .ts)
-build/                                # Compiled JavaScript output (generated)
-
-.claude/
-└── settings.local.json               # Local Claude Code settings
-
-.github/workflows/
-└── node.js.yml                       # CI: build + test on Node 18/20/22
-
-# Root-level scripts
-api-docs.json                         # Source Swagger 2.0 specification
-split_swagger.py                      # Generate docs from Swagger spec
-validate_mcp_tools.py                 # Validate MCP tool registrations
-setup.ps1 / setup.sh                  # Project setup (Windows/Unix)
-setup_simple.ps1                      # Simplified Windows setup
-run_validation.ps1 / run_validation.sh # Run full validation suite
+├── simplified-index.ts        # Streamlined MCP server (9 tools, CURRENT)
+├── index.ts                   # Comprehensive MCP server (16 tools)
+├── api/client.ts              # SecurityScorecard API client
+├── integration/               # API discovery: hybrid search, embeddings, schema
+├── types/api.ts               # Shared TypeScript types
+├── get_findings_by_category.ts
+├── asset_management.ts
+└── api_reference.ts
+docs/api/                      # Self-contained API reference (628 endpoints)
+tools/                         # update_api_spec.sh - fetch Swagger spec
+scripts/                       # Maintenance scripts (PS1/Bash)
+tests/                         # Test files (.js and .ts)
+build/                         # Compiled output (generated)
 ```
 
 ## Common Patterns
 
-### Pagination Handling
+- **Pagination**: Cursor-based - loop with `cursor`/`next_cursor` params, `size: 50`. See existing tools for examples.
+- **Error handling**: Wrap API calls in try-catch, return `{ isError: true }` with user-friendly messages.
+- **Data validation** (streamlined only): Use `validate_data_completeness` to cross-verify results; warn when confidence < 0.8.
 
-The SecurityScorecard API uses cursor-based pagination. When implementing paginated endpoints:
+## Gotchas
 
-```typescript
-let allItems = [];
-let cursor = null;
-
-do {
-  const response = await client.makeRequest('GET', endpoint, {
-    queryParams: { cursor, size: 50 }
-  });
-  allItems.push(...response.data.entries);
-  cursor = response.data.next_cursor;
-} while (cursor);
-```
-
-### Error Handling
-
-Always wrap API calls in try-catch and return user-friendly error messages:
-
-```typescript
-try {
-  const result = await this.client.getCompanyScore(domain);
-  // ... process result
-} catch (error) {
-  return {
-    content: [{
-      type: "text",
-      text: `❌ Failed to fetch security score: ${error.message}`
-    }],
-    isError: true
-  };
-}
-```
-
-### Data Validation (Streamlined Only)
-
-Use the `validate_data_completeness` tool to cross-verify results:
-
-```typescript
-// After fetching data from multiple sources, validate consistency
-const validation = await this.validateDataCompleteness(domain);
-if (validation.confidence < 0.8) {
-  // Include warning in response
-}
-```
-
-## Operational Workflows
-
-### Using API Discovery for Complex Queries
-
-The `query_security_data` tool in the streamlined server integrates with API discovery to help you find and use the correct endpoints:
-
-**Example workflow:**
-1. User asks: "How do I check credential rotation policies?"
-2. Tool invokes `ApiReferenceClient.hybridSearch("credential rotation")`
-3. Discovery returns: `GET /v1/credential-policies` with parameters and documentation
-4. Tool executes the API call with correct syntax
-5. Returns data with explanation of what was found
-
-**The tool handles:**
-- Endpoint discovery from natural language descriptions
-- Parameter validation and suggestions
-- HTTP method detection
-- Query parameter construction
-- Error messages with alternative endpoint suggestions
-
-**When discovery fails:**
-The tool suggests:
-- Alternative endpoints that might match
-- Using specialized tools if available (`analyze_email_security` for SPF/DMARC queries)
-- Checking `docs/api/` for manual reference
-
-### Focus on Findings and Issues
-
-For operational security work, the most frequently used tools are:
-
-1. **`analyze_security_risks`** - Identifies top issues by severity and business impact
-   - Use for: Daily security reviews, prioritizing remediation work
-   - Returns: Issue counts by type, severity breakdown, risk scoring
-
-2. **`analyze_email_security`** - Direct SPF/DMARC/DKIM breakdown
-   - Use for: Email authentication compliance checks
-   - Returns: Counts of missing/misconfigured email security controls
-
-3. **`analyze_issue_types`** - Granular counts for specific issue types
-   - Use for: Tracking remediation progress, compliance reporting
-   - Pass specific issue types to get exact counts
-
-4. **`discover_assets`** - Asset inventory with issue context
-   - Use for: Understanding attack surface, identifying high-risk assets
-   - Includes data completeness validation warnings
-
-5. **`query_security_data`** - Fallback for anything not covered above
-   - Use for: Custom queries, exploring new data, complex filtering
-   - Leverages API discovery to find correct syntax
-
-## Quick Reference
-
-**Current production setup:**
-- Server: `simplified-index.ts` (streamlined version)
-- Entry point: `build/simplified-index.js`
-- Focus: Operational security workflows (findings, issues, assets)
-- Tools: 9 specialized operational tools
-
-**When you need to find an API endpoint:**
-1. Use `api_discovery` tool with a search query - returns structured JSON with confidence scores
-2. Use `query_security_data` with `validate_only: true` to verify endpoint syntax
-3. API discovery uses synonym expansion, field boosting, and version bias
-4. Results include confidence scores and alternative suggestions
-5. Use `include_schema: true` in `api_discovery` for request/response schema details
-
-**When extending functionality:**
-1. Add tools to `simplified-index.ts` (not `index.ts`)
-2. Implement all 3 response modes (minimal/standard/detailed)
-3. Focus on operational utility over executive reporting
-4. Use API discovery in `query_security_data` for complex endpoint needs
-5. Run `npm run api:embed` after changing `docs/api/index.jsonl`
-6. Write tests before submitting PRs
-
-**Key files for operational work:**
-- `src/simplified-index.ts` - Main server with 9 tools (CURRENT)
-- `src/api/client.ts` - SecurityScorecard API client methods
-- `src/integration/api-reference-client.ts` - Enhanced API discovery with synonyms, field boosting
-- `src/integration/api-schema.ts` - Schema extraction from Swagger spec
-- `src/get_findings_by_category.ts` - Factor-based finding organization
-- `src/asset_management.ts` - Asset inventory utilities
-- `docs/api/index-embeddings.json` - Cached semantic embeddings (enriched)
+- `npm run build` (tsc) OOMs even with 8GB heap - always use `npm run build:fast` (esbuild)
+- Run `npm run api:embed` after any changes to `docs/api/index.jsonl`
+- `api_discovery` returns structured JSON with confidence scores; use `include_schema: true` for request/response schema details
+- `query_security_data` supports `validate_only: true` to verify endpoint syntax without executing
