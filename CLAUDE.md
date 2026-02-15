@@ -8,10 +8,10 @@ This is a Model Context Protocol (MCP) server that integrates with the SecurityS
 
 The project provides **two server implementations**:
 
-1. **Streamlined** (`simplified-index.ts`) - **CURRENT SETUP** - 8 specialized tools for operational workflows with 90% token reduction
-2. **Comprehensive** (`index.ts`) - Full-featured with 11+ tools including executive reporting (not currently in use)
+1. **Streamlined** (`simplified-index.ts`) - **CURRENT SETUP** - 9 specialized tools for operational workflows with 90% token reduction
+2. **Comprehensive** (`index.ts`) - Full-featured with 16 tools including executive reporting (not currently in use)
 
-Both implementations use the MCP SDK v1.25.1+ with the modern `McpServer` API and MCP 2025-06-18 schema compliance.
+Both implementations use the MCP SDK v1.25.2+ with the modern `McpServer` API.
 
 ## Current Setup
 
@@ -19,7 +19,7 @@ Both implementations use the MCP SDK v1.25.1+ with the modern `McpServer` API an
 
 **Primary Use Case:** Operational work with SecurityScorecard findings - issue analysis, asset management, email security validation, and security data queries.
 
-**API Reference Integration:** When you need to make complex API calls beyond the 8 specialized tools, use the `query_security_data` tool. This tool integrates with the API discovery system to help find the correct endpoint syntax and parameters for SecurityScorecard API calls.
+**API Reference Integration:** When you need to make complex API calls beyond the 9 specialized tools, use the `query_security_data` tool. This tool integrates with the API discovery system to help find the correct endpoint syntax and parameters for SecurityScorecard API calls.
 
 ## Commands
 
@@ -44,11 +44,9 @@ npm run start:original
 npm test
 ```
 
-### Known Issues (2025-12-27)
+### Known Issues
 
 **TypeScript OOM**: `npm run build` (tsc) runs out of memory even with 8GB heap. Use `npm run build:fast` (esbuild) instead - builds in ~130ms.
-
-**Bug Fixed (Verified)**: `security_dashboard` and `create_improvement_plan` tools were calling `this.client.getCompanyScore()` which was missing from the compiled JS. Fixed by changing to `getCompanyFactorSummary()` which uses `/companies/{domain}/summary-factors` endpoint. Tested and confirmed working: `security_dashboard domain=neste.com` returns "Score 96/100, Grade A".
 
 ### API Reference Management
 
@@ -76,6 +74,16 @@ npm run dev:api
 
 **Important:** The `api:embed` script uses `@xenova/transformers` MiniLM model to generate semantic embeddings. Run this whenever `docs/api/index.jsonl` changes to keep search results accurate.
 
+### Validation
+
+```bash
+# Validate MCP tool registrations
+npm run validate
+
+# Run basic usage validation
+npm run api:validate
+```
+
 ### Testing Individual Files
 
 ```bash
@@ -93,26 +101,28 @@ npm run test:ts
 The codebase maintains two complete MCP server implementations that share common utilities but differ in tool registration and response strategies:
 
 **`src/simplified-index.ts` (Streamlined) - CURRENT SETUP**
-- 8 specialized MCP tools focused on operational security workflows
+- 9 specialized MCP tools focused on operational security workflows
 - Response modes: minimal (15-50 tokens), standard (200-300 tokens), detailed (800+ tokens)
 - Cross-tool data validation and completeness checking
 - **API discovery integration** for complex queries via `query_security_data` tool
 - Focus: Daily operations, issue analysis, asset management, email security
 
-**Core Operational Tools (8):**
+**Core Operational Tools (9):**
 1. `security_dashboard` - Score, grade, and key metrics
 2. `analyze_security_risks` - Issue prioritization and risk analysis
 3. `create_improvement_plan` - Actionable remediation roadmaps
 4. `discover_assets` - Asset inventory with security context
 5. `analyze_email_security` - SPF/DMARC/DKIM analysis
-6. `analyze_issue_types` - Granular issue type breakdowns
-7. `validate_data_completeness` - Cross-tool data verification
-8. `query_security_data` - **Direct API access with discovery assistance**
+6. `api_discovery` - Search and discover API endpoints with hybrid search
+7. `analyze_issue_types` - Granular issue type breakdowns
+8. `validate_data_completeness` - Cross-tool data verification
+9. `query_security_data` - **Direct API access with discovery assistance**
 
 **`src/index.ts` (Comprehensive) - NOT IN CURRENT USE**
-- 11+ registered MCP tools with full SecurityScorecard API coverage
+- 16 registered MCP tools with full SecurityScorecard API coverage
 - Standard response sizes (200-1000+ tokens)
 - Includes ROI calculations, strategic roadmaps, and executive reporting
+- Tools: `get_score_improvement_roadmap`, `calculate_factor_score_impact`, `get_issues_by_roi`, `find_high_impact_findings_across_assets`, `get_findings_by_asset`, `get_findings_by_category`, `generate_remediation_report`, `get_asset_inventory`, `get_asset_findings`, `compare_assets`, `call_api_endpoint`, `discover_all_assets`, `get_asset_detailed_findings`, `get_ip_security_details`, `diagnose_api_coverage`, `api_discovery`
 - Best for: Complete analysis, strategic planning, advanced workflows (when needed)
 
 ### Key Architectural Components
@@ -155,7 +165,7 @@ This system helps find the correct syntax for complex SecurityScorecard API call
   - Used by `api_discovery` with `include_schema: true` parameter
 
 **When to rely on API discovery:**
-- You need an endpoint that isn't covered by the 8 specialized tools
+- You need an endpoint that isn't covered by the 9 specialized tools
 - You're unsure of the exact parameter names or query syntax
 - You want to explore what data is available for a specific security domain
 - You need to construct a complex query with multiple filters
@@ -167,11 +177,10 @@ This system helps find the correct syntax for complex SecurityScorecard API call
 **4. MCP Server Implementation Pattern**
 Both servers follow this structure:
 ```typescript
-// Initialize MCP server with 2025-06-18 schema
+// Initialize MCP server
 const server = new McpServer({
   name: "security-scorecard-[variant]",
-  version: "4.1.0",
-  protocolVersion: "2025-06-18"
+  version: "4.1.0"
 });
 
 // Register tools with Zod schemas
@@ -220,6 +229,14 @@ if (response_mode === "standard") {
 ```
 
 Claude Desktop intelligently escalates from minimal → standard → detailed as needed during conversations.
+
+## Dependencies
+
+**Runtime:** `@modelcontextprotocol/sdk` ^1.25.2, `@xenova/transformers` ^2.17.2, `dotenv` ^17.2.3, `sharp` ^0.34.5, `zod` ^4.3.5
+
+**Dev:** `esbuild` ^0.27.2, `typescript` ^5.9.3, `ts-node` ^10.9.2, `@types/node` ^25.0.3
+
+**Node.js:** >=18 required
 
 ## Environment Variables
 
@@ -282,7 +299,7 @@ this.server.registerTool("tool_name", {
 ```
 2. Add business logic to shared utilities if reusable across both servers (`src/asset_management.ts`, etc.)
 3. Write tests in `tests/` directory
-4. Rebuild: `npm run build`
+4. Rebuild: `npm run build:fast`
 5. Update `README.md` tool documentation if user-facing
 
 ### Testing API Endpoints Manually
@@ -339,7 +356,7 @@ When modifying or adding tools to the **streamlined version** (current setup):
    - Minimal: Direct answers for quick queries (15-50 tokens)
    - Standard: Operational context with key insights (200-300 tokens)
    - Detailed: Comprehensive analysis with remediation guidance (800+ tokens)
-3. **Always include metadata footer:** `*Generated: {timestamp} | Schema: 2025-06-18*`
+3. **Always include metadata footer:** `*Generated: {timestamp}*`
 4. **Use structured markdown** for readability (headers, lists, tables)
 5. **Return actionable validation errors** with suggestions for alternative approaches
 6. **Include data completeness warnings** when cross-tool validation shows inconsistencies
@@ -349,6 +366,13 @@ When modifying the comprehensive version (if needed):
 - Prioritize completeness over token efficiency
 - Include executive-level strategic context and ROI calculations
 - Standard response sizes (200-1000+ tokens)
+
+## CI/CD
+
+GitHub Actions workflow (`.github/workflows/node.js.yml`) runs on pushes and PRs to `main`:
+- Tests against Node.js 18.x, 20.x, and 22.x
+- Runs `npm ci`, `npm run build`, and `npm test`
+- 10-minute timeout per job
 
 ## Branch Workflow
 
@@ -360,8 +384,8 @@ When modifying the comprehensive version (if needed):
 
 ```
 src/
-├── index.ts                          # Comprehensive MCP server (11+ tools)
-├── simplified-index.ts               # Streamlined MCP server (8 tools, recommended)
+├── index.ts                          # Comprehensive MCP server (16 tools)
+├── simplified-index.ts               # Streamlined MCP server (9 tools, recommended)
 ├── api/
 │   └── client.ts                     # SecurityScorecard API client
 ├── integration/
@@ -379,13 +403,36 @@ docs/api/                             # Self-contained API reference
 ├── index-embeddings.json             # Semantic embeddings cache (enriched)
 └── {tag}/*.md                        # Per-endpoint documentation
 
+examples/                             # Usage examples
+├── basic_usage.ts                    # Basic API usage patterns
+├── mcp_integration.ts                # MCP server integration example
+├── mcp_upgrade_example.ts            # SDK upgrade migration example
+└── test_examples.ts                  # Test helper examples
+
 tools/
 └── update_api_spec.sh                # Fetch latest Swagger from SecurityScorecard
 
+scripts/                              # Maintenance and update scripts
+├── fetch-docs.ps1                    # Fetch API docs (PowerShell)
+├── update.ps1                        # Update workflow (PowerShell)
+└── update.sh                         # Update workflow (Bash)
+
 tests/                                # Test files (both .js and .ts)
-build/                                # Compiled JavaScript output
+build/                                # Compiled JavaScript output (generated)
+
+.claude/
+└── settings.local.json               # Local Claude Code settings
+
+.github/workflows/
+└── node.js.yml                       # CI: build + test on Node 18/20/22
+
+# Root-level scripts
 api-docs.json                         # Source Swagger 2.0 specification
 split_swagger.py                      # Generate docs from Swagger spec
+validate_mcp_tools.py                 # Validate MCP tool registrations
+setup.ps1 / setup.sh                  # Project setup (Windows/Unix)
+setup_simple.ps1                      # Simplified Windows setup
+run_validation.ps1 / run_validation.sh # Run full validation suite
 ```
 
 ## Common Patterns
@@ -494,7 +541,7 @@ For operational security work, the most frequently used tools are:
 - Server: `simplified-index.ts` (streamlined version)
 - Entry point: `build/simplified-index.js`
 - Focus: Operational security workflows (findings, issues, assets)
-- Tools: 8 specialized operational tools
+- Tools: 9 specialized operational tools
 
 **When you need to find an API endpoint:**
 1. Use `api_discovery` tool with a search query - returns structured JSON with confidence scores
@@ -512,7 +559,7 @@ For operational security work, the most frequently used tools are:
 6. Write tests before submitting PRs
 
 **Key files for operational work:**
-- `src/simplified-index.ts` - Main server with 8 tools (CURRENT)
+- `src/simplified-index.ts` - Main server with 9 tools (CURRENT)
 - `src/api/client.ts` - SecurityScorecard API client methods
 - `src/integration/api-reference-client.ts` - Enhanced API discovery with synonyms, field boosting
 - `src/integration/api-schema.ts` - Schema extraction from Swagger spec
