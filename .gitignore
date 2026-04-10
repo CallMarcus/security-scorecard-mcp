@@ -30,6 +30,9 @@ test-debug-logs/
 *.swp
 *.swo
 
+# Claude Code local settings
+.claude/settings.local.json
+
 # OS files
 .DS_Store
 Thumbs.db

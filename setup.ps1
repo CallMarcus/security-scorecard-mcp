@@ -1,5 +1,4 @@
 # Requires PowerShell 5+
-# No parameters needed for simplified single-channel setup
 $ErrorActionPreference = 'Stop'
 
 # Verify Node.js 18+ is installed
