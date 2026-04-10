@@ -30,7 +30,7 @@ class SecurityScorecardServer {
 
   constructor() {
     this.server = new McpServer({
-      name: "security-scorecard-simplified",
+      name: "security-scorecard",
       version: "4.1.0"
     });
 
