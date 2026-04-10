@@ -270,23 +270,26 @@ export class ApiReferenceClient {
       score += 2;
     }
 
-    // Prefer shorter paths (often listing endpoints)
-    score += Math.max(0, 3 - endpoint.path.split('/').length);
+    // Only apply tiebreaker bonuses when the endpoint has keyword relevance
+    if (score > 0) {
+      // Prefer shorter paths (often listing endpoints)
+      score += Math.max(0, 3 - endpoint.path.split('/').length);
 
-    // Version bias: prefer v2 endpoints over v1 or unversioned
-    if (pathText.includes('/v2/')) {
-      score += 2;
-    } else if (pathText.includes('/v1/')) {
-      score += 0.5; // Slight penalty vs v2
-    }
+      // Version bias: prefer v2 endpoints over v1 or unversioned
+      if (pathText.includes('/v2/')) {
+        score += 2;
+      } else if (pathText.includes('/v1/')) {
+        score += 0.5; // Slight penalty vs v2
+      }
 
-    // Deprecation detection: downweight if summary/path hints at deprecation
-    const deprecationHints = ['deprecated', 'legacy', 'old', 'obsolete'];
-    const fullText = `${summaryText} ${pathText} ${operationIdText}`;
-    for (const hint of deprecationHints) {
-      if (fullText.includes(hint)) {
-        score *= 0.5; // Halve score for deprecated endpoints
-        break;
+      // Deprecation detection: downweight if summary/path hints at deprecation
+      const deprecationHints = ['deprecated', 'legacy', 'old', 'obsolete'];
+      const fullText = `${summaryText} ${pathText} ${operationIdText}`;
+      for (const hint of deprecationHints) {
+        if (fullText.includes(hint)) {
+          score *= 0.5; // Halve score for deprecated endpoints
+          break;
+        }
       }
     }
 

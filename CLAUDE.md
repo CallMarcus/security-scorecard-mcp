@@ -6,16 +6,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a Model Context Protocol (MCP) server that integrates with the SecurityScorecard REST API for **operational security work** - managing findings, analyzing issues, and working with security data.
 
-The project provides **two server implementations**:
-
-1. **Streamlined** (`simplified-index.ts`) - **CURRENT SETUP** - 9 specialized tools for operational workflows with 90% token reduction
-2. **Comprehensive** (`index.ts`) - Full-featured with 16 tools including executive reporting (not currently in use)
-
-Both implementations use the MCP SDK v1.25.2+ with the modern `McpServer` API.
+The server (`src/index.ts`) provides **9 specialized tools** for operational workflows with 90% token reduction, using the MCP SDK v1.29.0+ with the modern `McpServer` API.
 
 ## Current Setup
-
-**Active Configuration:** Claude Desktop is configured with the **streamlined version** (`simplified-index.ts`)
 
 **Primary Use Case:** Operational work with SecurityScorecard findings - issue analysis, asset management, email security validation, and security data queries.
 
@@ -32,13 +25,8 @@ npm run build
 # Fast build using esbuild (recommended - low memory, 164ms)
 npm run build:fast
 
-# Run the streamlined server (recommended)
+# Run the server
 npm start
-# or explicitly:
-npm run start:simplified
-
-# Run the comprehensive server
-npm run start:original
 
 # Run tests
 npm test
@@ -92,20 +80,13 @@ npm run test:ts
 
 ## Architecture
 
-### Dual Server Design
+### Server: `src/index.ts`
 
-The codebase maintains two complete MCP server implementations that share common utilities but differ in tool registration and response strategies:
-
-**`src/simplified-index.ts` (Streamlined) - CURRENT SETUP**
 - 9 specialized MCP tools focused on operational security workflows
 - Response modes: minimal (15-50 tokens), standard (200-300 tokens), detailed (800+ tokens)
 - Cross-tool data validation and completeness checking
 - **API discovery integration** for complex queries via `query_security_data` tool
 - Focus: Daily operations, issue analysis, asset management, email security
-
-**`src/index.ts` (Comprehensive) - NOT IN CURRENT USE**
-- 16 tools with full SecurityScorecard API coverage (ROI, strategic roadmaps, executive reporting)
-- Best for: Complete analysis, strategic planning, advanced workflows (when needed)
 
 ### Key Architectural Components
 
@@ -131,7 +112,7 @@ This system helps find the correct syntax for complex SecurityScorecard API call
 **Use API discovery when** the 9 specialized tools don't cover your needs, or you're unsure of endpoint syntax/parameters.
 
 **4. MCP Server Implementation Pattern**
-Both servers use `McpServer` + `registerTool()` with Zod input schemas and `StdioServerTransport`. See `src/simplified-index.ts` for the canonical pattern.
+The server uses `McpServer` + `registerTool()` with Zod input schemas and `StdioServerTransport`. See `src/index.ts` for the canonical pattern.
 
 ### Type Definitions
 
@@ -139,13 +120,13 @@ Both servers use `McpServer` + `registerTool()` with Zod input schemas and `Stdi
 - `RequestOptions`, `ApiResponse` - Generic API communication types
 - Use these when extending the client or adding new endpoints
 
-### Response Mode Pattern (Streamlined Only)
+### Response Mode Pattern
 
 Tools implement 3 tiers: **minimal** (15-50 tokens, no headers), **standard** (200-300 tokens, key insights), **detailed** (800+ tokens, full analysis). Claude Desktop escalates as needed during conversations.
 
 ## Dependencies
 
-**Runtime:** `@modelcontextprotocol/sdk` ^1.25.2, `@xenova/transformers` ^2.17.2, `dotenv` ^17.2.3, `sharp` ^0.34.5, `zod` ^4.3.5
+**Runtime:** `@modelcontextprotocol/sdk` ^1.29.0, `@xenova/transformers` ^2.17.2, `dotenv` ^17.2.3, `zod` ^4.3.5
 
 **Dev:** `esbuild` ^0.27.2, `typescript` ^5.9.3, `ts-node` ^10.9.2, `@types/node` ^25.0.3
 
@@ -173,10 +154,7 @@ Optional:
 
 ### Adding a New Tool
 
-**Default:** Add new operational tools to `simplified-index.ts` (current setup)
-**Only if:** The tool is specifically for executive reporting or strategic analysis, add to `index.ts`
-
-1. Add tool registration in `src/simplified-index.ts` `setupTools()` method (follow existing tools as pattern)
+1. Add tool registration in `src/index.ts` `setupTools()` method (follow existing tools as pattern)
 2. Include all 3 response modes (minimal/standard/detailed) and `annotations` metadata
 3. Add reusable business logic to shared utilities (`src/asset_management.ts`, etc.)
 4. Write tests in `tests/` directory
@@ -192,13 +170,10 @@ Run `npm run api:embed` after updating `docs/api/index.jsonl`. Uses MiniLM via `
 
 ## Tool Response Guidelines
 
-**Streamlined version** (current setup):
 - Implement all 3 response modes (see Response Mode Pattern above)
 - Include metadata footer: `*Generated: {timestamp}*`
 - Use structured markdown; return actionable validation errors
 - Include data completeness warnings when cross-tool validation shows inconsistencies
-
-**Comprehensive version** (if needed): Prioritize completeness over token efficiency; include executive-level context and ROI calculations.
 
 ## CI/CD
 
@@ -217,8 +192,7 @@ GitHub Actions workflow (`.github/workflows/node.js.yml`) runs on pushes and PRs
 
 ```
 src/
-├── simplified-index.ts        # Streamlined MCP server (9 tools, CURRENT)
-├── index.ts                   # Comprehensive MCP server (16 tools)
+├── index.ts                   # MCP server (9 tools)
 ├── api/client.ts              # SecurityScorecard API client
 ├── integration/               # API discovery: hybrid search, embeddings, schema
 ├── types/api.ts               # Shared TypeScript types
@@ -236,7 +210,7 @@ build/                         # Compiled output (generated)
 
 - **Pagination**: Cursor-based - loop with `cursor`/`next_cursor` params, `size: 50`. See existing tools for examples.
 - **Error handling**: Wrap API calls in try-catch, return `{ isError: true }` with user-friendly messages.
-- **Data validation** (streamlined only): Use `validate_data_completeness` to cross-verify results; warn when confidence < 0.8.
+- **Data validation**: Use `validate_data_completeness` to cross-verify results; warn when confidence < 0.8.
 
 ## Gotchas
 

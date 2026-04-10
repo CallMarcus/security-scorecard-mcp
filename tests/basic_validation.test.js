@@ -139,9 +139,8 @@ describe('MCP Tools Compatibility', () => {
     try {
       const fs = await import('fs');
       const indexExists = fs.existsSync('./build/index.js');
-      const simplifiedExists = fs.existsSync('./build/simplified-index.js');
-      
-      if (indexExists || simplifiedExists) {
+
+      if (indexExists) {
         assert.ok(true, 'MCP server files exist');
         console.log('✅ MCP server module files found');
       } else {
