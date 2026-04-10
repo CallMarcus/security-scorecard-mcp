@@ -14,7 +14,7 @@ interface SecurityScorecardConfig {
   defaultDomain: string;
 }
 
-class SimplifiedSecurityScorecardServer {
+class SecurityScorecardServer {
   private server: McpServer;
   private client: any;
   private config: SecurityScorecardConfig;
@@ -662,10 +662,10 @@ class SimplifiedSecurityScorecardServer {
   async start() {
     const transport = new StdioServerTransport();
     await this.server.connect(transport);
-    console.error("✅ SecurityScorecard MCP Server (Streamlined) running");
+    console.error("SecurityScorecard MCP Server running");
   }
 }
 
 // Start the server
-const server = new SimplifiedSecurityScorecardServer();
+const server = new SecurityScorecardServer();
 server.start().catch(console.error);
