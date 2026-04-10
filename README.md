@@ -32,7 +32,7 @@ Edit `%APPDATA%\Claude\claude_desktop_config.json`:
   "mcpServers": {
     "security-scorecard": {
       "command": "node",
-      "args": ["C:\\path\\to\\security-scorecard-mcp\\build\\simplified-index.js"],
+      "args": ["C:\\path\\to\\security-scorecard-mcp\\build\\index.js"],
       "env": {
         "SECURITY_SCORECARD_API_TOKEN": "your-api-token-here",
         "COMPANY_DOMAIN": "example.com"
@@ -44,9 +44,9 @@ Edit `%APPDATA%\Claude\claude_desktop_config.json`:
 
 **Important:** Replace the path and credentials with your actual values, then restart Claude Desktop.
 
-## Available Tools (Streamlined Version)
+## Available Tools
 
-The streamlined server (`simplified-index.js`) provides 8 specialized tools optimized for Claude Desktop:
+The server (`index.js`) provides 9 specialized tools optimized for Claude Desktop:
 
 | Tool | Purpose |
 |------|---------|
@@ -55,6 +55,7 @@ The streamlined server (`simplified-index.js`) provides 8 specialized tools opti
 | `create_improvement_plan` | Actionable remediation roadmaps |
 | `discover_assets` | Asset inventory with security context |
 | `analyze_email_security` | SPF/DMARC/DKIM analysis |
+| `api_discovery` | Search 628+ API endpoints with hybrid semantic/keyword search |
 | `analyze_issue_types` | Granular issue type breakdowns |
 | `validate_data_completeness` | Cross-tool data verification |
 | `query_security_data` | Direct API access with discovery |
@@ -65,10 +66,6 @@ Each tool supports three response modes for token efficiency:
 - **minimal** - Quick answers (15-50 tokens)
 - **standard** - Overview with context (200-300 tokens)
 - **detailed** - Comprehensive analysis (800+ tokens)
-
-## Comprehensive Version
-
-For full API coverage and executive reporting, use `build/index.js` instead. This version includes 11 tools with strategic analysis, ROI calculations, and complete SecurityScorecard API access.
 
 ## Environment Variables
 
@@ -117,8 +114,7 @@ npm test             # Run tests
 
 ```
 src/
-  simplified-index.ts    # Streamlined MCP server (8 tools)
-  index.ts               # Comprehensive MCP server (11 tools)
+  index.ts               # MCP server (9 tools)
   api/client.ts          # SecurityScorecard API client
   integration/           # API discovery system
 docs/api/                # Self-contained API reference
@@ -129,7 +125,9 @@ build/                   # Compiled JavaScript
 
 ### Testing
 
-See `TEST-PLAN-CLAUDE-DESKTOP.md` for comprehensive validation tests.
+```bash
+npm test             # Run test suite
+```
 
 ## Troubleshooting
 
@@ -152,7 +150,7 @@ npm run build:fast
 ### Claude Desktop doesn't see the MCP
 
 1. Check the config path: `%APPDATA%\Claude\claude_desktop_config.json`
-2. Verify the path to `simplified-index.js` is correct
+2. Verify the path to `index.js` is correct
 3. Restart Claude Desktop completely
 
 ### API returns 401 Unauthorized
