@@ -1,7 +1,7 @@
 {
   "name": "security-scorecard-mcp",
   "version": "4.1.0",
-  "description": "Compiled MCP server for the SecurityScorecard API",
+  "description": "MCP server that brings SecurityScorecard into Claude Desktop — 9 operational tools for issue triage, asset discovery, and email-security checks, plus hybrid semantic search over 628 API endpoints.",
   "main": "build/index.js",
   "type": "module",
   "scripts": {
