@@ -1,6 +1,6 @@
 # SecurityScorecard MCP Server
 
-A Model Context Protocol (MCP) server for Claude Desktop that integrates with the [SecurityScorecard API](https://securityscorecard.readme.io/).
+**SecurityScorecard MCP Server** brings the [SecurityScorecard](https://securityscorecard.readme.io/) platform into Claude Desktop (and any MCP-compatible client) as a conversational interface for day-to-day security operations. It exposes 9 purpose-built tools for issue analysis, asset inventory, email-security validation, and risk prioritization, with token-efficient response modes (minimal / standard / detailed) so an LLM can drill from a 50-token snapshot down to a full report. For anything the specialized tools don't cover, a hybrid semantic + keyword search over 628 indexed API endpoints lets the model discover and call the right endpoint on the fly.
 
 ## Quick Start (Windows 11)
 
