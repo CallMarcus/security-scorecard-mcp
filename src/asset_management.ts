@@ -192,7 +192,7 @@ async function getAllAssetsPaginated(
 /**
  * Validate if a string is a domain name
  */
-function isValidDomain(str: string): boolean {
+export function isValidDomain(str: string): boolean {
   if (!str) return false;
   const domainRegex = /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
   return domainRegex.test(str);
@@ -201,7 +201,7 @@ function isValidDomain(str: string): boolean {
 /**
  * Validate if a string is an IP address
  */
-function isValidIP(str: string): boolean {
+export function isValidIP(str: string): boolean {
   if (!str) return false;
   const ipRegex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
   return ipRegex.test(str);
@@ -806,17 +806,19 @@ export async function compareAssets(
     }
   }
 
-  // Generate recommendations
-  const recommendations = generateComparisonRecommendations(comparisons);
+  // Sort by risk first: generateComparisonRecommendations assumes the array is
+  // ordered highest-risk first (it treats [0] as the riskiest asset).
+  const sortedComparisons = comparisons.sort((a, b) => b.security_risk_score - a.security_risk_score);
+  const recommendations = generateComparisonRecommendations(sortedComparisons);
 
   return {
-    comparison: comparisons.sort((a, b) => b.security_risk_score - a.security_risk_score),
+    comparison: sortedComparisons,
     recommendations
   };
 }
 
 // Helper functions
-function getFactorForIssueType(issueType: string): string {
+export function getFactorForIssueType(issueType: string): string {
   if (issueType.includes('patching') || issueType.includes('vuln')) return 'patching_cadence';
   if (issueType.includes('spf') || issueType.includes('dmarc') || issueType.includes('dns')) return 'dns_health';
   if (issueType.includes('tls') || issueType.includes('ssl') || issueType.includes('cert')) return 'network_security';
@@ -862,7 +864,7 @@ async function findParentDomain(makeRequest: (endpoint: string, method?: string,
 /**
  * Extract issue types from factors response
  */
-function extractIssueTypesFromFactors(factors: any): string[] {
+export function extractIssueTypesFromFactors(factors: any): string[] {
   const issueTypes = new Set<string>();
   factors.entries?.forEach((factor: any) => {
     factor.issue_summary?.forEach((issue: any) => {
@@ -877,7 +879,7 @@ function extractIssueTypesFromFactors(factors: any): string[] {
 /**
  * Process issue entries into findings object
  */
-function processIssuesIntoFindings(issues: any[], findings: { [key: string]: any }, issueType: string) {
+export function processIssuesIntoFindings(issues: any[], findings: { [key: string]: any }, issueType: string) {
   if (!issues || issues.length === 0) return;
   
   const severities = issues.map(i => i.severity).filter(Boolean);
@@ -892,14 +894,14 @@ function processIssuesIntoFindings(issues: any[], findings: { [key: string]: any
   };
 }
 
-function getRemediationEffort(issueType: string): 'low' | 'medium' | 'high' {
+export function getRemediationEffort(issueType: string): 'low' | 'medium' | 'high' {
   if (issueType.includes('spf') || issueType.includes('dmarc') || issueType.includes('hsts')) return 'low';
   if (issueType.includes('patching_cadence_v3_critical')) return 'high';
   if (issueType.includes('patching')) return 'medium';
   return 'medium';
 }
 
-function getBusinessImpact(issueType: string, severity: string): string {
+export function getBusinessImpact(issueType: string, severity: string): string {
   const impacts = {
     'critical': 'High risk of immediate security breach',
     'high': 'Significant security vulnerability',
@@ -910,7 +912,7 @@ function getBusinessImpact(issueType: string, severity: string): string {
   return impacts[severity as keyof typeof impacts] || 'Unknown risk level';
 }
 
-function calculatePriorityScore(data: any): number {
+export function calculatePriorityScore(data: any): number {
   const severityScores = { 'critical': 5, 'high': 4, 'medium': 3, 'low': 2, 'informational': 1 };
   const effortScores = { 'low': 3, 'medium': 2, 'high': 1 };
   
@@ -920,7 +922,7 @@ function calculatePriorityScore(data: any): number {
   return (severityScore * data.count * effortScore);
 }
 
-function generateComparisonRecommendations(comparisons: any[]): string[] {
+export function generateComparisonRecommendations(comparisons: any[]): string[] {
   const recommendations = [];
   
   if (comparisons.length > 1) {
@@ -940,7 +942,7 @@ function generateComparisonRecommendations(comparisons: any[]): string[] {
   return recommendations;
 }
 
-function findCommonIssues(comparisons: any[]): string[] {
+export function findCommonIssues(comparisons: any[]): string[] {
   const allIssues = comparisons.flatMap(c => c.top_issue_types);
   const issueCounts: { [key: string]: number } = {};
   
