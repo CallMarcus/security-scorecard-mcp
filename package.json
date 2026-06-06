@@ -4,7 +4,16 @@
   "description": "A community-built, comprehensive MCP server for the SecurityScorecard API. Not affiliated with SecurityScorecard, Inc.",
   "main": "build/index.js",
   "type": "module",
+  "bin": {
+    "ssc-mcp": "build/index.js"
+  },
+  "files": [
+    "build",
+    "docs",
+    "api-docs.json"
+  ],
   "scripts": {
+    "prepublishOnly": "npm run build:fast",
     "build": "tsc",
     "build:fast": "esbuild src/*.ts src/**/*.ts --outdir=build --format=esm --platform=node --target=es2020",
     "start": "node build/index.js",
