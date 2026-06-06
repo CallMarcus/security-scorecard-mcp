@@ -1,0 +1,46 @@
+# Dependencies
+node_modules/
+
+# Environment variables
+.env
+.env.local
+
+# Build artifacts
+build/
+*.tsbuildinfo
+
+# Release archives
+*.zip
+
+# Generated/extracted data
+extracted_*.json
+validation_results*.json
+
+# Backup files
+*.backup
+*.bak
+
+# Test artifacts
+test-debug-logs/
+*.test-output
+
+# IDE/Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Claude Code local settings
+.claude/settings.local.json
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Logs
+*.log
+npm-debug.log*

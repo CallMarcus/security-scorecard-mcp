@@ -1,0 +1,14 @@
+{
+  "getAssetInventory": {
+    "text": "Retrieve inventory of active assets\nGET /v1/assets\nTag: Assets",
+    "embedding": [0.1, 0.9, 0.2]
+  },
+  "listCredentialPolicies": {
+    "text": "List credential rotation policies for compliance teams\nGET /v1/credential-policies\nTag: Security",
+    "embedding": [0.25, 0.05, 0.97]
+  },
+  "resetUserPassword": {
+    "text": "Trigger account recovery email for locked users\nPOST /v1/users/reset-password\nTag: Accounts",
+    "embedding": [0.92, 0.08, 0.0]
+  }
+}
