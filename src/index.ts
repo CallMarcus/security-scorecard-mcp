@@ -30,8 +30,8 @@ class SecurityScorecardServer {
 
   constructor() {
     this.server = new McpServer({
-      name: "security-scorecard",
-      version: "4.1.0"
+      name: "SSC MCP Server",
+      version: "1.0.1"
     });
 
     this.config = {
@@ -662,7 +662,7 @@ class SecurityScorecardServer {
   async start() {
     const transport = new StdioServerTransport();
     await this.server.connect(transport);
-    console.error("SecurityScorecard MCP Server running");
+    console.error("SSC MCP Server running");
   }
 }
 

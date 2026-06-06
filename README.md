@@ -1,6 +1,6 @@
-# SecurityScorecard MCP Server
+# SSC MCP Server
 
-A Model Context Protocol (MCP) server for Claude Desktop that integrates with the [SecurityScorecard API](https://securityscorecard.readme.io/).
+A community-built, comprehensive Model Context Protocol (MCP) server for Claude Desktop that integrates with the [SecurityScorecard API](https://securityscorecard.readme.io/).
 
 > **Disclaimer:** This is an independent, community-built open-source project. It is **not affiliated with, endorsed by, sponsored by, or associated with SecurityScorecard, Inc.** in any way. It is built solely against SecurityScorecard's publicly available API documentation. "SecurityScorecard" and all related names, marks, and logos are trademarks of SecurityScorecard, Inc. and are used here for identification purposes only. You must supply your own API credentials and comply with SecurityScorecard's terms of service.
 

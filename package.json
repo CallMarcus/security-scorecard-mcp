@@ -1,7 +1,7 @@
 {
-  "name": "security-scorecard-mcp",
+  "name": "@callmarcus/securityscorecard-mcp",
   "version": "1.0.1",
-  "description": "Compiled MCP server for the SecurityScorecard API",
+  "description": "A community-built, comprehensive MCP server for the SecurityScorecard API. Not affiliated with SecurityScorecard, Inc.",
   "main": "build/index.js",
   "type": "module",
   "scripts": {
