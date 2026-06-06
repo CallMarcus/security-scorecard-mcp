@@ -124,7 +124,7 @@ export class ApiReferenceClient {
 
   private async getEmbedder(): Promise<any> {
     if (!this.embedderPromise) {
-      this.embedderPromise = import('@xenova/transformers').then(module => {
+      this.embedderPromise = import('@huggingface/transformers').then(module => {
         const moduleAny = module as any;
         const pipelineFactory = moduleAny.pipeline || moduleAny.default?.pipeline;
         if (!pipelineFactory) {

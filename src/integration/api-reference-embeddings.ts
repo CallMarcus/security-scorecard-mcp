@@ -2,7 +2,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { pipeline as createPipeline } from '@xenova/transformers';
+import { pipeline as createPipeline } from '@huggingface/transformers';
 
 interface ApiIndexEntry {
   operationId: string;

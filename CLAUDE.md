@@ -56,7 +56,7 @@ npm run api:full
 npm run dev:api
 ```
 
-**Important:** The `api:embed` script uses `@xenova/transformers` MiniLM model to generate semantic embeddings. Run this whenever `docs/api/index.jsonl` changes to keep search results accurate.
+**Important:** The `api:embed` script uses the `@huggingface/transformers` MiniLM model to generate semantic embeddings. Run this whenever `docs/api/index.jsonl` changes to keep search results accurate.
 
 ### Validation
 
@@ -126,7 +126,7 @@ Tools implement 3 tiers: **minimal** (15-50 tokens, no headers), **standard** (2
 
 ## Dependencies
 
-**Runtime:** `@modelcontextprotocol/sdk` ^1.29.0, `@xenova/transformers` ^2.17.2, `dotenv` ^17.2.3, `zod` ^4.3.5
+**Runtime:** `@modelcontextprotocol/sdk` ^1.29.0, `@huggingface/transformers` ^4.2.0, `dotenv` ^17.4.1, `zod` ^4.3.6
 
 **Dev:** `esbuild` ^0.27.2, `typescript` ^5.9.3, `ts-node` ^10.9.2, `@types/node` ^25.0.3
 
@@ -166,7 +166,7 @@ Add methods to `src/api/client.ts` using the `makeRequest<T>()` pattern with typ
 
 ### Regenerating API Embeddings
 
-Run `npm run api:embed` after updating `docs/api/index.jsonl`. Uses MiniLM via `@xenova/transformers`, caches to `docs/api/index-embeddings.json`, and does fast incremental updates for unchanged entries.
+Run `npm run api:embed` after updating `docs/api/index.jsonl`. Uses MiniLM via `@huggingface/transformers`, caches to `docs/api/index-embeddings.json`, and does fast incremental updates for unchanged entries.
 
 ## Tool Response Guidelines
 
