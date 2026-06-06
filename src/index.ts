@@ -31,7 +31,7 @@ class SecurityScorecardServer {
   constructor() {
     this.server = new McpServer({
       name: "SSC MCP Server",
-      version: "1.0.2"
+      version: "1.0.3"
     });
 
     this.config = {
