@@ -1,19 +1,49 @@
 # SSC MCP Server
 
+[![npm version](https://img.shields.io/npm/v/@callmarcus/securityscorecard-mcp.svg)](https://www.npmjs.com/package/@callmarcus/securityscorecard-mcp)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 A community-built, comprehensive Model Context Protocol (MCP) server for Claude Desktop that integrates with the [SecurityScorecard API](https://securityscorecard.readme.io/).
+
+> Published on npm as [`@callmarcus/securityscorecard-mcp`](https://www.npmjs.com/package/@callmarcus/securityscorecard-mcp) and listed in the [MCP Registry](https://registry.modelcontextprotocol.io) as `io.github.CallMarcus/securityscorecard-mcp`.
 
 > **Disclaimer:** This is an independent, community-built open-source project. It is **not affiliated with, endorsed by, sponsored by, or associated with SecurityScorecard, Inc.** in any way. It is built solely against SecurityScorecard's publicly available API documentation. "SecurityScorecard" and all related names, marks, and logos are trademarks of SecurityScorecard, Inc. and are used here for identification purposes only. You must supply your own API credentials and comply with SecurityScorecard's terms of service.
 
-## Quick Start (Windows 11)
+## Quick Start
 
 ### Prerequisites
 
 1. **Node.js 18+** - [Download](https://nodejs.org/)
 2. **SecurityScorecard API Token** - Get from your [SecurityScorecard dashboard](https://platform.securityscorecard.io/)
 
-### Installation
+### Option A — Install from npm (recommended)
 
-```powershell
+No clone or build required. Point Claude Desktop at the published package with `npx`.
+
+Edit your `claude_desktop_config.json`:
+- **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
+- **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
+
+```json
+{
+  "mcpServers": {
+    "security-scorecard": {
+      "command": "npx",
+      "args": ["-y", "@callmarcus/securityscorecard-mcp"],
+      "env": {
+        "SECURITY_SCORECARD_API_TOKEN": "your-api-token-here",
+        "COMPANY_DOMAIN": "example.com"
+      }
+    }
+  }
+}
+```
+
+`npx -y` fetches and runs the latest published version automatically. Replace the credentials with your own, then restart Claude Desktop.
+
+### Option B — Run from source (for development)
+
+```bash
 # Clone the repository
 git clone https://github.com/CallMarcus/security-scorecard-mcp.git
 cd security-scorecard-mcp
@@ -25,16 +55,14 @@ npm install
 npm run build:fast
 ```
 
-### Configure Claude Desktop
-
-Edit `%APPDATA%\Claude\claude_desktop_config.json`:
+Then point Claude Desktop at your local build:
 
 ```json
 {
   "mcpServers": {
     "security-scorecard": {
       "command": "node",
-      "args": ["C:\\path\\to\\security-scorecard-mcp\\build\\index.js"],
+      "args": ["/path/to/security-scorecard-mcp/build/index.js"],
       "env": {
         "SECURITY_SCORECARD_API_TOKEN": "your-api-token-here",
         "COMPANY_DOMAIN": "example.com"
