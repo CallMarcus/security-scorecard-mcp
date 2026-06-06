@@ -1,0 +1,2 @@
+{"tag":"Operations","method":"GET","path":"/v2/health","operationId":"getServiceHealth","summary":"Service heartbeat status probe","file":"ops/health.md","hasBody":false,"requiredPathParams":[],"queryParams":[]}
+{"tag":"Email","method":"GET","path":"/v1/companies/domain/email-security","operationId":"getEmailSecurity","summary":"Retrieve SPF DMARC DKIM email security configuration","file":"email/email-security.md","hasBody":false,"requiredPathParams":["domain"],"queryParams":[]}

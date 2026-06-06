@@ -9,6 +9,7 @@
     "build:fast": "esbuild src/*.ts src/**/*.ts --outdir=build --format=esm --platform=node --target=es2020",
     "start": "node build/index.js",
     "test": "node --test tests/*.test.js",
+    "test:coverage": "node --test --experimental-test-coverage tests/*.test.js",
     "test:ts": "node --test tests/*.test.ts",
     "api:fetch": "bash tools/update_api_spec.sh",
     "api:generate": "python split_swagger.py",
