@@ -12,8 +12,8 @@
 - `search` (optional, string) — word or phrase to search for
 - `vendor_domain` (optional, string) — Vendor domains whoes report is needed comma separated
 - `tiers` (optional, string) — Tiers comma separated
+- `tag` (optional, string) — Comma-separated list of tag names to filter vendors by
 - `incident_likelihoods` (optional, string) — incident likelihood comma separated
-- `report_incident_likelihoods` (optional, string) — incident likelihood by report comma separated
 - `business_impacts` (optional, string) — business impacts comma separated
 - `published_at` (optional, string) — published at filter, accept stringified object with date value and operator
 - `hide_report_body` (optional, string) — pass true if we dont need the report body
@@ -72,9 +72,6 @@ A list of likelihood report data
             "type": "string"
           },
           "published_by": {
-            "type": "string"
-          },
-          "report_incident_likelihood": {
             "type": "string"
           },
           "incident_likelihood_score": {
@@ -208,6 +205,21 @@ A list of likelihood report data
                           "key": {
                             "type": "string",
                             "description": "key of the issue type"
+                          },
+                          "count": {
+                            "type": "number",
+                            "description": "count of the issue type"
+                          },
+                          "periods": {
+                            "type": "array",
+                            "description": "if this issue is about past findings, these are the periods when they were observed",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "severity": {
+                            "type": "string",
+                            "description": "Indicator MAX severity (low, medium, high or critical)"
                           }
                         },
                         "required": [

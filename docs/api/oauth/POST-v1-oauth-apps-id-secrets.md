@@ -19,6 +19,10 @@ Add a new client secret for an OAuth application
     "comment": {
       "type": "string",
       "description": "Optional comment about the secret"
+    },
+    "expiration_date": {
+      "type": "string",
+      "description": "Expiration date for the secret"
     }
   },
   "additionalProperties": false,
@@ -52,6 +56,10 @@ OAuth application client secret with secret value (only returned on creation)
     "comment": {
       "type": "string",
       "description": "Optional comment about the secret"
+    },
+    "expiration_date": {
+      "type": "string",
+      "description": "Optional expiration date for the secret"
     },
     "created_by": {
       "type": "string",

@@ -16,7 +16,7 @@ create a new invitation for a new user/vendor
     "email": {
       "type": "string",
       "format": "email",
-      "pattern": "^.+@.+$",
+      "pattern": "^\\S+@\\S+\\.\\S+$",
       "x-example": "john.smith@example.com"
     },
     "first_name": {

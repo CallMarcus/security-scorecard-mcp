@@ -31,7 +31,7 @@ a person that uses any system at SecurityScorecard
     "email": {
       "type": "string",
       "format": "email",
-      "pattern": "^.+@.+$",
+      "pattern": "^\\S+@\\S+\\.\\S+$",
       "x-example": "john.smith@example.com"
     },
     "first_name": {
@@ -269,6 +269,9 @@ a person that uses any system at SecurityScorecard
                   "type": "string",
                   "format": "date-time",
                   "pattern": "^\\d{4}-\\d{2}-\\d{2}[ T]\\d{2}:\\d{2}:\\d{2}\\.{0,1}\\d*Z$"
+                },
+                "has_acknowledged_warning": {
+                  "type": "boolean"
                 }
               },
               "additionalProperties": false

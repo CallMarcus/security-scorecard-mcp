@@ -7,6 +7,7 @@
 
 ## Query Parameters
 - `tiers` (optional, string) — The tiers to filter the risk matrix data. Optional, defaults to all tiers.
+- `tag` (optional, string) — The tag to filter the risk matrix data. Optional.
 
 ## Responses
 ### 200

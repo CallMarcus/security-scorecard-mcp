@@ -35,11 +35,6 @@ List of OAuthAppGets
             "type": "string",
             "description": "Description of the OAuth application"
           },
-          "callback_url": {
-            "type": "string",
-            "x-example": "https://myapp.com/callback",
-            "description": "Callback URL for the OAuth application"
-          },
           "client_id": {
             "type": "string",
             "description": "Unique client ID for the OAuth application"
@@ -72,13 +67,29 @@ List of OAuthAppGets
             "type": "boolean",
             "description": "Whether the OAuth app is active"
           },
-          "require_pkce": {
-            "type": "boolean",
-            "description": "Whether PKCE (Proof Key for Code Exchange) is required"
-          },
           "created_by": {
             "type": "string",
             "description": "Username of the user who created this OAuth app"
+          },
+          "owners_user_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[\\da-z-]{16,}$"
+            },
+            "description": "User IDs of owners who can manage this OAuth app"
+          },
+          "bot_user_roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Roles to assign to the bot user"
+          },
+          "has_expiring_or_expired_secrets": {
+            "type": "boolean",
+            "description": "True if this app has at least one client secret expiring within the default window (15 days) or already expired"
           }
         },
         "additionalProperties": false,
@@ -91,8 +102,8 @@ List of OAuthAppGets
           "created_at",
           "updated_at",
           "is_active",
-          "require_pkce",
-          "created_by"
+          "created_by",
+          "owners_user_ids"
         ],
         "description": "OAuth application configuration (without secrets)"
       }

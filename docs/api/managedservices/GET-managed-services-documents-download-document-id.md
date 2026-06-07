@@ -33,6 +33,9 @@ document data with presigned download url
     "created_at": {
       "type": "string"
     },
+    "category": {
+      "type": "string"
+    },
     "created_by": {
       "type": "string"
     },
@@ -73,6 +76,7 @@ document data with presigned download url
     "filename",
     "description",
     "created_at",
+    "category",
     "created_by",
     "url"
   ],

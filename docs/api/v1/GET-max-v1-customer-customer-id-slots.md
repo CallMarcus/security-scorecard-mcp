@@ -34,9 +34,7 @@ Gets the list all the vendors of a partner
   },
   "required": [
     "total",
-    "used",
-    "updated_at",
-    "updated_by"
+    "used"
   ],
   "additionalProperties": false
 }

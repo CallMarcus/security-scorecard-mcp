@@ -12,8 +12,8 @@
 - `limit` (optional, number) — page size, the amount of items per page (max: 200)
 - `vendor_domain` (optional, string) — Vendor domains whoes report is needed comma separated
 - `tiers` (optional, string) — Tiers comma separated
+- `tag` (optional, string) — Comma-separated list of tag names to filter vendors by
 - `incident_likelihoods` (optional, string) — incident likelihood comma separated
-- `report_incident_likelihoods` (optional, string) — report incident likelihood comma separated
 - `business_impacts` (optional, string) — business impacts comma separated
 - `customer_domain` (optional, string) — Customer Domain whoes report is needed comma separated
 - `published` (optional, string) — If true returns published reports, false returns draft reports and no value return all reports
@@ -73,9 +73,6 @@ A list of likelihood report data
             "type": "string"
           },
           "published_by": {
-            "type": "string"
-          },
-          "report_incident_likelihood": {
             "type": "string"
           },
           "incident_likelihood_score": {
@@ -209,6 +206,21 @@ A list of likelihood report data
                           "key": {
                             "type": "string",
                             "description": "key of the issue type"
+                          },
+                          "count": {
+                            "type": "number",
+                            "description": "count of the issue type"
+                          },
+                          "periods": {
+                            "type": "array",
+                            "description": "if this issue is about past findings, these are the periods when they were observed",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "severity": {
+                            "type": "string",
+                            "description": "Indicator MAX severity (low, medium, high or critical)"
                           }
                         },
                         "required": [

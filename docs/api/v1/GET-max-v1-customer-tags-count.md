@@ -10,6 +10,7 @@
 - `business_impact` (optional, string) — Business impact to get tags count for
 - `incident_likelihood` (optional, string) — Incident likelihood to get tags count for
 - `tag_type` (optional, string) — Tag types to get tags count for
+- `tag` (optional, string) — Comma-separated list of tag names to filter vendors by
 
 ## Responses
 ### 200

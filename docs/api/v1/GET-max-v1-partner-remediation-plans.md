@@ -18,6 +18,7 @@
 - `published` (optional, string) — boolean to get the published reports
 - `published_at` (optional, string) — published at filter, accept stringified object with date value and operator
 - `hide_report_body` (optional, string) — pass true if we dont need the report body
+- `tag` (optional, string) — Tags comma separated (UUIDs)
 
 ## Responses
 ### 200

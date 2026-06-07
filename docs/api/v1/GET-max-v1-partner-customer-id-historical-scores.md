@@ -10,6 +10,7 @@
 
 ## Query Parameters
 - `tiers` (optional, string) — Tiers to filter the data by (gold, silver, platinum)
+- `tag` (optional, string) — Comma-separated list of tag UUIDs to filter vendors by
 
 ## Responses
 ### 200

@@ -106,6 +106,10 @@ Gets the vendor details
     "has_active_breach": {
       "type": "boolean",
       "description": "Vendor has active breach"
+    },
+    "score": {
+      "type": "number",
+      "description": "Vendor score"
     }
   },
   "required": [

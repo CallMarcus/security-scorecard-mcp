@@ -62,6 +62,14 @@ Gets the list of breaches
             "type": "string",
             "description": "published date of the breach"
           },
+          "news_source": {
+            "type": "string",
+            "description": "news source of the breach"
+          },
+          "source": {
+            "type": "string",
+            "description": "source of the breach"
+          },
           "customers": {
             "type": "array",
             "items": {

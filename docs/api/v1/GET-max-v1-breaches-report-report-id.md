@@ -13,17 +13,7 @@
 - `limit` (optional, number) — page size, the amount of items per page (max: 200)
 - `sort` (optional, string) — stringified object with value for column to sort by and operator
 - `search` (optional, string) — word or phrase to search for
-- `triaged` (optional, string) — true for findings that are set to be triaged
-- `report` (optional, string) — true for findings that are set to be reported
-- `customer_id` (optional, string) — Customer ID filter, it also accepts a comma separated list of customer ids
-- `customer_name` (optional, string) — Customer name filter, it also accepts a comma separated list of customer names
-- `customer_domain` (optional, string) — Customer domain filter, it also accepts a comma separated list of customer domains
-- `vendor_id` (optional, string) — Vendor ID filter, it also accepts a comma separated list of vendor ids
-- `vendor_domain` (optional, string) — Vendor domain filter, it also accepts a comma separated list of domains
-- `vendor_name` (optional, string) — Vendor name filter, it also accepts a comma separated list of strings
 - `published_at` (optional, string) — Published date filter, accept stringified object with date value and operator
-- `tiers` (optional, string) — tiers comma separated
-- `triaged_at` (optional, string) — get the findings that have ben triaged in a specific date range
 
 ## Responses
 ### 200
@@ -64,6 +54,14 @@ Gets the data from the archived reports
           "published_date": {
             "type": "string",
             "description": "published date of the breach"
+          },
+          "news_source": {
+            "type": "string",
+            "description": "news source of the breach"
+          },
+          "source": {
+            "type": "string",
+            "description": "source of the breach"
           },
           "customers": {
             "type": "array",

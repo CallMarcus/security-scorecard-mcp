@@ -22,14 +22,21 @@ Create a new OAuth application
       "type": "string",
       "description": "Description of the OAuth application"
     },
-    "callback_url": {
-      "type": "string",
-      "x-example": "https://myapp.com/callback",
-      "description": "Callback URL for the OAuth application"
+    "bot_user_roles": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Roles to assign to the bot user"
     },
-    "require_pkce": {
-      "type": "boolean",
-      "description": "Whether PKCE (Proof Key for Code Exchange) is required"
+    "owners_user_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "format": "uuid",
+        "pattern": "^[\\da-z-]{16,}$"
+      },
+      "description": "User IDs of owners who can manage this OAuth app"
     }
   },
   "additionalProperties": false,
@@ -61,11 +68,6 @@ OAuth application configuration with initial client secret (only returned on cre
     "description": {
       "type": "string",
       "description": "Description of the OAuth application"
-    },
-    "callback_url": {
-      "type": "string",
-      "x-example": "https://myapp.com/callback",
-      "description": "Callback URL for the OAuth application"
     },
     "client_id": {
       "type": "string",
@@ -103,13 +105,25 @@ OAuth application configuration with initial client secret (only returned on cre
       "type": "boolean",
       "description": "Whether the OAuth app is active"
     },
-    "require_pkce": {
-      "type": "boolean",
-      "description": "Whether PKCE (Proof Key for Code Exchange) is required"
-    },
     "created_by": {
       "type": "string",
       "description": "Username of the user who created this OAuth app"
+    },
+    "owners_user_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "format": "uuid",
+        "pattern": "^[\\da-z-]{16,}$"
+      },
+      "description": "User IDs of owners who can manage this OAuth app"
+    },
+    "bot_user_roles": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Roles to assign to the bot user"
     }
   },
   "additionalProperties": false,
@@ -123,8 +137,8 @@ OAuth application configuration with initial client secret (only returned on cre
     "created_at",
     "updated_at",
     "is_active",
-    "require_pkce",
-    "created_by"
+    "created_by",
+    "owners_user_ids"
   ],
   "description": "OAuth application configuration with initial client secret (only returned on creation)"
 }

@@ -11,7 +11,7 @@ Get all scorecards filtered by portfolio/s and/or watchlist/s
 ## Query Parameters
 - `page` (optional, integer) — page number, 0 is the first page (default: 0)
 - `page_size` (optional, integer) — number of portfolios per page (max: 200, default: 20)
-- `sort` (optional, string) — sort scorecards, supported criteria: (-)domain, (-)name, (-)industry, (-)score, (-)grade, (-)last_month_score_change, (-)added_date, (-)business_impact, (-)last_logged_in, (-)status, (-)vsor_contract_end_date, (-)vsor_business_unit, (-)vsor_status, (-)vsor_risk, (-)vsor_monitored, (-)products_count (default: domain)
+- `sort` (optional, string) — sort scorecards, supported criteria: (-)domain, (-)name, (-)industry, (-)score, (-)grade, (-)last_month_score_change, (-)ransomware_score, (-)ransomwareScore, (-)ransomware_score_categorical_value, (-)ransomwareScoreCategoricalValue, (-)bsi_score, (-)bsiScore, (-)bsi_score_categorical_value, (-)bsiScoreCategoricalValue, (-)added_date, (-)business_impact, (-)last_logged_in, (-)status, (-)vsor_contract_end_date, (-)vsor_business_unit, (-)vsor_status, (-)vsor_risk, (-)vsor_monitored, (-)products_count, (-)vsor_metadata_internal_vendor_id, (-)vsor_metadata_external_vendor_id (default: domain)
 - `portfolios` (optional, array) — filter by portfolios
 - `portfolios_criteria` (optional, string) — Criteria(AND/OR) required to filter by portfolios
 - `watchlists` (optional, array) — filter by watchlists
@@ -24,6 +24,8 @@ Get all scorecards filtered by portfolio/s and/or watchlist/s
 - `score` (optional, array) — filter by score
 - `grade` (optional, array) — filter by grade letter
 - `last_month_score_change` (optional, array) — filter by score points difference in the last 30 days
+- `ransomware_score_categorical_value` (optional, array) — filter by ransomware score severity level
+- `bsi_score_categorical_value` (optional, array) — filter by Breach Susceptibility Indicator score severity level
 - `tags` (optional, array) — filter by tag names
 - `tags_criteria` (optional, string) — Criteria(AND/OR) required to filter by tag names
 - `public_tags` (optional, array) — filter by public tag names
@@ -99,6 +101,22 @@ A page in a list of ScorecardSearchBies
           "last_month_score_change": {
             "type": "number",
             "x-example": -5
+          },
+          "ransomware_score": {
+            "type": "integer",
+            "x-example": "95"
+          },
+          "ransomware_score_categorical_value": {
+            "type": "string",
+            "x-example": "very_low"
+          },
+          "bsi_score": {
+            "type": "integer",
+            "x-example": "90"
+          },
+          "bsi_score_categorical_value": {
+            "type": "string",
+            "x-example": "very_high"
           },
           "platform_score_date": {
             "type": "string",

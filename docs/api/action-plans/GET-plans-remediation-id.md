@@ -8,6 +8,9 @@
 ## Path Parameters
 - `id` (**required**) — unique plan id
 
+## Query Parameters
+- `role` (optional, string) — 
+
 ## Responses
 ### 200
 the plan entity
@@ -62,9 +65,8 @@ the plan entity
     },
     "score-type": {
       "type": "string",
-      "description": "enables user to create plan with scoring v2 scores",
+      "description": "enables user to create plan with scoring v3 scores",
       "enum": [
-        "scoring_v2",
         "scoring_v3"
       ]
     },
@@ -159,6 +161,17 @@ the plan entity
                 "count": {
                   "type": "number",
                   "description": "count of findings associated with the issue type"
+                },
+                "periods": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "if this issue is about past findings, these are the periods when they were observed"
+                },
+                "severity": {
+                  "type": "string",
+                  "description": "Indicator severity (low, medium, high, critical)"
                 }
               },
               "required": [

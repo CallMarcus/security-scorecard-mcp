@@ -21,6 +21,18 @@ edit metadata of already uploaded document
       "type": "string",
       "description": "file description"
     },
+    "category": {
+      "type": "string",
+      "enum": [
+        "likelihood-assessment",
+        "zdaas-reports",
+        "customer-uploaded",
+        "weekly-reports",
+        "questionnaire-analysis",
+        "other"
+      ],
+      "description": "document category"
+    },
     "associatedVendorIds": {
       "type": "array",
       "items": {
