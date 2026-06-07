@@ -120,7 +120,10 @@ async function buildEmbeddings(): Promise<void> {
 
   const extractor = await createPipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2');
 
-  const updated: EmbeddingCache = { ...existing };
+  // Build the cache from scratch off the current index so operationIds that
+  // left the spec are dropped instead of accumulating as stale orphans. Cache
+  // hits (unchanged text) are still reused, so this stays incremental.
+  const updated: EmbeddingCache = {};
   let updatedCount = 0;
 
   for (const entry of apiIndex) {
@@ -146,6 +149,12 @@ async function buildEmbeddings(): Promise<void> {
     };
     updatedCount += 1;
     console.log(`Embedded ${entry.operationId}`);
+  }
+
+  const liveIds = new Set(Object.keys(updated));
+  const prunedCount = Object.keys(existing).filter((id) => !liveIds.has(id)).length;
+  if (prunedCount > 0) {
+    console.log(`Pruned ${prunedCount} stale embedding(s) no longer in the index.`);
   }
 
   if (updatedCount === 0) {

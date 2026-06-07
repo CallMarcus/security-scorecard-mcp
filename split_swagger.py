@@ -9,6 +9,7 @@ Usage: python split_swagger.py
 import json
 import os
 import re
+import shutil
 import pathlib
 from urllib.parse import quote
 
@@ -17,7 +18,28 @@ SRC = "api-docs.json"  # 2MB Swagger 2.0 file
 OUT = pathlib.Path("docs/api")
 SCHEMAS_OUT = pathlib.Path("docs/schemas")
 
-def slug(s): 
+# Files at the OUT root that this script does NOT own and must never delete.
+# index-embeddings.json is produced by the separate `api:embed` step and acts
+# as an incremental cache — wiping it would force a full (slow) recompute.
+PRESERVE = {"index-embeddings.json"}
+
+def clean_outputs():
+    """Remove everything this script generates so routes/schemas dropped from
+    the spec don't linger as stale orphans, while preserving files we don't own
+    (e.g. index-embeddings.json). Generators that only ever add files cause the
+    docs tree to drift; cleaning first keeps it an exact mirror of the spec."""
+    if OUT.exists():
+        for child in OUT.iterdir():
+            if child.name in PRESERVE:
+                continue
+            if child.is_dir():
+                shutil.rmtree(child)
+            else:
+                child.unlink()
+    if SCHEMAS_OUT.exists():
+        shutil.rmtree(SCHEMAS_OUT)
+
+def slug(s):
     """Convert string to URL-safe slug"""
     return re.sub(r'[^a-z0-9]+', '-', s.lower()).strip('-')
 
@@ -26,10 +48,6 @@ def path_slug(p):
     return slug(p.replace('{', '_').replace('}', '_').strip('/')) or 'root'
 
 def main():
-    # Create output directories
-    OUT.mkdir(parents=True, exist_ok=True)
-    SCHEMAS_OUT.mkdir(parents=True, exist_ok=True)
-
     print(f"Reading {SRC}...")
     try:
         with open(SRC, "r", encoding="utf-8") as f:
@@ -44,6 +62,12 @@ def main():
     print(f"Swagger version: {spec.get('swagger', 'unknown')}")
     print(f"API title: {spec.get('info', {}).get('title', 'Unknown')}")
     print(f"API version: {spec.get('info', {}).get('version', 'unknown')}")
+
+    # Only clean once we know the spec is valid, so a broken/missing source
+    # never wipes the existing docs. Then (re)create the output directories.
+    clean_outputs()
+    OUT.mkdir(parents=True, exist_ok=True)
+    SCHEMAS_OUT.mkdir(parents=True, exist_ok=True)
 
     # Extract base URL info
     base_url = ""
