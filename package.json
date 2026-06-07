@@ -4,6 +4,10 @@
   "description": "A community-built, comprehensive MCP server for the SecurityScorecard API. Not affiliated with SecurityScorecard, Inc.",
   "license": "MIT",
   "mcpName": "io.github.CallMarcus/securityscorecard-mcp",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CallMarcus/security-scorecard-mcp.git"
+  },
   "main": "build/index.js",
   "type": "module",
   "bin": {
