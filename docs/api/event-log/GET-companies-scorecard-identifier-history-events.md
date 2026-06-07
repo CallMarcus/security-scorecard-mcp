@@ -79,6 +79,46 @@ List of CompanyHistoricalEvents
             "additionalProperties": false,
             "description": "when event type is \"breach\" includes\nadditional information about the breach.\n\nImportant Note: the fields available here might change in the future."
           },
+          "breach_incidents": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "measurement_id": {
+                  "type": "string"
+                },
+                "measurement_type": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "summary": {
+                  "type": "string"
+                },
+                "root_cause": {
+                  "type": "string"
+                },
+                "breach_date": {
+                  "type": "integer"
+                },
+                "published_date": {
+                  "type": "integer"
+                },
+                "records_lost": {
+                  "type": "number"
+                },
+                "confirmed": {
+                  "type": "boolean"
+                },
+                "originating_party": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            },
+            "description": "when issue type is \"confirmed_first_party_breach\" or\n\"confirmed_third_party_breach\", lists the individual breach incidents\nfrom the breach-ages API for this effective date. Each entry represents\na distinct breach incident that may share the same scoring date. Only\npresent when incident data is available."
+          },
           "severity": {
             "type": "string",
             "x-example": "high",

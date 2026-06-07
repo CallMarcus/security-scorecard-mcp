@@ -45,6 +45,9 @@ a list of documents for current client
           "created_at": {
             "type": "string"
           },
+          "category": {
+            "type": "string"
+          },
           "created_by": {
             "type": "string"
           },
@@ -82,6 +85,7 @@ a list of documents for current client
           "filename",
           "description",
           "created_at",
+          "category",
           "created_by"
         ],
         "description": "max document"

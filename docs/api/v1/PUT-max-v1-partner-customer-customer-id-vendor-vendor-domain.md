@@ -16,6 +16,7 @@
   "properties": {
     "breach_id": {
       "type": "string",
+      "format": "uuid",
       "description": "id of the breach that you want to update"
     },
     "dismiss": {

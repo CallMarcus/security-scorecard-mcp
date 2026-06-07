@@ -39,6 +39,10 @@ List of OAuthAppSecrets
             "type": "string",
             "description": "Optional comment about the secret"
           },
+          "expiration_date": {
+            "type": "string",
+            "description": "Expiration date for the secret"
+          },
           "created_by": {
             "type": "string",
             "format": "uuid",

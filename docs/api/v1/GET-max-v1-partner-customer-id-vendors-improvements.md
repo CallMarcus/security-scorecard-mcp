@@ -10,6 +10,7 @@
 
 ## Query Parameters
 - `tiers` (optional, string) — Comma-separated list of tier names to filter vendors by
+- `tag` (optional, string) — Comma-separated list of tag names to filter vendors by
 
 ## Responses
 ### 200

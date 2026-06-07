@@ -532,7 +532,7 @@ company profile
               "email": {
                 "type": "string",
                 "format": "email",
-                "pattern": "^.+@.+$"
+                "pattern": "^\\S+@\\S+\\.\\S+$"
               },
               "linkedin": {
                 "type": "string"

@@ -215,7 +215,7 @@ set the organization overview description
               "email": {
                 "type": "string",
                 "format": "email",
-                "pattern": "^.+@.+$"
+                "pattern": "^\\S+@\\S+\\.\\S+$"
               },
               "linkedin": {
                 "type": "string"
@@ -999,7 +999,7 @@ company profile
               "email": {
                 "type": "string",
                 "format": "email",
-                "pattern": "^.+@.+$"
+                "pattern": "^\\S+@\\S+\\.\\S+$"
               },
               "linkedin": {
                 "type": "string"

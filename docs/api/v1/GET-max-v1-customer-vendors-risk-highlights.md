@@ -8,6 +8,7 @@
 ## Query Parameters
 - `date_range` (optional, number) — Number of days for which the delta needs to be calculated
 - `tiers` (optional, string) — Tiers to filter the data by comma separated
+- `tag` (optional, string) — Comma-separated list of tag names to filter vendors by
 
 ## Responses
 ### 200

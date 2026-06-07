@@ -51,6 +51,17 @@
           "count": {
             "type": "number",
             "description": "count of findings associated with the issue type"
+          },
+          "periods": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "if this issue is about past findings, these are the periods when they were observed"
+          },
+          "severity": {
+            "type": "string",
+            "description": "Indicator severity (low, medium, high, critical)"
           }
         },
         "required": [

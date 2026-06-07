@@ -9,7 +9,8 @@
 - `customer_id` (**required**) — customer ID to get incident likelihood trends for
 
 ## Query Parameters
-- `tiers` (optional, string) — Comma-separated list of tier names to filter vendors by
+- `tiers` (optional, string) — Tiers to filter the data by comma separated
+- `tag` (optional, string) — Comma-separated list of tag names to filter vendors by
 
 ## Responses
 ### 200

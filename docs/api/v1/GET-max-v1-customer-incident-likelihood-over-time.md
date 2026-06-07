@@ -10,6 +10,7 @@ Retrieves incident likelihood data for the last 4 quarters ending at the specifi
 
 ## Query Parameters
 - `tiers` (optional, string) — Tiers to filter the data by (gold, silver, platinum)
+- `tag` (optional, string) — Tag to filter the data by
 
 ## Responses
 ### 200

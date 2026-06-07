@@ -82,9 +82,8 @@ a list of plans visible by the user
           },
           "score-type": {
             "type": "string",
-            "description": "enables user to create plan with scoring v2 scores",
+            "description": "enables user to create plan with scoring v3 scores",
             "enum": [
-              "scoring_v2",
               "scoring_v3"
             ]
           },
@@ -276,9 +275,8 @@ a list of plans visible by the user
           },
           "score_type": {
             "type": "string",
-            "description": "enables user to create plan with scoring v2 scores",
+            "description": "enables user to create plan with scoring v3 scores",
             "enum": [
-              "scoring_v2",
               "scoring_v3"
             ]
           },

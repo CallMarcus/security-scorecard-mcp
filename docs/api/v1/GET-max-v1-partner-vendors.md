@@ -11,7 +11,9 @@
 - `sort` (optional, string) — stringified object with value for column to sort by and operator
 - `vendor_name` (optional, string) — Search by vendor name
 - `customer_name` (optional, string) — Search by customer name
+- `customer_domain` (optional, string) — Search by customer domain
 - `customer_id` (optional, string) — Search by customer id
+- `tag` (optional, string) — Search by tag
 - `tier` (optional, string) — Search using tier
 - `lifecycle` (optional, string) — Search using lifecycle
 - `engagement` (optional, string) — Search using engagement
@@ -132,6 +134,10 @@ Gets the list all the vendors of a partner
           "has_active_breach": {
             "type": "boolean",
             "description": "Vendor has active breach"
+          },
+          "score": {
+            "type": "number",
+            "description": "Vendor score"
           }
         },
         "required": [
