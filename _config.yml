@@ -1,0 +1,6 @@
+# GitHub Pages (legacy Jekyll build, source: main /). Everything else —
+# site title, description, theme, jekyll-seo-tag — is auto-injected by GitHub,
+# so this file only adds what the defaults can't: the Search Console tag.
+# jekyll-seo-tag renders this as:
+#   <meta name="google-site-verification" content="..." /> in <head>.
+google_site_verification: bseGgv3eG90BZNYmTJmQ_-qXPVTAzxzwxG63mxTiOJ0
