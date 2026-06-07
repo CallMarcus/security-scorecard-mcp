@@ -1,0 +1,84 @@
+# Tag-driven release: push a vX.Y.Z tag and this publishes to npm + the MCP
+# registry and cuts the matching GitHub Release, all from one source of truth
+# (the tag). Keeps the three venues from drifting apart.
+#
+# Auth is keyless (OIDC) — no npm or registry tokens stored in the repo:
+#   - npm:          OIDC "trusted publishing" (configured once on npmjs.com)
+#   - MCP registry: `mcp-publisher login github-oidc`
+#
+# ONE-TIME SETUP (required before the first run, or npm publish will fail auth):
+#   npmjs.com -> @callmarcus/securityscorecard-mcp -> Settings -> Trusted Publisher
+#   Provider: GitHub Actions
+#   Repository: CallMarcus/security-scorecard-mcp
+#   Workflow filename: release.yml
+#
+# RELEASE FLOW: land a version bump (package.json + src/index.ts + server.json)
+# via PR to main, then:
+#   git checkout main && git pull
+#   git tag vX.Y.Z && git push origin vX.Y.Z
+
+name: Release
+
+on:
+  push:
+    tags: ["v*.*.*"]
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write   # OIDC for both npm trusted publishing and the MCP registry
+      contents: write   # create the GitHub Release
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+
+      # npm OIDC trusted publishing requires npm CLI >= 11.5.1.
+      - name: Upgrade npm
+        run: npm install -g npm@latest
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Guard against the drift we hit once: the pushed tag must match the
+      # version baked into package.json AND server.json, so a stale/mis-tagged
+      # commit can never ship.
+      - name: Verify tag matches package versions
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          PKG="$(node -p "require('./package.json').version")"
+          SRV="$(node -p "require('./server.json').version")"
+          echo "tag=$TAG  package.json=$PKG  server.json=$SRV"
+          if [ "$TAG" != "$PKG" ]; then echo "::error::tag v$TAG does not match package.json $PKG"; exit 1; fi
+          if [ "$TAG" != "$SRV" ]; then echo "::error::tag v$TAG does not match server.json $SRV"; exit 1; fi
+
+      - name: Build
+        run: npm run build:fast
+
+      - name: Test
+        run: npm test
+
+      # No NODE_AUTH_TOKEN: OIDC trusted publishing authenticates via id-token.
+      # npm auto-attaches build provenance for public repo + public package.
+      - name: Publish to npm
+        run: npm publish --access public
+
+      - name: Install mcp-publisher
+        run: |
+          curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
+
+      - name: Publish to MCP Registry
+        run: |
+          ./mcp-publisher login github-oidc
+          ./mcp-publisher publish
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes --latest
