@@ -1,3 +1,4 @@
+<meta name="google-site-verification" content="bseGgv3eG90BZNYmTJmQ_-qXPVTAzxzwxG63mxTiOJ0" />
 # SSC MCP Server
 
 [![npm version](https://img.shields.io/npm/v/@callmarcus/securityscorecard-mcp.svg)](https://www.npmjs.com/package/@callmarcus/securityscorecard-mcp)
