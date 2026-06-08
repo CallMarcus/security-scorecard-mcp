@@ -11,6 +11,13 @@ updates:
       day: "monday"
       time: "09:00"
       timezone: "UTC"
+    # Supply-chain safety: let a newly published version "age" a few days before
+    # Dependabot proposes it, so a compromised/malicious release has time to be
+    # caught and yanked before it can auto-PR into the repo. Applies to all deps
+    # (no `include` = everything). https://docs.github.com/en/code-security/dependabot
+    cooldown:
+      default-days: 3       # minor + major updates wait 3 days
+      semver-patch-days: 2  # lower-risk patches wait 2 days
     open-pull-requests-limit: 5
     reviewers:
       - "CallMarcus"
