@@ -49,10 +49,11 @@ updates:
       day: "monday"
       time: "09:00"
       timezone: "UTC"
-    # Same supply-chain cooldown as npm above.
+    # Same supply-chain cooldown as npm above. The github-actions ecosystem
+    # only supports `default-days` (no semver-* fields), so all action bumps
+    # share the 3-day wait.
     cooldown:
       default-days: 3
-      semver-patch-days: 2
     open-pull-requests-limit: 5
     reviewers:
       - "CallMarcus"
