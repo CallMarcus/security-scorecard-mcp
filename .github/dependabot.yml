@@ -39,3 +39,34 @@ updates:
     allow:
       - dependency-type: "direct"
       - dependency-type: "indirect"
+
+  # Keep GitHub Actions (checkout, setup-node, etc.) patched too — these run
+  # with repo credentials, so a stale or compromised action is a real risk.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "UTC"
+    # Same supply-chain cooldown as npm above.
+    cooldown:
+      default-days: 3
+      semver-patch-days: 2
+    open-pull-requests-limit: 5
+    reviewers:
+      - "CallMarcus"
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "automated"
+    # Group minor and patch action bumps to reduce PR noise
+    groups:
+      actions-minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
