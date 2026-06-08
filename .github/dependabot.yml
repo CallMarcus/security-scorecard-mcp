@@ -11,6 +11,13 @@ updates:
       day: "monday"
       time: "09:00"
       timezone: "UTC"
+    # Supply-chain safety: let a newly published version "age" a few days before
+    # Dependabot proposes it, so a compromised/malicious release has time to be
+    # caught and yanked before it can auto-PR into the repo. Applies to all deps
+    # (no `include` = everything). https://docs.github.com/en/code-security/dependabot
+    cooldown:
+      default-days: 3       # minor + major updates wait 3 days
+      semver-patch-days: 2  # lower-risk patches wait 2 days
     open-pull-requests-limit: 5
     reviewers:
       - "CallMarcus"
@@ -32,3 +39,35 @@ updates:
     allow:
       - dependency-type: "direct"
       - dependency-type: "indirect"
+
+  # Keep GitHub Actions (checkout, setup-node, etc.) patched too — these run
+  # with repo credentials, so a stale or compromised action is a real risk.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "UTC"
+    # Same supply-chain cooldown as npm above. The github-actions ecosystem
+    # only supports `default-days` (no semver-* fields), so all action bumps
+    # share the 3-day wait.
+    cooldown:
+      default-days: 3
+    open-pull-requests-limit: 5
+    reviewers:
+      - "CallMarcus"
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "automated"
+    # Group minor and patch action bumps to reduce PR noise
+    groups:
+      actions-minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
