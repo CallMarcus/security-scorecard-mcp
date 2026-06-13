@@ -199,7 +199,7 @@ src/
 ├── get_findings_by_category.ts
 ├── asset_management.ts
 └── api_reference.ts
-docs/api/                      # Self-contained API reference (628 endpoints)
+docs/api/                      # Self-contained API reference (507 endpoints)
 tools/                         # update_api_spec.sh - fetch Swagger spec
 scripts/                       # Maintenance scripts (PS1/Bash)
 tests/                         # Test files (.js and .ts)
