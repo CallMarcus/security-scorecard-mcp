@@ -3,7 +3,7 @@
 [![npm version](https://img.shields.io/npm/v/@callmarcus/securityscorecard-mcp.svg)](https://www.npmjs.com/package/@callmarcus/securityscorecard-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-A community-built, comprehensive Model Context Protocol (MCP) server for Claude Desktop that integrates with the [SecurityScorecard API](https://securityscorecard.readme.io/).
+A community-built, comprehensive Model Context Protocol (MCP) server that integrates with the [SecurityScorecard API](https://securityscorecard.readme.io/). It runs over stdio, so it works with any MCP-compatible client — Claude Desktop, Claude Code, Cursor, VS Code, and others.
 
 > Published on npm as [`@callmarcus/securityscorecard-mcp`](https://www.npmjs.com/package/@callmarcus/securityscorecard-mcp) and listed in the [MCP Registry](https://registry.modelcontextprotocol.io) as `io.github.CallMarcus/securityscorecard-mcp`.
 
@@ -18,11 +18,9 @@ A community-built, comprehensive Model Context Protocol (MCP) server for Claude 
 
 ### Option A — Install from npm (recommended)
 
-No clone or build required. Point Claude Desktop at the published package with `npx`.
+No clone or build required. The server runs over stdio via `npx`, so any MCP-compatible client can launch it. `npx -y` always fetches the latest published version.
 
-Edit your `claude_desktop_config.json`:
-- **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
-- **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
+**Most clients** — Claude Desktop, Cursor, Cline, Windsurf, and others — share the same `mcpServers` JSON. Add this block to the client's MCP config:
 
 ```json
 {
@@ -39,7 +37,44 @@ Edit your `claude_desktop_config.json`:
 }
 ```
 
-`npx -y` fetches and runs the latest published version automatically. Replace the credentials with your own, then restart Claude Desktop.
+Where that config file lives:
+
+| Client | Config file |
+|--------|-------------|
+| Claude Desktop (Windows) | `%APPDATA%\Claude\claude_desktop_config.json` |
+| Claude Desktop (macOS) | `~/Library/Application Support/Claude/claude_desktop_config.json` |
+| Cursor | `~/.cursor/mcp.json` (global) or `.cursor/mcp.json` (project) |
+
+Replace the credentials with your own, then restart the client.
+
+**Claude Code** — add it from the CLI instead:
+
+```bash
+claude mcp add security-scorecard \
+  --env SECURITY_SCORECARD_API_TOKEN=your-api-token-here \
+  --env COMPANY_DOMAIN=example.com \
+  -- npx -y @callmarcus/securityscorecard-mcp
+```
+
+On Windows, wrap the launcher in `cmd /c`: `... -- cmd /c npx -y @callmarcus/securityscorecard-mcp`.
+
+**VS Code** (Copilot) — uses a `servers` key with an explicit `type`, in `.vscode/mcp.json`:
+
+```json
+{
+  "servers": {
+    "security-scorecard": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@callmarcus/securityscorecard-mcp"],
+      "env": {
+        "SECURITY_SCORECARD_API_TOKEN": "your-api-token-here",
+        "COMPANY_DOMAIN": "example.com"
+      }
+    }
+  }
+}
+```
 
 ### Option B — Run from source (for development)
 
@@ -55,7 +90,7 @@ npm install
 npm run build:fast
 ```
 
-Then point Claude Desktop at your local build:
+Then point your MCP client at the local build. For clients that use the `mcpServers` format (Claude Desktop, Cursor, …):
 
 ```json
 {
@@ -72,11 +107,11 @@ Then point Claude Desktop at your local build:
 }
 ```
 
-**Important:** Replace the path and credentials with your actual values, then restart Claude Desktop.
+**Important:** Replace the path and credentials with your actual values, then restart your MCP client. (For Claude Code, run `claude mcp add security-scorecard --env SECURITY_SCORECARD_API_TOKEN=your-api-token-here -- node /path/to/security-scorecard-mcp/build/index.js`.)
 
 ## Available Tools
 
-The server (`index.js`) provides 9 specialized tools optimized for Claude Desktop:
+The server (`index.js`) provides 9 specialized tools:
 
 | Tool | Purpose |
 |------|---------|
@@ -177,11 +212,12 @@ npm install
 npm run build:fast
 ```
 
-### Claude Desktop doesn't see the MCP
+### Your client doesn't see the server
 
-1. Check the config path: `%APPDATA%\Claude\claude_desktop_config.json`
-2. Verify the path to `index.js` is correct
-3. Restart Claude Desktop completely
+1. Double-check the config file location for your client (see [Quick Start](#quick-start))
+2. For a from-source install, verify the path to `build/index.js` is correct
+3. Restart the client completely
+4. Sanity-check that the server starts on its own: `npx -y @callmarcus/securityscorecard-mcp` (it should launch and wait silently on stdio)
 
 ### API returns 401 Unauthorized
 
