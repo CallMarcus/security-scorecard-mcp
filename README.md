@@ -13,7 +13,7 @@ A community-built, comprehensive Model Context Protocol (MCP) server that integr
 
 ### Prerequisites
 
-1. **Node.js 18+** - [Download](https://nodejs.org/)
+1. **Node.js 20+** - [Download](https://nodejs.org/)
 2. **SecurityScorecard API Token** - Get from your [SecurityScorecard dashboard](https://platform.securityscorecard.io/)
 
 ### Option A — Install from npm (recommended)
