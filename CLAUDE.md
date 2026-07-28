@@ -130,7 +130,7 @@ Tools implement 3 tiers: **minimal** (15-50 tokens, no headers), **standard** (2
 
 **Dev:** `esbuild` ^0.28.0, `typescript` ^7.0.2, `@types/node` ^26.1.1
 
-**Node.js:** >=18 required
+**Node.js:** >=20 required
 
 ## Environment Variables
 
@@ -178,7 +178,7 @@ Run `npm run api:embed` after updating `docs/api/index.jsonl`. Uses MiniLM via `
 ## CI/CD
 
 GitHub Actions workflow (`.github/workflows/node.js.yml`) runs on pushes and PRs to `main`:
-- Tests against Node.js 18.x, 20.x, and 22.x
+- Tests against Node.js 20.x, 22.x, and 24.x
 - Runs `npm ci`, `npm run build`, and `npm test`
 - 10-minute timeout per job
 
