@@ -19,7 +19,7 @@ The server (`src/index.ts`) provides **9 specialized tools** for operational wor
 ### Building and Running
 
 ```bash
-# Build TypeScript to JavaScript (may run out of memory on some systems)
+# Build TypeScript to JavaScript (tsc)
 npm run build
 
 # Fast build using esbuild (recommended - low memory, 164ms)
@@ -128,7 +128,7 @@ Tools implement 3 tiers: **minimal** (15-50 tokens, no headers), **standard** (2
 
 **Runtime:** `@modelcontextprotocol/sdk` ^1.29.0, `@huggingface/transformers` ^4.2.0, `dotenv` ^17.4.1, `zod` ^4.3.6
 
-**Dev:** `esbuild` ^0.27.2, `typescript` ^5.9.3, `ts-node` ^10.9.2, `@types/node` ^25.0.3
+**Dev:** `esbuild` ^0.28.0, `typescript` ^7.0.2, `@types/node` ^26.1.1
 
 **Node.js:** >=18 required
 
@@ -214,7 +214,7 @@ build/                         # Compiled output (generated)
 
 ## Gotchas
 
-- `npm run build` (tsc) OOMs even with 8GB heap - always use `npm run build:fast` (esbuild)
+- Since TypeScript 7 (native compiler), `npm run build` (tsc) is fast (~3s); `npm run build:fast` (esbuild) remains the default build path
 - Run `npm run api:embed` after any changes to `docs/api/index.jsonl`
 - `api_discovery` returns structured JSON with confidence scores; use `include_schema: true` for request/response schema details
 - `query_security_data` supports `validate_only: true` to verify endpoint syntax without executing
