@@ -28,7 +28,7 @@
     "test:ts": "node --test tests/*.test.ts",
     "api:fetch": "bash tools/update_api_spec.sh",
     "api:generate": "python split_swagger.py",
-    "api:embed": "node --loader ts-node/esm src/integration/api-reference-embeddings.ts",
+    "api:embed": "tsc && node build/integration/api-reference-embeddings.js",
     "api:test": "npm run test",
     "api:validate": "node examples/basic_usage.js",
     "api:update": "npm run api:generate && npm run api:embed",
@@ -50,7 +50,6 @@
   "devDependencies": {
     "@types/node": "^26.1.1",
     "esbuild": "^0.28.0",
-    "ts-node": "^10.9.2",
-    "typescript": "^6.0.3"
+    "typescript": "^7.0.2"
   }
 }
