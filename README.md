@@ -212,6 +212,16 @@ npm install
 npm run build:fast
 ```
 
+### Semantic search degrades to keyword-only (Windows + WSL)
+
+Install for the platform that runs the server. Claude Desktop on Windows
+launches the server with Windows `node`, so if `npm install` ran under WSL
+the native modules (`onnxruntime-node`, `sharp`) only have linux binaries —
+the embeddings layer fails to load and `api_discovery` silently degrades to
+keyword-only search (results still come back, but confidence scoring is
+cruder). Run `npm install && npm run build:fast` from PowerShell or cmd in
+the repo directory instead — or keep two clones, one per platform.
+
 ### Your client doesn't see the server
 
 1. Double-check the config file location for your client (see [Quick Start](#quick-start))

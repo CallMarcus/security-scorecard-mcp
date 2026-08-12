@@ -404,7 +404,11 @@ export class ApiReferenceClient {
     } catch (error) {
       searchMode = 'keyword-only';
       semanticDisabledReason = error instanceof Error ? error.message : 'Semantic search unavailable';
-      console.warn(`⚠️  Semantic search disabled: ${semanticDisabledReason}`);
+      const nativeLoadFailure = /onnxruntime|\.node|not a valid Win32 application|invalid ELF header|Cannot find module/i.test(semanticDisabledReason);
+      console.warn(`⚠️  Semantic search disabled, falling back to keyword-only: ${semanticDisabledReason}`);
+      if (nativeLoadFailure) {
+        console.warn(`⚠️  Likely cause: native modules built for a different platform (e.g. npm install ran under WSL but the server runs on Windows node, or vice versa). Re-run npm install from the platform that launches this server.`);
+      }
     }
 
     const combined = new Map<string, ApiSearchResult>();
