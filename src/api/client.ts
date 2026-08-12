@@ -61,6 +61,81 @@ export class SecurityScorecardApiClient {
     };
   }
 
+  /**
+   * Fetch every page of a paginated list endpoint (issue #17).
+   *
+   * SSC uses two pagination styles:
+   * - 'page':   footprint endpoints — `page` (0-based) + `page-size` (max 100);
+   *             a short page means the list is exhausted.
+   * - 'cursor': issues/findings endpoints — `size` + `cursor`, where the
+   *             response carries `next_cursor` (or a full `next` URL).
+   *
+   * maxPages is a hard safety cap; `truncated: true` means it was hit while
+   * pages were still coming, so callers should surface a truncation notice.
+   */
+  async fetchAllPages<T = any>(
+    method: string,
+    path: string,
+    options: {
+      style: 'page' | 'cursor';
+      queryParams?: Record<string, any>;
+      pageSize?: number;
+      maxPages?: number;
+    }
+  ): Promise<{ entries: T[]; pages: number; truncated: boolean }> {
+    const { style, queryParams = {}, pageSize = 100, maxPages = 20 } = options;
+    const all: T[] = [];
+    let pages = 0;
+    let truncated = false;
+
+    if (style === 'page') {
+      for (let page = 0; page < maxPages; page += 1) {
+        const response = await this.makeRequest(method, path, {
+          queryParams: { ...queryParams, page, 'page-size': pageSize }
+        });
+        const entries: T[] = response.data?.entries ?? [];
+        all.push(...entries);
+        pages += 1;
+        if (entries.length < pageSize) return { entries: all, pages, truncated: false };
+      }
+      truncated = true;
+      return { entries: all, pages, truncated };
+    }
+
+    // cursor style
+    let nextPath: string | null = null;
+    let cursor: string | null = null;
+    for (let i = 0; i < maxPages; i += 1) {
+      let response;
+      if (nextPath) {
+        response = await this.makeRequest(method, nextPath);
+      } else {
+        const params: Record<string, any> = { ...queryParams, size: pageSize };
+        if (cursor) params.cursor = cursor;
+        response = await this.makeRequest(method, path, { queryParams: params });
+      }
+      const data = response.data ?? {};
+      const entries: T[] = data.entries ?? [];
+      all.push(...entries);
+      pages += 1;
+
+      const nextCursor = data.next_cursor ?? data.cursor?.next ?? null;
+      const nextUrl = typeof data.next === 'string' ? data.next : (typeof data.links?.next === 'string' ? data.links.next : null);
+      if (nextCursor) {
+        cursor = String(nextCursor);
+        nextPath = null;
+      } else if (nextUrl) {
+        // Follow the server-provided URL verbatim (minus origin) — it already
+        // carries cursor and size query params.
+        nextPath = nextUrl.replace(/^https?:\/\/[^/]+/, '');
+        cursor = null;
+      } else {
+        return { entries: all, pages, truncated: false };
+      }
+    }
+    return { entries: all, pages, truncated: true };
+  }
+
   // === PORTFOLIO METHODS ===
   
   /**
@@ -146,8 +221,17 @@ export class SecurityScorecardApiClient {
    * Get company active issues (uses /issues endpoint with status filter due to API bug in /active-issues)
    */
   async getCompanyActiveIssues(domain: string, queryParams?: Record<string, any>): Promise<ApiResponse<any>> {
-    const params = { status: 'open', size: 50, ...queryParams };
-    return this.makeRequest('GET', `/companies/${domain}/issues`, { queryParams: params });
+    const { size, ...rest } = { status: 'open', ...queryParams } as Record<string, any>;
+    const result = await this.fetchAllPages('GET', `/companies/${domain}/issues`, {
+      style: 'cursor',
+      queryParams: rest,
+      pageSize: typeof size === 'number' ? size : 50
+    });
+    return {
+      data: { entries: result.entries, total: result.entries.length, truncated: result.truncated },
+      status: 200,
+      headers: new Headers()
+    };
   }
 
   /**
