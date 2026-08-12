@@ -117,7 +117,7 @@ List of CompanyHistoricalEvents
               },
               "additionalProperties": false
             },
-            "description": "when issue type is \"confirmed_first_party_breach\" or\n\"confirmed_third_party_breach\", lists the individual breach incidents\nfrom the breach-ages API for this effective date. Each entry represents\na distinct breach incident that may share the same scoring date. Only\npresent when incident data is available."
+            "description": "when issue type is \"confirmed_first_party_breach\",\n\"confirmed_third_party_breach\", \"alleged_first_party_breach\", or\n\"alleged_third_party_breach\", lists the individual breach incidents\nfrom the breach-ages API for this effective date. Each entry represents\na distinct breach incident that may share the same scoring date. Only\npresent when incident data is available."
           },
           "severity": {
             "type": "string",

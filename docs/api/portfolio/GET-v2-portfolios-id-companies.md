@@ -13,6 +13,13 @@ Get all companies in a portfolio
 
 ## Query Parameters
 - `with_factors` (optional, boolean) — return factors, along with portfolio companies
+- `vsor_status` (optional, array) — filter by VSOR status
+- `vsor_risk` (optional, array) — filter by VSOR risk
+- `vsor_business_unit` (optional, array) — filter by VSOR business unit
+- `vsor_data_types_shared` (optional, array) — filter by VSOR data types shared
+- `vsor_contract_end_date_from` (optional, string) — filter by VSOR contract end date (from)
+- `vsor_contract_end_date_to` (optional, string) — filter by VSOR contract end date (to)
+- `custom_fields` (optional, string) — filter by custom VSOR field values — URL-encoded JSON `{ fieldId: [values] }`
 - `page` (optional, integer) — page number, 0 is the first page (default: 0)
 - `page_size` (optional, integer) — number of portfolios per page (max: 200, default: 20)
 - `sort` (optional, string) — sort scorecards, supported criteria: (-)domain, (-)name, (-)industry, (-)score, (-)grade, (-)last_month_score_change, (-)ransomware_score, (-)ransomwareScore, (-)ransomware_score_categorical_value, (-)ransomwareScoreCategoricalValue, (-)bsi_score, (-)bsiScore, (-)bsi_score_categorical_value, (-)bsiScoreCategoricalValue, (-)added_date, (-)business_impact, (-)last_logged_in, (-)status, (-)vsor_contract_end_date, (-)vsor_business_unit, (-)vsor_status, (-)vsor_risk, (-)vsor_monitored, (-)products_count, (-)vsor_metadata_internal_vendor_id, (-)vsor_metadata_external_vendor_id (default: domain)
@@ -27,6 +34,8 @@ Get all companies in a portfolio
 - `status` (optional, string) — filter by status
 - `score` (optional, array) — filter by score
 - `grade` (optional, array) — filter by grade letter
+- `recalibrated_score` (optional, array) — filter by recalibrated score
+- `recalibrated_score_grade` (optional, array) — filter by recalibrated score grade letter
 - `last_month_score_change` (optional, array) — filter by score points difference in the last 30 days
 - `ransomware_score_categorical_value` (optional, array) — filter by ransomware score severity level
 - `bsi_score_categorical_value` (optional, array) — filter by Breach Susceptibility Indicator score severity level
@@ -198,6 +207,72 @@ A page in a list of ScorecardSearchBies
           },
           "vsor_monitored": {
             "type": "boolean"
+          },
+          "vsor_status": {
+            "type": "string",
+            "description": "VSOR lifecycle status of the vendor"
+          },
+          "vsor_risk": {
+            "type": "string",
+            "description": "VSOR risk level of the vendor"
+          },
+          "vsor_data_types_shared": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "VSOR data types shared with the vendor"
+          },
+          "vsor_business_unit": {
+            "type": "string",
+            "description": "VSOR business unit that owns the vendor relationship"
+          },
+          "vsor_contract_end_date": {
+            "type": "string",
+            "description": "VSOR contract end date"
+          },
+          "vsor_metadata": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "VSOR additional vendor metadata (e.g. internalVendorId, externalVendorId)"
+          },
+          "custom_fields": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^[\\da-z-]{16,}$",
+                  "description": "Custom field value ID"
+                },
+                "field_type": {
+                  "type": "string",
+                  "description": "Type of the custom field"
+                },
+                "field_label": {
+                  "type": "string",
+                  "description": "Label of the custom field"
+                },
+                "data": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Value(s) of the custom field. Multi-valued types (multi-select) hold multiple entries; single-valued types (text, date, switch) hold a one-element array."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "field_type",
+                "field_label",
+                "data"
+              ]
+            },
+            "description": "Custom field values for this vendor"
           },
           "products": {
             "type": "array",

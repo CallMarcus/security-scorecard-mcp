@@ -23,6 +23,8 @@ retrieve suggested vendors for the caller's domain
 - `status` (optional, string) — filter by status
 - `score` (optional, array) — filter by score
 - `grade` (optional, array) — filter by grade letter
+- `recalibrated_score` (optional, array) — filter by recalibrated score
+- `recalibrated_score_grade` (optional, array) — filter by recalibrated score grade letter
 - `last_month_score_change` (optional, array) — filter by score points difference in the last 30 days
 - `ransomware_score_categorical_value` (optional, array) — filter by ransomware score severity level
 - `bsi_score_categorical_value` (optional, array) — filter by Breach Susceptibility Indicator score severity level
@@ -209,6 +211,72 @@ A page in a list of VendorPortfolioAutomationSuggestions
             "type": "boolean",
             "description": "Is monitored if it is present in at least one portfolio"
           },
+          "vsor_status": {
+            "type": "string",
+            "description": "Status of the vendor in the vendor lifecycle"
+          },
+          "vsor_risk": {
+            "type": "string",
+            "description": "Riskiness of the vendor"
+          },
+          "vsor_data_types_shared": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Data types shared with the vendor"
+          },
+          "vsor_business_unit": {
+            "type": "string",
+            "description": "Business unit that manages the relationship with the vendor"
+          },
+          "vsor_contract_end_date": {
+            "type": "string",
+            "description": "Date on which the vendor's contract ends"
+          },
+          "vsor_metadata": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true,
+            "description": "Additional vendor's information"
+          },
+          "custom_fields": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^[\\da-z-]{16,}$",
+                  "description": "Custom field value ID"
+                },
+                "field_type": {
+                  "type": "string",
+                  "description": "Type of the custom field"
+                },
+                "field_label": {
+                  "type": "string",
+                  "description": "Label of the custom field"
+                },
+                "data": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Value(s) of the custom field. Multi-valued types (multi-select) hold multiple entries; single-valued types (text, date, switch) hold a one-element array."
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "field_type",
+                "field_label",
+                "data"
+              ]
+            },
+            "description": "Custom field values for this vendor"
+          },
           "products": {
             "type": "array",
             "items": {
@@ -254,29 +322,6 @@ A page in a list of VendorPortfolioAutomationSuggestions
             },
             "additionalProperties": false
           },
-          "vsor_status": {
-            "type": "string",
-            "description": "Status of the vendor in the vendor lifecycle"
-          },
-          "vsor_data_types_shared": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "description": "Data types shared with the vendor"
-          },
-          "vsor_business_unit": {
-            "type": "string",
-            "description": "Business unit that manages the relationship with the vendor"
-          },
-          "vsor_risk": {
-            "type": "string",
-            "description": "Riskiness of the vendor"
-          },
-          "vsor_contract_end_date": {
-            "type": "string",
-            "description": "Date on which the vendor's contract ends"
-          },
           "vsor_contract_value_amount": {
             "type": "integer",
             "description": "Vendor's contract value amount in cents"
@@ -285,15 +330,101 @@ A page in a list of VendorPortfolioAutomationSuggestions
             "type": "string",
             "description": "ISO 4217 code in which the contract amount is voiced"
           },
-          "vsor_metadata": {
-            "type": "object",
-            "properties": {},
-            "additionalProperties": true,
-            "description": "Additional vendor's information"
-          },
           "vsor_source": {
             "type": "string",
             "description": "How the vendor record was created: 'manual' for manual entry, 'intake' for records created via an intake submission"
+          },
+          "inherent_risk": {
+            "type": "string",
+            "description": "Risk tier assigned at intake submission time: 'low' | 'medium' | 'high' | 'critical'. Absent from response for non-intake vendors."
+          },
+          "vsor_service_type": {
+            "type": "string",
+            "enum": [
+              "saas_software",
+              "managed_service",
+              "professional_services",
+              "data_provider",
+              "hardware_equipment",
+              "outsourcing_bpo",
+              "other"
+            ],
+            "description": "Intake: vendor service type. One of: saas_software, managed_service, professional_services, data_provider, hardware_equipment, outsourcing_bpo, other"
+          },
+          "vsor_data_volume": {
+            "type": "string",
+            "enum": [
+              "fewer_than_100",
+              "100_to_1000",
+              "1000_to_10000",
+              "10000_to_100000",
+              "100000_to_1000000",
+              "over_1000000",
+              "unknown",
+              "n_a"
+            ],
+            "description": "Intake: estimated number of data subjects the vendor will access or process. One of: fewer_than_100, 100_to_1000, 1000_to_10000, 10000_to_100000, 100000_to_1000000, over_1000000, unknown, n_a"
+          },
+          "vsor_uses_ai": {
+            "type": "string",
+            "enum": [
+              "no_ai",
+              "ai_ml",
+              "generative_ai",
+              "unknown"
+            ],
+            "description": "Intake: whether the vendor uses AI or ML. One of: no_ai, ai_ml, generative_ai, unknown"
+          },
+          "vsor_data_handling": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "access_only",
+                "process",
+                "store",
+                "create",
+                "n_a"
+              ]
+            },
+            "description": "Intake: how vendor handles our data. One of: access_only, process, store, create, n_a. n_a is mutually exclusive with all other values."
+          },
+          "vsor_data_residency": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "europe_eea",
+                "united_kingdom",
+                "united_states",
+                "canada",
+                "latin_america",
+                "africa",
+                "middle_east",
+                "asia_pacific",
+                "oceania",
+                "multiple_regions",
+                "unknown",
+                "n_a"
+              ]
+            },
+            "description": "Intake: geographic regions where vendor stores/processes data. n_a is mutually exclusive with all other values."
+          },
+          "vsor_vendor_access_type": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "none",
+                "remote_network",
+                "physical_onsite",
+                "api_integration",
+                "privileged_admin",
+                "handles_hardware",
+                "n_a"
+              ]
+            },
+            "description": "Intake: types of access vendor needs to our systems. none and n_a are each mutually exclusive with all other values."
           },
           "portfolios": {
             "type": "array",
@@ -324,40 +455,6 @@ A page in a list of VendorPortfolioAutomationSuggestions
           "contacts_count": {
             "type": "number",
             "description": "Number of contacts the current vendor has"
-          },
-          "custom_fields": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "string",
-                  "format": "uuid",
-                  "pattern": "^[\\da-z-]{16,}$",
-                  "description": "Custom field value ID"
-                },
-                "field_type": {
-                  "type": "string",
-                  "description": "Type of the custom field"
-                },
-                "field_label": {
-                  "type": "string",
-                  "description": "Label of the custom field"
-                },
-                "data": {
-                  "type": "string",
-                  "description": "Value of the custom field"
-                }
-              },
-              "additionalProperties": false,
-              "required": [
-                "id",
-                "field_type",
-                "field_label",
-                "data"
-              ]
-            },
-            "description": "Custom field values for this vendor"
           },
           "suggestion_confidence": {
             "type": "integer",

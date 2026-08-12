@@ -23,9 +23,10 @@ Tier slots information for the partner
               "platinum",
               "gold",
               "silver",
+              "questionnaire",
               "unknown"
             ],
-            "description": "Tier name (platinum, gold, silver, unknown)"
+            "description": "Tier name (platinum, gold, silver, questionnaire, unknown)"
           },
           "total": {
             "type": "integer",
@@ -42,6 +43,14 @@ Tier slots information for the partner
           "available_slots": {
             "type": "integer",
             "description": "available slots count"
+          },
+          "list_price": {
+            "type": "string",
+            "description": "Per-tier list price in USD as an exact decimal string; omitted when unset"
+          },
+          "discount_pct": {
+            "type": "string",
+            "description": "Per-tier discount percent 0-100 as a decimal string; omitted when unset"
           }
         },
         "required": [

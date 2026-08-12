@@ -181,6 +181,14 @@ a person that uses any system at SecurityScorecard
                       },
                       "additionalProperties": false
                     }
+                  },
+                  "vsor_columns_seeded": {
+                    "type": "boolean",
+                    "description": "true once the FE has seeded the VSOR optional columns into this table preference; used to avoid re-seeding on every load"
+                  },
+                  "custom_columns_seeded": {
+                    "type": "boolean",
+                    "description": "true once the FE has seeded the custom VSOR optional columns into this table preference; used to avoid re-seeding on every load"
                   }
                 },
                 "additionalProperties": false
