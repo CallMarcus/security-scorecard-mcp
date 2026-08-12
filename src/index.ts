@@ -495,10 +495,11 @@ class SecurityScorecardServer {
         endpoint: z.string().describe("API endpoint to query (e.g., /companies/{domain}/factors)"),
         domain: z.string().describe("Domain to use in endpoint").default(this.config.defaultDomain),
         method: z.enum(["GET", "POST", "PUT", "DELETE"]).describe("HTTP method").default("GET"),
-        validate_only: z.boolean().describe("Only validate endpoint without calling API").default(false)
+        validate_only: z.boolean().describe("Only validate endpoint without calling API").default(false),
+        fetch_all: z.boolean().describe("Follow pagination and return every page of a GET list endpoint (capped at 20 pages; a truncation notice is added if the cap is hit)").default(false)
       }
     }, async (args) => {
-      const { endpoint, domain, method = "GET", validate_only = false } = args;
+      const { endpoint, domain, method = "GET", validate_only = false, fetch_all = false } = args;
 
       // Pre-call validation: search for matching endpoints
       const searchResponse = await this.apiReferenceClient.hybridSearchWithMetadata(
@@ -546,9 +547,24 @@ class SecurityScorecardServer {
         // Replace {domain} placeholder in endpoint
         const processedEndpoint = endpoint.replace(/{domain}/g, domain);
 
-        const { createSecurityScorecardClient } = await import('./api/client.js');
+        const { createSecurityScorecardClient, paginationStyleFor } = await import('./api/client.js');
         const client = createSecurityScorecardClient(this.config.apiToken);
-        const response = await client.callEndpoint(method, processedEndpoint);
+
+        let data: any;
+        let paginationNote = '';
+        if (fetch_all && method === 'GET') {
+          const result = await client.fetchAllPages(method, processedEndpoint, {
+            style: paginationStyleFor(processedEndpoint)
+          });
+          data = { entries: result.entries, total: result.entries.length };
+          paginationNote = `\n**Pagination:** fetched ${result.pages} page(s), ${result.entries.length} entries`;
+          if (result.truncated) {
+            paginationNote += ` — ⚠️ TRUNCATED at the page cap; the full list is larger`;
+          }
+        } else {
+          const response = await client.callEndpoint(method, processedEndpoint);
+          data = response.data;
+        }
 
         // Include validation info in successful response
         let validationNote = '';
@@ -559,7 +575,7 @@ class SecurityScorecardServer {
         return {
           content: [{
             type: "text",
-            text: `# API Query Results\n\n**Endpoint:** ${processedEndpoint}\n**Method:** ${method}${validationNote}\n\n\`\`\`json\n${JSON.stringify(response.data, null, 2)}\n\`\`\``
+            text: `# API Query Results\n\n**Endpoint:** ${processedEndpoint}\n**Method:** ${method}${paginationNote}${validationNote}\n\n\`\`\`json\n${JSON.stringify(data, null, 2)}\n\`\`\``
           }]
         };
 

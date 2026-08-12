@@ -112,3 +112,11 @@ describe('getCompanyActiveIssues pagination', () => {
     assert.equal(response.data.entries.length, 80);
   });
 });
+
+describe('paginationStyleFor', () => {
+  test('footprint endpoints use page style, issues endpoints use cursor style', async () => {
+    const { paginationStyleFor } = await import('../build/api/client.js');
+    assert.equal(paginationStyleFor('/footprint/example.com/assets/domains'), 'page');
+    assert.equal(paginationStyleFor('/companies/example.com/issues/spf_record_missing'), 'cursor');
+  });
+});
