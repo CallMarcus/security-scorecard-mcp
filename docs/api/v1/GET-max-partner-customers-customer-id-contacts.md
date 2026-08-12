@@ -1,14 +1,17 @@
-# List all contacts for all customers of the partner
+# List contacts for a customer
 
 - **Method:** `GET`
-- **Path:** `/max/v1/partner/contacts`
+- **Path:** `/max/partner/customers/{customer_id}/contacts`
 - **Tag:** `V1`
-- **operationId:** `getV1PartnerContacts`
+- **operationId:** `getV1CustomersByCustomeridContacts`
+
+## Path Parameters
+- `customer_id` (**required**) — Customer ID
 
 ## Query Parameters
 - `page` (optional, number) — page number, 0 is the first page
 - `limit` (optional, number) — page size, the amount of items per page (max: 200)
-- `vendor_id` (optional, string) — Optional vendor ID filter. Omit for all contacts; pass a UUID for that vendor; pass the literal string "null" for customer-only contacts (no vendor).
+- `vendor_id` (optional, string) — Optional vendor ID filter. Omit for all; pass a UUID for that vendor; pass the literal string "null" for customer-only contacts.
 - `search` (optional, string) — Search text to filter contacts by email, first name, or last name (case-insensitive substring match).
 - `sort` (optional, string) — Sort order as a JSON string representing an array of objects with "id" (field name: email, first_name, last_name, created_at) and "desc" (boolean).
 - `email` (optional, string) — Email filter; accepts a single value or comma-separated list (case-insensitive substring match; multiple values are ORed).
@@ -17,7 +20,7 @@
 
 ## Responses
 ### 200
-List of contacts across all managed customers
+List of contacts
 ```json
 {
   "type": "object",
@@ -211,12 +214,12 @@ List of contacts across all managed customers
 ### 400
 Invalid query parameters
 ### 403
-Access denied
+Access denied due to insufficient permissions
 
 ## Example cURL Request
 ```bash
 curl -X GET \
-  'https://api.securityscorecard.io//max/v1/partner/contacts' \
+  'https://api.securityscorecard.io//max/partner/customers/<customer_id>/contacts' \
   -H 'Authorization: Token <YOUR_API_TOKEN>'
 ```
 

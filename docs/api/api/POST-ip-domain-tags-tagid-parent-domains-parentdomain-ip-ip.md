@@ -32,7 +32,8 @@ ip association schema
     },
     "tags": {
       "type": "array",
-      "description": "array of tag ids"
+      "description": "array of tag ids",
+      "items": {}
     },
     "organization_id": {
       "type": "string",

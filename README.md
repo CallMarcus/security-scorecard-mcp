@@ -120,7 +120,7 @@ The server (`index.js`) provides 9 specialized tools:
 | `create_improvement_plan` | Actionable remediation roadmaps |
 | `discover_assets` | Asset inventory with security context |
 | `analyze_email_security` | SPF/DMARC/DKIM analysis |
-| `api_discovery` | Search 507 API endpoints with hybrid semantic/keyword search |
+| `api_discovery` | Search 517 API endpoints with hybrid semantic/keyword search |
 | `analyze_issue_types` | Granular issue type breakdowns |
 | `validate_data_completeness` | Cross-tool data verification |
 | `query_security_data` | Direct API access with discovery |
@@ -156,7 +156,7 @@ The server includes hybrid search (semantic + keyword) for finding SecurityScore
 Use api_discovery to search for "email security"
 ```
 
-This searches 507 indexed endpoints and returns matching paths with confidence scores, required parameters, and curl examples.
+This searches 517 indexed endpoints and returns matching paths with confidence scores, required parameters, and curl examples.
 
 To update the API reference after changes:
 
@@ -183,7 +183,7 @@ src/
   api/client.ts          # SecurityScorecard API client
   integration/           # API discovery system
 docs/api/                # Self-contained API reference
-  index.jsonl            # Endpoint index (507 endpoints)
+  index.jsonl            # Endpoint index (517 endpoints)
   index-embeddings.json  # Semantic search embeddings
 build/                   # Compiled JavaScript
 ```
