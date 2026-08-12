@@ -6,11 +6,13 @@ export interface SecurityScorecardConfig {
 }
 
 /**
- * Which pagination style an endpoint family uses: footprint endpoints take
- * page/page-size, everything else (issues, findings) is size/cursor.
+ * Which pagination style an endpoint family uses (live-verified 2026-08-12):
+ * - footprint endpoints: 0-based `page` + `page-size` (which the server
+ *   ignores — it returns a fixed 50 per page), with an authoritative `total`.
+ * - issues/findings endpoints: 1-based `page` + `size` (respected), `total`.
  */
-export function paginationStyleFor(path: string): 'page' | 'cursor' {
-  return path.includes('/footprint/') ? 'page' : 'cursor';
+export function paginationStyleFor(path: string): 'page' | 'size-page' {
+  return path.includes('/footprint/') ? 'page' : 'size-page';
 }
 
 export class SecurityScorecardApiClient {
@@ -72,76 +74,81 @@ export class SecurityScorecardApiClient {
   /**
    * Fetch every page of a paginated list endpoint (issue #17).
    *
-   * SSC uses two pagination styles:
-   * - 'page':   footprint endpoints — `page` (0-based) + `page-size` (max 100);
-   *             a short page means the list is exhausted.
-   * - 'cursor': issues/findings endpoints — `size` + `cursor`, where the
-   *             response carries `next_cursor` (or a full `next` URL).
+   * Styles (see paginationStyleFor): 'page' sends 0-based `page` +
+   * `page-size`; 'size-page' sends 1-based `page` + `size`. Both endpoint
+   * families return an authoritative `total`, which drives the stop
+   * condition — the server may ignore the requested page size (footprint
+   * fixes it at 50), so a short page is only trusted when no total exists.
+   * If a response carries `next_cursor` or a `next` URL, that is followed
+   * instead of page arithmetic.
    *
    * maxPages is a hard safety cap; `truncated: true` means it was hit while
-   * pages were still coming, so callers should surface a truncation notice.
+   * entries remained, so callers should surface a truncation notice.
    */
   async fetchAllPages<T = any>(
     method: string,
     path: string,
     options: {
-      style: 'page' | 'cursor';
+      style: 'page' | 'size-page';
       queryParams?: Record<string, any>;
       pageSize?: number;
       maxPages?: number;
     }
-  ): Promise<{ entries: T[]; pages: number; truncated: boolean }> {
+  ): Promise<{ entries: T[]; pages: number; truncated: boolean; total?: number }> {
     const { style, queryParams = {}, pageSize = 100, maxPages = 20 } = options;
     const all: T[] = [];
     let pages = 0;
-    let truncated = false;
-
-    if (style === 'page') {
-      for (let page = 0; page < maxPages; page += 1) {
-        const response = await this.makeRequest(method, path, {
-          queryParams: { ...queryParams, page, 'page-size': pageSize }
-        });
-        const entries: T[] = response.data?.entries ?? [];
-        all.push(...entries);
-        pages += 1;
-        if (entries.length < pageSize) return { entries: all, pages, truncated: false };
-      }
-      truncated = true;
-      return { entries: all, pages, truncated };
-    }
-
-    // cursor style
-    let nextPath: string | null = null;
+    let total: number | undefined;
     let cursor: string | null = null;
+    let cursorPath: string | null = null;
+
     for (let i = 0; i < maxPages; i += 1) {
       let response;
-      if (nextPath) {
-        response = await this.makeRequest(method, nextPath);
+      if (cursorPath) {
+        // Server-provided next URL already carries its own query params
+        response = await this.makeRequest(method, cursorPath);
       } else {
-        const params: Record<string, any> = { ...queryParams, size: pageSize };
-        if (cursor) params.cursor = cursor;
+        const params: Record<string, any> = { ...queryParams };
+        if (cursor) {
+          params.cursor = cursor;
+          params.size = pageSize;
+        } else if (style === 'page') {
+          params.page = i;
+          params['page-size'] = pageSize;
+        } else {
+          params.page = i + 1;
+          params.size = pageSize;
+        }
         response = await this.makeRequest(method, path, { queryParams: params });
       }
+
       const data = response.data ?? {};
       const entries: T[] = data.entries ?? [];
       all.push(...entries);
       pages += 1;
+      if (typeof data.total === 'number') total = data.total;
 
       const nextCursor = data.next_cursor ?? data.cursor?.next ?? null;
-      const nextUrl = typeof data.next === 'string' ? data.next : (typeof data.links?.next === 'string' ? data.links.next : null);
+      const nextUrl = typeof data.next === 'string' ? data.next
+        : (typeof data.links?.next === 'string' ? data.links.next : null);
       if (nextCursor) {
         cursor = String(nextCursor);
-        nextPath = null;
-      } else if (nextUrl) {
-        // Follow the server-provided URL verbatim (minus origin) — it already
-        // carries cursor and size query params.
-        nextPath = nextUrl.replace(/^https?:\/\/[^/]+/, '');
-        cursor = null;
-      } else {
-        return { entries: all, pages, truncated: false };
+        cursorPath = null;
+        continue;
       }
+      if (nextUrl) {
+        cursorPath = nextUrl.replace(/^https?:\/\/[^/]+/, '');
+        cursor = null;
+        continue;
+      }
+
+      if (entries.length === 0) return { entries: all, pages, truncated: false, total };
+      if (typeof total === 'number' && all.length >= total) return { entries: all, pages, truncated: false, total };
+      if (typeof total !== 'number' && entries.length < pageSize) return { entries: all, pages, truncated: false, total };
     }
-    return { entries: all, pages, truncated: true };
+
+    const truncated = typeof total === 'number' ? all.length < total : true;
+    return { entries: all, pages, truncated, total };
   }
 
   // === PORTFOLIO METHODS ===
@@ -229,14 +236,19 @@ export class SecurityScorecardApiClient {
    * Get company active issues (uses /issues endpoint with status filter due to API bug in /active-issues)
    */
   async getCompanyActiveIssues(domain: string, queryParams?: Record<string, any>): Promise<ApiResponse<any>> {
-    const { size, ...rest } = { status: 'open', ...queryParams } as Record<string, any>;
+    const params = { status: 'open', size: 50, ...queryParams } as Record<string, any>;
+    // An explicit page override means the caller wants that single page
+    if (params.page !== undefined) {
+      return this.makeRequest('GET', `/companies/${domain}/issues`, { queryParams: params });
+    }
+    const { size, ...rest } = params;
     const result = await this.fetchAllPages('GET', `/companies/${domain}/issues`, {
-      style: 'cursor',
+      style: 'size-page',
       queryParams: rest,
       pageSize: typeof size === 'number' ? size : 50
     });
     return {
-      data: { entries: result.entries, total: result.entries.length, truncated: result.truncated },
+      data: { entries: result.entries, total: result.total ?? result.entries.length, truncated: result.truncated },
       status: 200,
       headers: new Headers()
     };

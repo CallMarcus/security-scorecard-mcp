@@ -208,7 +208,7 @@ build/                         # Compiled output (generated)
 
 ## Common Patterns
 
-- **Pagination**: Cursor-based - loop with `cursor`/`next_cursor` params, `size: 50`. See existing tools for examples.
+- **Pagination**: Use `client.fetchAllPages()` — handles both SSC styles (footprint: 0-based `page`+`page-size`, which the server ignores and fixes at 50/page; issues: 1-based `page`+`size`, respected). Both return an authoritative `total` that drives the stop condition. `maxPages` cap with `truncated` flag; `paginationStyleFor(path)` picks the style. Cursor responses (`next_cursor`/`next` URL) are followed automatically if an endpoint returns them.
 - **Error handling**: Wrap API calls in try-catch, return `{ isError: true }` with user-friendly messages.
 - **Data validation**: Use `validate_data_completeness` to cross-verify results; warn when confidence < 0.8.
 
@@ -217,4 +217,4 @@ build/                         # Compiled output (generated)
 - Since TypeScript 7 (native compiler), `npm run build` (tsc) is fast (~3s); `npm run build:fast` (esbuild) remains the default build path
 - Run `npm run api:embed` after any changes to `docs/api/index.jsonl`
 - `api_discovery` returns structured JSON with confidence scores; use `include_schema: true` for request/response schema details
-- `query_security_data` supports `validate_only: true` to verify endpoint syntax without executing
+- `query_security_data` supports `validate_only: true` to verify endpoint syntax without executing, and `fetch_all: true` to follow pagination on GET list endpoints (20-page cap with truncation notice)
