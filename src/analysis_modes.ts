@@ -8,7 +8,7 @@
  */
 
 import type { FactorSummary, FindingEntry } from './get_findings_by_category.js';
-import type { AssetInventory } from './asset_management.js';
+import type { AssetInventory, AssetScore } from './asset_management.js';
 
 export type ResponseMode = 'minimal' | 'standard' | 'detailed';
 export type FocusFactor = 'dns_health' | 'application_security' | 'network_security' | 'endpoint_security' | 'all';
@@ -245,9 +245,19 @@ export function renderImprovementPlan(
   return out + footer(options);
 }
 
-function assetLine(asset: { asset_name: string; score?: number; issues_count: number; critical_issues: number; high_issues: number }, withRisk: boolean): string {
+function assetLine(asset: AssetScore, withRisk: boolean): string {
   if (!withRisk) return `- ${asset.asset_name}`;
-  return `- ${asset.asset_name} — score ${asset.score ?? 'n/a'}, ${asset.issues_count} issue(s) (${asset.critical_issues} critical, ${asset.high_issues} high)`;
+  if (typeof asset.score_impact === 'number') {
+    const impact = asset.score_impact !== 0 ? `score impact ${asset.score_impact.toFixed(1)}, ` : '';
+    const status = asset.status ? ` [${asset.status}]` : '';
+    return `- ${asset.asset_name} — ${impact}${asset.issue_types_count ?? 0} issue type(s), ${asset.issues_count} finding(s)${status}`;
+  }
+  return `- ${asset.asset_name} — score ${asset.score ?? 'n/a'}, ${asset.issues_count} issue(s) (${asset.critical_issues ?? 0} critical, ${asset.high_issues ?? 0} high)`;
+}
+
+function renderInventoryWarnings(inventory: AssetInventory): string {
+  if (!inventory.warnings?.length) return '';
+  return inventory.warnings.map(w => `⚠️ ${w}`).join('\n') + '\n\n';
 }
 
 export function renderAssetInventory(
@@ -270,15 +280,24 @@ export function renderAssetInventory(
   let out = `# 🔍 Asset Inventory: ${domain}\n\n`;
   out += `**Domains:** ${domainCount} | **IP addresses:** ${ipCount} | **Total issues:** ${totalIssues}\n`;
   if (includeRiskDetails) {
-    out += `**Average asset score:** ${inventory.summary.avg_score}\n`;
+    if (typeof inventory.summary.total_score_impact === 'number') {
+      out += `**Total score impact across assets:** ${inventory.summary.total_score_impact.toFixed(1)}\n`;
+    }
+    if (typeof inventory.summary.avg_score === 'number') {
+      out += `**Average asset score:** ${inventory.summary.avg_score}\n`;
+    }
   }
   out += '\n';
+  out += renderInventoryWarnings(inventory);
 
   if (includeRiskDetails) {
     const worst = inventory.summary.worst_performers[0];
     const best = inventory.summary.best_performers[0];
-    if (worst) out += `**Worst performer:** ${worst.asset_name} (score ${worst.score ?? 'n/a'}, ${worst.critical_issues} critical)\n`;
-    if (best) out += `**Best performer:** ${best.asset_name} (score ${best.score ?? 'n/a'})\n`;
+    const riskNote = (a: AssetScore) => typeof a.score_impact === 'number'
+      ? `score impact ${a.score_impact.toFixed(1)}, ${a.issues_count} finding(s)`
+      : `score ${a.score ?? 'n/a'}, ${a.critical_issues ?? 0} critical`;
+    if (worst) out += `**Worst performer:** ${worst.asset_name} (${riskNote(worst)})\n`;
+    if (best) out += `**Best performer:** ${best.asset_name} (${riskNote(best)})\n`;
     out += '\n';
   }
 
@@ -342,11 +361,22 @@ export function renderDataCompletenessReport(
     out += `## Audit checks\n`;
     out += `- Domain discovery returned data: ${domainCount > 0 ? 'yes' : 'NO — verify footprint endpoints'}\n`;
     out += `- IP discovery returned data: ${ipCount > 0 ? 'yes' : 'NO — verify footprint endpoints'}\n`;
-    out += `- Average asset score: ${inventory.summary.avg_score}\n`;
+    if (typeof inventory.summary.avg_score === 'number') {
+      out += `- Average asset score: ${inventory.summary.avg_score}\n`;
+    }
+    if (typeof inventory.summary.total_score_impact === 'number') {
+      out += `- Total score impact across assets: ${inventory.summary.total_score_impact.toFixed(1)}\n`;
+    }
     out += `- Total issues across assets: ${inventory.summary.total_issues}\n`;
+    for (const warning of inventory.warnings ?? []) {
+      out += `- ⚠️ ${warning}\n`;
+    }
     const worst = inventory.summary.worst_performers[0];
     if (worst) {
-      out += `- Worst performer: ${worst.asset_name} (score ${worst.score ?? 'n/a'}, ${worst.critical_issues} critical)\n`;
+      const note = typeof worst.score_impact === 'number'
+        ? `score impact ${worst.score_impact.toFixed(1)}, ${worst.issues_count} finding(s)`
+        : `score ${worst.score ?? 'n/a'}, ${worst.critical_issues ?? 0} critical`;
+      out += `- Worst performer: ${worst.asset_name} (${note})\n`;
     }
     const best = inventory.summary.best_performers[0];
     if (best) {
