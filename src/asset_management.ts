@@ -8,9 +8,16 @@ export interface AssetScore {
   asset_type: 'domain' | 'ip_address';
   score?: number;
   grade?: string;
+  /** Individual findings on this asset (footprint `findings` field) */
   issues_count: number;
-  critical_issues: number;
-  high_issues: number;
+  /** Distinct issue types on this asset (footprint `issues` field) */
+  issue_types_count?: number;
+  /** Summed score impact of this asset's findings (footprint `score_impact`) */
+  score_impact?: number;
+  /** Attribution status: CLAIMED / ATTRIBUTED / REFUTED / UNDER_REVIEW_* */
+  status?: string;
+  critical_issues?: number;
+  high_issues?: number;
   last_seen?: string;
 }
 
@@ -20,11 +27,15 @@ export interface AssetInventory {
   domains: AssetScore[];
   ip_addresses: AssetScore[];
   summary: {
-    avg_score: number;
+    /** SSC provides no per-asset 0-100 score; absent unless a source supplies one */
+    avg_score?: number;
+    total_score_impact?: number;
     worst_performers: AssetScore[];
     best_performers: AssetScore[];
     total_issues: number;
   };
+  /** Discovery problems (failed endpoints, truncated pagination) — never swallowed */
+  warnings: string[];
 }
 
 export interface AssetFindings {
@@ -47,149 +58,6 @@ export interface AssetFindings {
 }
 
 /**
- * Get all assets using pagination to overcome API limits
- */
-async function getAllAssetsPaginated(
-  makeRequest: (endpoint: string, method?: string, body?: any) => Promise<any>,
-  domain: string,
-  assetType?: 'domain' | 'ip_address'
-): Promise<any[]> {
-  const allAssets: any[] = [];
-  let offset = 0;
-  const limit = 100; // Use higher limit for pagination
-  
-  const debugMode = process.env.DEBUG_MODE === "true";
-  function debugLog(message: string, data?: any) {
-    if (debugMode) {
-      console.log(`[PAGINATION] ${message}`);
-      if (data) console.log(JSON.stringify(data, null, 2));
-    }
-  }
-  
-  // Try different pagination patterns and endpoint variations
-  // COMPREHENSIVE API ENDPOINT HIERARCHY: Based on user feedback discovery
-  // UPDATED: Based on user's working API Reference discovery - correct endpoint structure
-  const endpointVariations = [
-    // LEVEL 1: Working API Reference Pattern - CONFIRMED WORKING by user
-    { url: `/footprint/${domain}/assets/domains`, method: 'GET', useBody: false, priority: 'highest' },
-    { url: `/footprint/${domain}/assets/ips`, method: 'GET', useBody: false, priority: 'highest' },
-    
-    // LEVEL 2: Digital Footprint POST API (Domain-scoped) - WORKING
-    { url: `/parent-domains/${domain}/domains`, method: 'POST', useBody: true, priority: 'high' },
-    { url: `/parent-domains/${domain}/ips`, method: 'POST', useBody: true, priority: 'high' },
-    
-    // LEVEL 3: Alternative footprint patterns
-    { url: `/footprint/${domain}/domains`, method: 'GET', useBody: false, priority: 'medium' },
-    { url: `/footprint/${domain}/ips`, method: 'GET', useBody: false, priority: 'medium' },
-    
-    // LEVEL 4: Companies endpoints (External monitoring - limited but working)
-    { url: `/companies/${domain}/assets`, method: 'GET', useBody: false, priority: 'low' },
-    { url: `/companies/${domain}/inventory`, method: 'GET', useBody: false, priority: 'low' },
-    { url: `/companies/${domain}/footprint`, method: 'GET', useBody: false, priority: 'low' }
-  ];
-  
-  for (const endpointConfig of endpointVariations) {
-    try {
-      debugLog(`Trying endpoint: ${endpointConfig.url} (${endpointConfig.method})`);
-      let hasMore = true;
-      let page = 0;
-      
-      while (hasMore) {
-        let response = null;
-        
-        try {
-          if (endpointConfig.useBody && endpointConfig.method === 'POST') {
-            // POST endpoints: Digital Footprint API
-            const body: any = {
-              page: page,
-              page_size: limit
-            };
-            
-            // Add filters if we're looking for specific asset type
-            if (assetType) {
-              body.filters = [{ field: 'status', operator: 'in', values: ['CLAIMED', 'ATTRIBUTED'] }];
-            }
-            
-            debugLog(`Trying POST ${endpointConfig.url} with body:`, body);
-            response = await makeRequest(endpointConfig.url, endpointConfig.method, body);
-            
-          } else {
-            // GET endpoints: Various API types with different parameter handling
-            let finalUrl = endpointConfig.url;
-            let queryParams = `page=${page}&size=${limit}`;
-            
-            // Handle API Reference endpoints with parentDomain parameter
-            if (endpointConfig.url.includes('/footprint/parentDomain/')) {
-              // API Reference endpoints: replace parentDomain with actual domain
-              finalUrl = endpointConfig.url.replace('/parentDomain/', `/${domain}/`);
-              debugLog(`API Reference endpoint transformation: ${endpointConfig.url} → ${finalUrl}`);
-            }
-            
-            // Add asset type filtering for legacy endpoints
-            if (!endpointConfig.url.includes('/footprint/') && !endpointConfig.url.includes('/parent-domains/')) {
-              if (assetType) {
-                queryParams += `&type=${assetType}`;
-              }
-            }
-            
-            const fullUrl = `${finalUrl}?${queryParams}`;
-            debugLog(`Trying GET ${fullUrl} (Priority: ${endpointConfig.priority || 'standard'})`);
-            response = await makeRequest(fullUrl, endpointConfig.method);
-          }
-          
-          if (response && (response.entries || response.data || response.assets)) {
-            debugLog(`Success with: ${endpointConfig.url}`);
-          }
-          
-        } catch (error) {
-          debugLog(`Error with ${endpointConfig.url}: ${error}`);
-          break;
-        }
-        
-        if (!response) {
-          debugLog(`No response for ${endpointConfig.url}, trying next endpoint`);
-          break;
-        }
-        
-        // Extract data from various response structures
-        const data = response.entries || response.data || response.assets || 
-                    response.results || response.items || [];
-        
-        if (!Array.isArray(data) || data.length === 0) {
-          debugLog(`No data found in response for ${endpointConfig.url}`);
-          break;
-        }
-        
-        allAssets.push(...data);
-        debugLog(`Found ${data.length} assets on page ${page}, total: ${allAssets.length}`);
-        
-        // Check if we should continue paginating
-        hasMore = data.length === limit;
-        page += 1;
-        
-        // Safety limit to prevent infinite loops
-        if (page > 100) {
-          debugLog(`Safety limit reached at page ${page}`);
-          break;
-        }
-      }
-      
-      // If we found assets with this endpoint, stop trying others
-      if (allAssets.length > 0) {
-        debugLog(`Successfully found ${allAssets.length} assets using ${endpointConfig.url}`);
-        break;
-      }
-      
-    } catch (error) {
-      debugLog(`Endpoint ${endpointConfig.url} failed: ${error}`);
-      continue;
-    }
-  }
-  
-  return allAssets;
-}
-
-/**
  * Validate if a string is a domain name
  */
 export function isValidDomain(str: string): boolean {
@@ -208,355 +76,84 @@ export function isValidIP(str: string): boolean {
 }
 
 /**
- * Get comprehensive asset inventory for organization using working API endpoints
- * Enhanced version with pagination and multiple discovery methods
+ * Get comprehensive asset inventory from the Digital Footprint API (issue #17).
+ *
+ * The footprint assets endpoints return per-asset issue-type counts, finding
+ * counts and summed score impact directly, so no per-asset enrichment calls
+ * are needed. Both lists are fetched with full pagination; discovery failures
+ * and truncation are reported in `warnings` instead of being swallowed.
+ *
+ * `clientOverride` lets tests inject a scripted client (no token required).
  */
 export async function getAssetInventory(
   domain: string,
-  apiToken: string
+  apiToken: string,
+  clientOverride?: { fetchAllPages: (method: string, path: string, options: any) => Promise<{ entries: any[]; pages: number; truncated: boolean }> }
 ): Promise<AssetInventory> {
-  const { createSecurityScorecardClient } = await import('./api/client.js');
-  const client = createSecurityScorecardClient(apiToken);
-  
-  const makeRequest = async (endpoint: string, method = 'GET', body?: any) => {
-    const response = await client.callEndpoint(method.toUpperCase() as any, endpoint, body);
-    return response.data;
+  let client = clientOverride;
+  if (!client) {
+    const { createSecurityScorecardClient } = await import('./api/client.js');
+    client = createSecurityScorecardClient(apiToken);
+  }
+
+  const warnings: string[] = [];
+
+  const fetchAssets = async (assetPath: 'domains' | 'ips', label: string): Promise<any[]> => {
+    try {
+      const result = await client!.fetchAllPages('GET', `/footprint/${domain}/assets/${assetPath}`, {
+        style: 'page',
+        pageSize: 100
+      });
+      if (result.truncated) {
+        warnings.push(`${label} asset list truncated after ${result.pages} pages (${result.entries.length} assets) — the full footprint is larger.`);
+      }
+      return result.entries;
+    } catch (error) {
+      warnings.push(`${label} asset discovery failed: ${error instanceof Error ? error.message : String(error)}`);
+      return [];
+    }
   };
-  
-  const debugMode = process.env.DEBUG_MODE === "true";
-  
-  function debugLog(message: string, data?: any) {
-    if (debugMode) {
-      console.log(`[ASSET DEBUG] ${message}`);
-      if (data) console.log(JSON.stringify(data, null, 2));
-    }
-  }
-  
-  try {
-    // First try multiple asset discovery methods
-    let domains: any[] = [];
-    let ips: any[] = [];
-    
-    // Method 1: Try working endpoints hierarchy (based on user's API Reference discovery)
-    debugLog("Trying confirmed working endpoint patterns (primary method)...");
-    try {
-      const [domainsResponse, ipsResponse] = await Promise.all([
-        // Use confirmed working pattern from user's API Reference discovery
-        makeRequest(`/footprint/${domain}/assets/domains`)
-          .catch(() => makeRequest(`/footprint/${domain}/domains`))
-          .catch(() => ({ entries: [] })),
-        makeRequest(`/footprint/${domain}/assets/ips`)
-          .catch(() => makeRequest(`/footprint/${domain}/ips`))
-          .catch(() => ({ entries: [] }))
-      ]);
-      
-      // Parse footprint API responses
-      domains = domainsResponse.entries || domainsResponse.data || domainsResponse.domains || [];
-      ips = ipsResponse.entries || ipsResponse.data || ipsResponse.ips || [];
-      
-      debugLog(`Footprint GET results: ${domains.length} domains, ${ips.length} IPs`);
-      debugLog("GET domain response structure:", domainsResponse);
-      debugLog("GET IP response structure:", ipsResponse);
-      
-      // If footprint endpoints work, we found our data!
-      if (domains.length > 0 || ips.length > 0) {
-        debugLog("SUCCESS: Footprint GET endpoints returned data!");
-      }
-      
-    } catch (error) {
-      debugLog("Footprint GET endpoints failed, trying POST alternatives...", error);
-    }
-    
-    // Method 2: Try POST endpoints for Digital Footprint API (fallback)
-    if (domains.length === 0 && ips.length === 0) {
-      debugLog("Trying Digital Footprint POST endpoints as fallback...");
-      try {
-        const [domainsResponse, ipsResponse] = await Promise.all([
-          makeRequest(`/parent-domains/${domain}/domains`, 'POST', { page: 0, page_size: 100 }).catch(() => ({ entries: [] })),
-          makeRequest(`/parent-domains/${domain}/ips`, 'POST', { page: 0, page_size: 100 }).catch(() => ({ entries: [] }))
-        ]);
-        
-        // Parse Digital Footprint API responses
-        domains = domainsResponse.entries || domainsResponse.data || domainsResponse.domains || [];
-        ips = ipsResponse.entries || ipsResponse.data || ipsResponse.ips || [];
-        
-        debugLog(`Digital Footprint POST results: ${domains.length} domains, ${ips.length} IPs`);
-        debugLog("POST domain response structure:", domainsResponse);
-        debugLog("POST IP response structure:", ipsResponse);
-        
-      } catch (error) {
-        debugLog("Digital Footprint POST endpoints failed, trying other fallback methods...", error);
-      }
-    }
-    
-    // Method 2: Try standard assets endpoint with pagination
-    if (domains.length === 0) {
-      debugLog("Trying paginated assets endpoint...");
-      domains = await getAllAssetsPaginated(makeRequest, domain, 'domain');
-      ips = await getAllAssetsPaginated(makeRequest, domain, 'ip_address');
-    }
-    
-    // Method 3: Try assets endpoint without type filter
-    if (domains.length === 0) {
-      debugLog("Trying generic assets endpoint...");
-      const allAssets = await getAllAssetsPaginated(makeRequest, domain);
-      domains = allAssets.filter((asset: any) => 
-        asset.type === 'domain' || asset.asset_type === 'domain' || 
-        (!asset.type && !asset.asset_type && isValidDomain(asset.name || asset.domain))
-      );
-      ips = allAssets.filter((asset: any) => 
-        asset.type === 'ip_address' || asset.asset_type === 'ip_address' ||
-        (!asset.type && !asset.asset_type && isValidIP(asset.name || asset.ip || asset.address))
-      );
-    }
-    
-    // Method 4: Enhanced asset discovery through issue data (with pagination)
-    if (domains.length === 0) {
-      debugLog('Using enhanced asset discovery through issue data...');
-      
-      // Get factors data to discover assets mentioned in issues using confirmed working pattern
-      let factorsResponse;
-      try {
-        // Use confirmed working API Reference pattern (user verified)
-        factorsResponse = await makeRequest(`/footprint/${domain}/factors`);
-      } catch (error) {
-        // Fallback to companies endpoint
-        factorsResponse = await makeRequest(`/companies/${domain}/factors`);
-      }
-      const discoveredDomains = new Set<string>();
-      const discoveredIPs = new Set<string>();
-      
-      // Add the main domain
-      discoveredDomains.add(domain);
-      
-      // Extract assets from issue data with pagination
-      for (const factor of factorsResponse.entries || []) {
-        debugLog(`Processing factor: ${factor.name}`);
-        
-        // Process ALL issue types, not just first 3
-        for (const issueType of (factor.issue_summary || [])) {
-          if (!issueType.type || issueType.count === 0) continue;
-          
-          try {
-            debugLog(`Discovering assets from issue type: ${issueType.type}`);
-            
-            // Use pagination to get ALL issues, not just first 10
-            let offset = 0;
-            const limit = 100;
-            let hasMore = true;
-            
-            while (hasMore) {
-              // Use working companies endpoint instead of failing scorecard
-              const issues = await makeRequest(
-                `/companies/${domain}/issues?type=${issueType.type}&status=open&size=${limit}&offset=${offset}`
-              );
-              
-              const issueEntries = issues.entries || [];
-              if (issueEntries.length === 0) break;
-              
-              for (const issue of issueEntries) {
-                // Extract domain names
-                if (issue.domain && issue.domain !== domain && isValidDomain(issue.domain)) {
-                  discoveredDomains.add(issue.domain);
-                }
-                if (issue.parent_domain && issue.parent_domain !== domain && isValidDomain(issue.parent_domain)) {
-                  discoveredDomains.add(issue.parent_domain);
-                }
-                if (issue.hostname && isValidDomain(issue.hostname)) {
-                  discoveredDomains.add(issue.hostname);
-                }
-                
-                // Extract IP addresses
-                if (issue.ip && isValidIP(issue.ip)) {
-                  discoveredIPs.add(issue.ip);
-                }
-                if (issue.ip_address && isValidIP(issue.ip_address)) {
-                  discoveredIPs.add(issue.ip_address);
-                }
-                if (issue.host && isValidIP(issue.host)) {
-                  discoveredIPs.add(issue.host);
-                }
-                
-                // Look for IPs in other fields
-                if (issue.details) {
-                  const ipMatches = JSON.stringify(issue.details).match(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g);
-                  if (ipMatches) {
-                    ipMatches.forEach(ip => {
-                      if (isValidIP(ip)) discoveredIPs.add(ip);
-                    });
-                  }
-                }
-              }
-              
-              hasMore = issueEntries.length === limit;
-              offset += limit;
-              
-              // Safety limit
-              if (offset > 5000) {
-                debugLog(`Safety limit reached for issue type ${issueType.type}`);
-                break;
-              }
-            }
-            
-            debugLog(`Found ${discoveredDomains.size} domains and ${discoveredIPs.size} IPs so far`);
-            
-          } catch (error) {
-            debugLog(`Error processing issue type ${issueType.type}: ${error}`);
-            continue;
-          }
-        }
-      }
-      
-      // Convert discovered assets to proper format
-      ips = Array.from(discoveredIPs).map(ip => ({
-        name: ip,
-        ip: ip,
-        address: ip,
-        type: 'ip_address',
-        asset_type: 'ip_address'
-      }));
-      
-      // Convert discovered domains to domain objects
-      domains = Array.from(discoveredDomains).map(domainName => ({
-        name: domainName,
-        domain: domainName,
-        hostname: domainName,
-        last_seen: new Date().toISOString()
-      }));
-    }
 
-  // Calculate asset scores and issue counts
-  const domainScores: AssetScore[] = [];
-  const ipScores: AssetScore[] = [];
+  const [domainEntries, ipEntries] = await Promise.all([
+    fetchAssets('domains', 'Domain'),
+    fetchAssets('ips', 'IP')
+  ]);
 
-  for (const domainAsset of domains) {
-    try {
-      // Extract domain name from various possible field names
-      const domainName = domainAsset.name || domainAsset.domain || domainAsset.hostname || domainAsset.asset_name || 'unknown';
-      
-      if (domainName === 'unknown') {
-        console.log('Warning: Could not extract domain name from asset:', JSON.stringify(domainAsset));
-      }
-      
-      // Use factors endpoint to get issue summary for each domain asset
-      let issueCount = 0;
-      let criticalCount = 0;
-      let highCount = 0;
-      
-      try {
-        // Try to get factors for this domain directly using confirmed working pattern
-        let factors;
-        try {
-          // Use confirmed working API Reference pattern
-          factors = await makeRequest(`/footprint/${domainName}/factors`);
-        } catch (error) {
-          // Fallback to companies endpoint
-          factors = await makeRequest(`/companies/${domainName}/factors`);
-        }
-        factors.entries?.forEach((factor: any) => {
-          factor.issue_summary?.forEach((issue: any) => {
-            if (issue.count) {
-              issueCount += issue.count;
-              if (issue.severity === 'critical') criticalCount += issue.count;
-              if (issue.severity === 'high') highCount += issue.count;
-            }
-          });
-        });
-      } catch (factorError) {
-        // If direct access fails, try through parent domain with domain parameter
-        const parentDomain = await findParentDomain(makeRequest, domainName);
-        if (parentDomain) {
-          let parentFactors;
-          try {
-            // Use confirmed working API Reference pattern
-            parentFactors = await makeRequest(`/footprint/${parentDomain}/factors`);
-          } catch (error) {
-            // Fallback to companies endpoint  
-            parentFactors = await makeRequest(`/companies/${parentDomain}/factors`);
-          }
-          const issueTypes = extractIssueTypesFromFactors(parentFactors);
-          
-          // Sample a few issue types to estimate total issues
-          for (const issueType of issueTypes.slice(0, 3)) {
-            try {
-              // Use working companies endpoint instead of failing scorecard
-              const issues = await makeRequest(`/companies/${parentDomain}/issues?type=${issueType}&domain=${domainName}&status=open`);
-              const entries = issues.entries || [];
-              issueCount += entries.length;
-              criticalCount += entries.filter((i: any) => i.severity === 'critical').length;
-              highCount += entries.filter((i: any) => i.severity === 'high').length;
-            } catch (issueError) {
-              continue;
-            }
-          }
-        }
-      }
+  const toScore = (entry: any, assetType: 'domain' | 'ip_address'): AssetScore => ({
+    asset_name: assetType === 'domain'
+      ? (entry.domain ?? entry.name ?? 'unknown')
+      : (entry.ip ?? entry.name ?? 'unknown'),
+    asset_type: assetType,
+    issues_count: entry.findings ?? 0,
+    issue_types_count: entry.issues ?? 0,
+    score_impact: typeof entry.score_impact === 'number' ? entry.score_impact : undefined,
+    status: entry.status,
+    last_seen: entry.first_observed_at
+  });
 
-      domainScores.push({
-        asset_name: domainName,
-        asset_type: 'domain',
-        issues_count: issueCount,
-        critical_issues: criticalCount,
-        high_issues: highCount,
-        last_seen: domainAsset.last_seen || new Date().toISOString()
-      });
-    } catch (error) {
-      // Asset may not have scoring data yet
-      const domainName = domainAsset.name || domainAsset.domain || domainAsset.hostname || domainAsset.asset_name || 'unknown';
-      domainScores.push({
-        asset_name: domainName,
-        asset_type: 'domain',
-        issues_count: 0,
-        critical_issues: 0,
-        high_issues: 0
-      });
-    }
-  }
+  const domains = domainEntries.map(e => toScore(e, 'domain'));
+  const ips = ipEntries.map(e => toScore(e, 'ip_address'));
 
-  // Calculate summary statistics
-  const allAssets = [...domainScores, ...ipScores];
+  const allAssets = [...domains, ...ips];
   const totalIssues = allAssets.reduce((sum, asset) => sum + asset.issues_count, 0);
-  
-  // Sort by risk (critical + high issues)
-  const sortedByRisk = allAssets.sort((a, b) => 
-    (b.critical_issues + b.high_issues) - (a.critical_issues + a.high_issues)
+  const totalScoreImpact = allAssets.reduce((sum, asset) => sum + (asset.score_impact ?? 0), 0);
+  const byImpact = [...allAssets].sort((a, b) =>
+    Math.abs(b.score_impact ?? 0) - Math.abs(a.score_impact ?? 0)
   );
 
   return {
     parent_domain: domain,
-    total_assets: domains.length + ips.length,
-    domains: domainScores,
-    ip_addresses: ipScores,
+    total_assets: allAssets.length,
+    domains,
+    ip_addresses: ips,
     summary: {
-      avg_score: 0, // Would need individual scores from API
-      worst_performers: sortedByRisk.slice(0, 5),
-      best_performers: sortedByRisk.slice(-5).reverse(),
+      total_score_impact: totalScoreImpact,
+      worst_performers: byImpact.slice(0, 5),
+      best_performers: byImpact.slice(-5).reverse(),
       total_issues: totalIssues
-    }
+    },
+    warnings
   };
-  
-  } catch (error) {
-    // If entire function fails, return basic structure with just the main domain
-    console.error('getAssetInventory failed:', error);
-    return {
-      parent_domain: domain,
-      total_assets: 1,
-      domains: [{
-        asset_name: domain,
-        asset_type: 'domain',
-        issues_count: 0,
-        critical_issues: 0,
-        high_issues: 0
-      }],
-      ip_addresses: [],
-      summary: {
-        avg_score: 0,
-        worst_performers: [],
-        best_performers: [],
-        total_issues: 0
-      }
-    };
-  }
 }
 
 /**

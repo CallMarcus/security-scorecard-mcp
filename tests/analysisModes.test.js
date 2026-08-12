@@ -262,6 +262,45 @@ describe('renderAssetInventory', () => {
     assert.ok(!withoutRisk.includes('score 65'), 'risk details present despite include_risk_details=false');
   });
 
+  // Shape produced by the footprint-backed getAssetInventory rewrite (issue #17)
+  const INVENTORY_V2 = {
+    parent_domain: 'example.com',
+    total_assets: 2,
+    domains: [
+      { asset_name: 'www.example.com', asset_type: 'domain', issues_count: 12, issue_types_count: 3, score_impact: -1.3, status: 'ATTRIBUTED' },
+      { asset_name: 'old.example.com', asset_type: 'domain', issues_count: 0, issue_types_count: 0, score_impact: 0, status: 'ATTRIBUTED' }
+    ],
+    ip_addresses: [],
+    summary: {
+      total_score_impact: -1.3,
+      worst_performers: [{ asset_name: 'www.example.com', asset_type: 'domain', issues_count: 12, issue_types_count: 3, score_impact: -1.3 }],
+      best_performers: [{ asset_name: 'old.example.com', asset_type: 'domain', issues_count: 0, issue_types_count: 0, score_impact: 0 }],
+      total_issues: 12
+    },
+    warnings: ['IP asset discovery failed: 403 Forbidden']
+  };
+
+  test('renders per-asset score impact when present', () => {
+    const out = renderAssetInventory('example.com', INVENTORY_V2, true, 'detailed', { generatedAt: GENERATED_AT });
+    assert.match(out, /-1\.3/, 'per-asset score impact missing');
+    assert.match(out, /12 finding/, 'findings count missing');
+    assert.ok(!out.includes('undefined'), 'undefined leaked into output');
+  });
+
+  test('surfaces inventory warnings in standard and detailed modes', () => {
+    for (const mode of ['standard', 'detailed']) {
+      const out = renderAssetInventory('example.com', INVENTORY_V2, true, mode, { generatedAt: GENERATED_AT });
+      assert.ok(out.includes('IP asset discovery failed'), `warning missing in ${mode} mode`);
+    }
+  });
+
+  test('tolerates a summary without avg_score', () => {
+    const out = renderAssetInventory('example.com', INVENTORY_V2, true, 'standard', { generatedAt: GENERATED_AT });
+    assert.ok(!out.includes('undefined'), 'undefined avg_score leaked');
+    const completeness = renderDataCompletenessReport('example.com', INVENTORY_V2, 2, 'detailed', { generatedAt: GENERATED_AT });
+    assert.ok(!completeness.includes('undefined'), 'undefined leaked into completeness report');
+  });
+
   test('detailed mode lists every asset and includes footer', () => {
     const out = renderAssetInventory('example.com', INVENTORY, true, 'detailed', { generatedAt: GENERATED_AT });
     for (const name of ['www.example.com', 'mail.example.com', '203.0.113.10', '203.0.113.11']) {
