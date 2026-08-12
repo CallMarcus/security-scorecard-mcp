@@ -4,6 +4,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { getFindingsByCategory } from "./get_findings_by_category.js";
 import { getAssetInventory } from "./asset_management.js";
+import { renderIssueTypeAnalysis, renderEmailSecurityAnalysis, renderDataCompletenessReport } from "./analysis_modes.js";
 import { createSecurityScorecardClient } from "./api/client.js";
 import { ApiReferenceClient } from "./integration/api-reference-client.js";
 import { getApiSchemaExtractor } from "./integration/api-schema.js";
@@ -303,32 +304,11 @@ class SecurityScorecardServer {
       try {
         const findings = await getFindingsByCategory(domain, this.config.apiToken);
         const factorBreakdown = findings.factor_breakdown || [];
-        
-        // Extract email-related issues
-        const emailFactors = factorBreakdown.filter(f => 
-          f.factor.toLowerCase().includes('dns') || 
-          f.factor.toLowerCase().includes('email') ||
-          f.factor.toLowerCase().includes('spf') ||
-          f.factor.toLowerCase().includes('dmarc')
-        );
-        
-        if (response_mode === "minimal") {
-          const spfIssues = emailFactors.find(f => f.factor.toLowerCase().includes('spf'))?.issue_count || 0;
-          const dmarcIssues = emailFactors.find(f => f.factor.toLowerCase().includes('dmarc'))?.issue_count || 0;
-          
-          return {
-            content: [{
-              type: "text",
-              text: `SPF missing: ${spfIssues}, DMARC missing: ${dmarcIssues}, Email issues: ${emailFactors.reduce((sum, f) => sum + f.issue_count, 0)}`
-            }]
-          };
-        }
 
-        // Standard/detailed modes would provide comprehensive email analysis
         return {
           content: [{
             type: "text",
-            text: `# 📧 Email Security Analysis: ${domain}\n\n**Email Security Factors:** ${emailFactors.length}\n\n[Detailed email security analysis would be provided here]`
+            text: renderEmailSecurityAnalysis(domain, factorBreakdown, response_mode)
           }]
         };
 
@@ -493,24 +473,11 @@ class SecurityScorecardServer {
       try {
         const findings = await getFindingsByCategory(domain, this.config.apiToken);
         const factorBreakdown = findings.factor_breakdown || [];
-        
-        if (response_mode === "minimal") {
-          const topTypes = factorBreakdown.slice(0, 3).map(f => 
-            `${f.factor.toLowerCase().replace(/_/g, ' ')}: ${f.critical_count + f.high_count}`
-          );
-          return {
-            content: [{
-              type: "text",
-              text: topTypes.join(", ")
-            }]
-          };
-        }
 
-        // Standard/detailed modes would provide comprehensive breakdown
         return {
           content: [{
             type: "text",
-            text: `# 🔍 Issue Type Analysis: ${domain}\n\n**Focus:** ${focus_factor}\n**Issue Types Found:** ${factorBreakdown.length}\n\n[Detailed breakdown would be provided here]`
+            text: renderIssueTypeAnalysis(domain, factorBreakdown, focus_factor, response_mode)
           }]
         };
 
@@ -534,26 +501,12 @@ class SecurityScorecardServer {
       const { domain, expected_asset_count, response_mode = "minimal" } = args;
       
       try {
-        // Simple validation check
         const assets = await getAssetInventory(domain, this.config.apiToken);
-        const totalAssets = assets.domains.length + assets.ip_addresses.length;
-        const confidence = totalAssets > 50 ? 85 : 95; // Simple heuristic
-        
-        if (response_mode === "minimal") {
-          const status = confidence > 90 ? "✅ Data Complete" : "⚠️ Incomplete";
-          return {
-            content: [{
-              type: "text",
-              text: `${status} (${confidence}% confidence) - ${totalAssets} assets found`
-            }]
-          };
-        }
 
-        // Standard/detailed modes would provide comprehensive validation
         return {
           content: [{
             type: "text",
-            text: `# ✅ Data Validation: ${domain}\n\n**Assets Found:** ${totalAssets}\n**Confidence:** ${confidence}%\n**Status:** ${confidence > 90 ? 'Complete' : 'May be incomplete'}\n\n[Detailed validation report would be provided here]`
+            text: renderDataCompletenessReport(domain, assets, expected_asset_count, response_mode)
           }]
         };
 
