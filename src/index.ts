@@ -4,7 +4,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { getFindingsByCategory } from "./get_findings_by_category.js";
 import { getAssetInventory } from "./asset_management.js";
-import { renderIssueTypeAnalysis, renderEmailSecurityAnalysis, renderDataCompletenessReport } from "./analysis_modes.js";
+import { renderIssueTypeAnalysis, renderEmailSecurityAnalysis, renderDataCompletenessReport, renderImprovementPlan, renderAssetInventory } from "./analysis_modes.js";
 import { createSecurityScorecardClient } from "./api/client.js";
 import { ApiReferenceClient } from "./integration/api-reference-client.js";
 import { getApiSchemaExtractor } from "./integration/api-schema.js";
@@ -215,32 +215,18 @@ class SecurityScorecardServer {
       }
     }, async (args) => {
       const { domain, target_grade = "A", timeline = "90-days", response_mode = "minimal" } = args;
-      
+
       try {
         // Use summary-factors endpoint which returns grade, score, and all factor data
         const summaryResponse = await this.client.getCompanyFactorSummary(domain);
         const currentScore = summaryResponse.data?.score || 0;
         const findings = await getFindingsByCategory(domain, this.config.apiToken);
         const factorBreakdown = findings.factor_breakdown || [];
-        
-        if (response_mode === "minimal") {
-          const quickWins = factorBreakdown.filter(f => f.critical_count > 0).slice(0, 2);
-          const scoreNeeded = target_grade === "A" ? 80 : target_grade === "B" ? 70 : 60;
-          const improvement = Math.max(0, scoreNeeded - currentScore);
-          
-          return {
-            content: [{
-              type: "text",
-              text: `Next actions: ${quickWins.map(f => f.factor).join(", ")} (Need ${improvement} points to reach grade ${target_grade})`
-            }]
-          };
-        }
 
-        // Standard/detailed implementation would continue here...
         return {
           content: [{
             type: "text",
-            text: `# 🎯 Security Improvement Plan: ${domain}\n\nCurrent Score: ${currentScore}/100\nTarget Grade: ${target_grade}\nTimeline: ${timeline}\n\n[Full implementation would continue here...]`
+            text: renderImprovementPlan(domain, currentScore, target_grade, timeline, factorBreakdown, response_mode)
           }]
         };
 
@@ -260,28 +246,14 @@ class SecurityScorecardServer {
       }
     }, async (args) => {
       const { domain, include_risk_details = true, response_mode = "minimal" } = args;
-      
+
       try {
         const assets = await getAssetInventory(domain, this.config.apiToken);
-        
-        if (response_mode === "minimal") {
-          const totalAssets = assets.domains.length + assets.ip_addresses.length;
-          const totalIssues = assets.domains.reduce((sum, d) => sum + d.issues_count, 0) + 
-                             assets.ip_addresses.reduce((sum, ip) => sum + ip.issues_count, 0);
-          
-          return {
-            content: [{
-              type: "text",
-              text: `${totalAssets} assets: ${assets.domains.length} domains, ${assets.ip_addresses.length} IPs (${totalIssues} issues)${totalAssets > 50 ? " ⚠️ Possible incomplete data" : ""}`
-            }]
-          };
-        }
 
-        // Standard/detailed modes would include comprehensive asset listing
         return {
           content: [{
             type: "text",
-            text: `# 🔍 Asset Inventory: ${domain}\n\n**Domains:** ${assets.domains.length}\n**IP Addresses:** ${assets.ip_addresses.length}\n\n[Full asset details would be listed here in production]`
+            text: renderAssetInventory(domain, assets, include_risk_details, response_mode)
           }]
         };
 
