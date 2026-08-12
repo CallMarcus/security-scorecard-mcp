@@ -5,6 +5,14 @@ export interface SecurityScorecardConfig {
   baseUrl?: string;
 }
 
+/**
+ * Which pagination style an endpoint family uses: footprint endpoints take
+ * page/page-size, everything else (issues, findings) is size/cursor.
+ */
+export function paginationStyleFor(path: string): 'page' | 'cursor' {
+  return path.includes('/footprint/') ? 'page' : 'cursor';
+}
+
 export class SecurityScorecardApiClient {
   private baseUrl: string;
   private apiToken: string;
