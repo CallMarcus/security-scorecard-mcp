@@ -6,7 +6,10 @@ import { fileURLToPath } from 'node:url';
 import {
   renderIssueTypeAnalysis,
   renderEmailSecurityAnalysis,
-  renderDataCompletenessReport
+  renderDataCompletenessReport,
+  renderImprovementPlan,
+  renderAssetInventory,
+  GRADE_THRESHOLDS
 } from '../build/analysis_modes.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -167,9 +170,112 @@ describe('renderDataCompletenessReport', () => {
   });
 });
 
+describe('renderImprovementPlan', () => {
+  // Local fixture: resolves one issue type to a dispute/compensating-control playbook
+  const PLAYBOOK_LOOKUP = (issueType) =>
+    issueType === 'tlscert_expired'
+      ? { slug: 'tlscert-expired', title: 'Expired TLS certificates' }
+      : null;
+
+  test('minimal mode uses correct grade thresholds (A=90, not 80)', () => {
+    assert.equal(GRADE_THRESHOLDS.A, 90);
+    assert.equal(GRADE_THRESHOLDS.B, 80);
+    assert.equal(GRADE_THRESHOLDS.C, 70);
+    const out = renderImprovementPlan('example.com', 82, 'A', '90-days', FACTOR_BREAKDOWN, 'minimal', { generatedAt: GENERATED_AT });
+    assert.match(out, /8 point/, 'gap to A should be 90-82=8 points');
+    assert.match(out, /90/, 'A threshold (90) not shown');
+  });
+
+  test('minimal mode ranks quick wins by score impact, not critical count alone', () => {
+    const out = renderImprovementPlan('example.com', 82, 'A', '90-days', FACTOR_BREAKDOWN, 'minimal', { generatedAt: GENERATED_AT });
+    assert.ok(out.includes('service_rdp'), 'highest-impact issue type (service_rdp, -4.0) missing from quick wins');
+  });
+
+  test('minimal mode reports when target grade is already met', () => {
+    const out = renderImprovementPlan('example.com', 93, 'A', '90-days', FACTOR_BREAKDOWN, 'minimal', { generatedAt: GENERATED_AT });
+    assert.match(out, /already|achieved|meets/i, 'no already-at-target message');
+    assert.ok(!/-\d+ point/.test(out), 'negative gap leaked into output');
+  });
+
+  test('standard mode ranks issue types by |score impact| with no placeholder', () => {
+    const out = renderImprovementPlan('example.com', 82, 'A', '90-days', FACTOR_BREAKDOWN, 'standard', { generatedAt: GENERATED_AT, playbookLookup: PLAYBOOK_LOOKUP });
+    assert.ok(!out.includes('would continue here'), 'placeholder text still present');
+    const rdp = out.indexOf('service_rdp');
+    const spf = out.indexOf('spf_record_missing');
+    assert.ok(rdp !== -1 && spf !== -1, 'expected issue types missing');
+    assert.ok(rdp < spf, 'service_rdp (-4.0) should rank above spf_record_missing (-2.1)');
+  });
+
+  test('standard mode shows cumulative recoverable impact with curved-scoring caveat', () => {
+    const out = renderImprovementPlan('example.com', 82, 'A', '90-days', FACTOR_BREAKDOWN, 'standard', { generatedAt: GENERATED_AT, playbookLookup: PLAYBOOK_LOOKUP });
+    assert.match(out, /11\.6|cumulative/i, 'cumulative impact missing');
+    assert.match(out, /curved|approximat|directional/i, 'curved-scoring caveat missing');
+  });
+
+  test('standard mode classifies dispute route via playbook lookup', () => {
+    const out = renderImprovementPlan('example.com', 82, 'A', '90-days', FACTOR_BREAKDOWN, 'standard', { generatedAt: GENERATED_AT, playbookLookup: PLAYBOOK_LOOKUP });
+    assert.ok(out.includes('tlscert-expired'), 'playbook slug for dispute route missing');
+    assert.match(out, /dispute/i, 'dispute route label missing');
+    assert.match(out, /remediate/i, 'remediate route label missing for issues without playbooks');
+  });
+
+  test('standard mode works without a playbook lookup', () => {
+    const out = renderImprovementPlan('example.com', 82, 'A', '90-days', FACTOR_BREAKDOWN, 'standard', { generatedAt: GENERATED_AT });
+    assert.match(out, /remediate/i);
+    assert.ok(!out.includes('undefined'), 'undefined leaked into output');
+  });
+
+  test('detailed mode includes all issue types, phased roadmap, hint, and footer', () => {
+    const out = renderImprovementPlan('example.com', 82, 'A', '90-days', FACTOR_BREAKDOWN, 'detailed', { generatedAt: GENERATED_AT, playbookLookup: PLAYBOOK_LOOKUP });
+    assert.ok(out.includes('service_smtp'), 'low-impact issue type missing from detailed output');
+    assert.match(out, /phase/i, 'phased roadmap missing');
+    assert.match(out, /90-days/, 'timeline not echoed');
+    assert.ok(out.includes('query_security_data'), 'drill-down chaining hint missing');
+    assert.match(out, /\*Generated: .*2026/, 'metadata footer missing');
+  });
+
+  test('gap to a lower target grade already met is not negative', () => {
+    const out = renderImprovementPlan('example.com', 82, 'B', '90-days', FACTOR_BREAKDOWN, 'standard', { generatedAt: GENERATED_AT });
+    assert.match(out, /already|achieved|meets/i);
+    assert.ok(!/-\d+ point/.test(out), 'negative gap leaked into output');
+  });
+});
+
+describe('renderAssetInventory', () => {
+  test('minimal mode keeps terse format', () => {
+    const out = renderAssetInventory('example.com', INVENTORY, true, 'minimal', { generatedAt: GENERATED_AT });
+    assert.match(out, /4 assets: 2 domains, 2 IPs/);
+    assert.match(out, /9 issues/);
+  });
+
+  test('standard mode shows summary stats and worst performer, no placeholder', () => {
+    const out = renderAssetInventory('example.com', INVENTORY, true, 'standard', { generatedAt: GENERATED_AT });
+    assert.ok(!out.includes('would be listed here'), 'placeholder text still present');
+    assert.match(out, /77/, 'average score missing');
+    assert.ok(out.includes('203.0.113.11'), 'worst performer missing');
+  });
+
+  test('include_risk_details=false omits per-asset risk annotations', () => {
+    const withRisk = renderAssetInventory('example.com', INVENTORY, true, 'detailed', { generatedAt: GENERATED_AT });
+    const withoutRisk = renderAssetInventory('example.com', INVENTORY, false, 'detailed', { generatedAt: GENERATED_AT });
+    assert.ok(withRisk.includes('score 65'), 'risk details missing when requested');
+    assert.ok(!withoutRisk.includes('score 65'), 'risk details present despite include_risk_details=false');
+  });
+
+  test('detailed mode lists every asset and includes footer', () => {
+    const out = renderAssetInventory('example.com', INVENTORY, true, 'detailed', { generatedAt: GENERATED_AT });
+    for (const name of ['www.example.com', 'mail.example.com', '203.0.113.10', '203.0.113.11']) {
+      assert.ok(out.includes(name), `asset ${name} missing from detailed inventory`);
+    }
+    assert.match(out, /\*Generated: .*2026/, 'metadata footer missing');
+  });
+});
+
 describe('placeholder regression guard', () => {
   test('src/index.ts contains no placeholder response text', () => {
     const src = readFileSync(path.join(repoRoot, 'src/index.ts'), 'utf8');
-    assert.ok(!src.includes('would be provided here'), 'placeholder stub text still in src/index.ts');
+    for (const marker of ['would be provided here', 'would continue here', 'would be listed here']) {
+      assert.ok(!src.includes(marker), `placeholder stub text "${marker}" still in src/index.ts`);
+    }
   });
 });

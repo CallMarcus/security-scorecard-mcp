@@ -141,6 +141,159 @@ export function renderEmailSecurityAnalysis(
   return out + footer(options);
 }
 
+export type TargetGrade = 'A' | 'B' | 'C';
+export type Timeline = '30-days' | '90-days' | '6-months';
+
+// SecurityScorecard letter-grade floors (verified against platform reports:
+// a score of 93 grades as A, so A starts at 90, not 80).
+export const GRADE_THRESHOLDS: Record<TargetGrade, number> = { A: 90, B: 80, C: 70 };
+
+/** Resolves an issue-type ID to a dispute/compensating-control playbook, if one covers it. */
+export type PlaybookLookup = (issueType: string) => { slug: string; title?: string } | null;
+
+export interface ImprovementPlanOptions extends RenderOptions {
+  playbookLookup?: PlaybookLookup;
+}
+
+interface RankedIssue extends FindingEntry {
+  route: string;
+}
+
+function rankIssuesByImpact(factorBreakdown: FactorSummary[], lookup?: PlaybookLookup): RankedIssue[] {
+  return sortByImpact(factorBreakdown.flatMap(f => f.issues)).map(issue => {
+    const playbook = lookup?.(issue.issue_type ?? '') ?? null;
+    return {
+      ...issue,
+      route: playbook
+        ? `dispute/compensating-control (playbook: \`${playbook.slug}\`)`
+        : 'remediate'
+    };
+  });
+}
+
+const CURVED_SCORING_CAVEAT =
+  '> ⚠️ SSC scoring is curved/normalised — summed impacts are directional approximations, not a guaranteed score change. Re-check the score after each remediation lands.';
+
+export function renderImprovementPlan(
+  domain: string,
+  currentScore: number,
+  targetGrade: TargetGrade,
+  timeline: Timeline,
+  factorBreakdown: FactorSummary[],
+  mode: ResponseMode,
+  options: ImprovementPlanOptions = {}
+): string {
+  const threshold = GRADE_THRESHOLDS[targetGrade];
+  const gap = Math.max(0, threshold - currentScore);
+  const ranked = rankIssuesByImpact(factorBreakdown, options.playbookLookup);
+
+  if (mode === 'minimal') {
+    const top = ranked.slice(0, 3)
+      .map(issue => `${issue.issue_type} (${(issue.total_score_impact ?? 0).toFixed(1)})`)
+      .join(', ');
+    const gapNote = gap > 0
+      ? `Gap to grade ${targetGrade} (${threshold}+): ${gap} point(s) from ${currentScore}.`
+      : `Grade ${targetGrade} threshold (${threshold}+) already met at ${currentScore}.`;
+    return `${gapNote} Top score impact: ${top || 'no open issues'}`;
+  }
+
+  let out = `# 🎯 Security Improvement Plan: ${domain}\n\n`;
+  out += `**Current score:** ${currentScore}/100 | **Target:** grade ${targetGrade} (${threshold}+) | **Timeline:** ${timeline}\n`;
+  out += gap > 0
+    ? `**Gap:** ${gap} point(s)\n\n`
+    : `**Gap:** none — target grade already met (focus below on protecting the score)\n\n`;
+
+  if (ranked.length === 0) {
+    out += 'No open issues found — nothing to remediate.\n';
+    return out + footer(options);
+  }
+
+  const limit = mode === 'standard' ? 8 : Number.POSITIVE_INFINITY;
+  const shown = ranked.slice(0, limit);
+
+  out += `## Issue types ranked by score impact\n`;
+  out += shown
+    .map(issue => `${issueLine(issue, true)} (factor: ${issue.factor}) — route: ${issue.route}`)
+    .join('\n');
+  if (ranked.length > shown.length) {
+    out += `\n- …and ${ranked.length - shown.length} more issue type(s) (use detailed mode)`;
+  }
+  out += '\n\n';
+
+  const cumulative = shown.reduce((sum, issue) => sum + (issue.total_score_impact ?? 0), 0);
+  out += `**Cumulative recoverable impact (top ${shown.length}):** ${Math.abs(cumulative).toFixed(1)} point(s)\n\n`;
+  out += `${CURVED_SCORING_CAVEAT}\n\n`;
+
+  if (mode === 'detailed') {
+    const phaseSize = Math.max(1, Math.ceil(ranked.length / 3));
+    const phases: Array<[string, RankedIssue[]]> = [
+      ['Phase 1 — immediate (highest impact)', ranked.slice(0, phaseSize)],
+      ['Phase 2 — near-term', ranked.slice(phaseSize, phaseSize * 2)],
+      ['Phase 3 — ongoing hygiene', ranked.slice(phaseSize * 2)]
+    ];
+    out += `## Phased roadmap (${timeline})\n`;
+    for (const [title, issues] of phases) {
+      if (issues.length === 0) continue;
+      out += `### ${title}\n`;
+      out += issues.map(issue => `- \`${issue.issue_type}\` — ${issue.route}`).join('\n');
+      out += '\n';
+    }
+    out += '\n';
+  }
+
+  out += DRILLDOWN_HINT;
+  return out + footer(options);
+}
+
+function assetLine(asset: { asset_name: string; score?: number; issues_count: number; critical_issues: number; high_issues: number }, withRisk: boolean): string {
+  if (!withRisk) return `- ${asset.asset_name}`;
+  return `- ${asset.asset_name} — score ${asset.score ?? 'n/a'}, ${asset.issues_count} issue(s) (${asset.critical_issues} critical, ${asset.high_issues} high)`;
+}
+
+export function renderAssetInventory(
+  domain: string,
+  inventory: AssetInventory,
+  includeRiskDetails: boolean,
+  mode: ResponseMode,
+  options: RenderOptions = {}
+): string {
+  const domainCount = inventory.domains.length;
+  const ipCount = inventory.ip_addresses.length;
+  const totalAssets = domainCount + ipCount;
+  const totalIssues = inventory.domains.reduce((sum, d) => sum + d.issues_count, 0)
+    + inventory.ip_addresses.reduce((sum, ip) => sum + ip.issues_count, 0);
+
+  if (mode === 'minimal') {
+    return `${totalAssets} assets: ${domainCount} domains, ${ipCount} IPs (${totalIssues} issues)${totalAssets > 50 ? ' ⚠️ Possible incomplete data' : ''}`;
+  }
+
+  let out = `# 🔍 Asset Inventory: ${domain}\n\n`;
+  out += `**Domains:** ${domainCount} | **IP addresses:** ${ipCount} | **Total issues:** ${totalIssues}\n`;
+  if (includeRiskDetails) {
+    out += `**Average asset score:** ${inventory.summary.avg_score}\n`;
+  }
+  out += '\n';
+
+  if (includeRiskDetails) {
+    const worst = inventory.summary.worst_performers[0];
+    const best = inventory.summary.best_performers[0];
+    if (worst) out += `**Worst performer:** ${worst.asset_name} (score ${worst.score ?? 'n/a'}, ${worst.critical_issues} critical)\n`;
+    if (best) out += `**Best performer:** ${best.asset_name} (score ${best.score ?? 'n/a'})\n`;
+    out += '\n';
+  }
+
+  if (mode === 'detailed') {
+    out += `## Domains (${domainCount})\n`;
+    out += inventory.domains.map(a => assetLine(a, includeRiskDetails)).join('\n') || '- none found';
+    out += `\n\n## IP addresses (${ipCount})\n`;
+    out += inventory.ip_addresses.map(a => assetLine(a, includeRiskDetails)).join('\n') || '- none found';
+    out += '\n\n';
+    out += '**Cross-check:** run `validate_data_completeness` with an expected asset count to verify this inventory is complete.\n';
+  }
+
+  return out + footer(options);
+}
+
 export function renderDataCompletenessReport(
   domain: string,
   inventory: AssetInventory,
