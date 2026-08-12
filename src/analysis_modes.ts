@@ -1,5 +1,5 @@
 /**
- * Response-mode rendering for analysis tools (issue #15).
+ * Response-mode rendering for analysis tools.
  *
  * Pure functions: they take data already fetched by the tool handlers in
  * src/index.ts and render minimal/standard/detailed markdown. Keeping them

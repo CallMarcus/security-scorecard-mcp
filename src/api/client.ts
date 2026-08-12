@@ -72,7 +72,7 @@ export class SecurityScorecardApiClient {
   }
 
   /**
-   * Fetch every page of a paginated list endpoint (issue #17).
+   * Fetch every page of a paginated list endpoint.
    *
    * Styles (see paginationStyleFor): 'page' sends 0-based `page` +
    * `page-size`; 'size-page' sends 1-based `page` + `size`. Both endpoint

@@ -76,7 +76,7 @@ export function isValidIP(str: string): boolean {
 }
 
 /**
- * Get comprehensive asset inventory from the Digital Footprint API (issue #17).
+ * Get comprehensive asset inventory from the Digital Footprint API.
  *
  * The footprint assets endpoints return per-asset issue-type counts, finding
  * counts and summed score impact directly, so no per-asset enrichment calls

@@ -262,7 +262,7 @@ describe('renderAssetInventory', () => {
     assert.ok(!withoutRisk.includes('score 65'), 'risk details present despite include_risk_details=false');
   });
 
-  // Shape produced by the footprint-backed getAssetInventory rewrite (issue #17)
+  // Shape produced by the footprint-backed getAssetInventory rewrite
   const INVENTORY_V2 = {
     parent_domain: 'example.com',
     total_assets: 2,
