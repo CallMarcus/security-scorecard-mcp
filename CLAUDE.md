@@ -126,7 +126,7 @@ Tools implement 3 tiers: **minimal** (15-50 tokens, no headers), **standard** (2
 
 ## Dependencies
 
-**Runtime:** `@modelcontextprotocol/sdk` ^1.29.0, `@huggingface/transformers` ^4.2.0, `dotenv` ^17.4.1, `zod` ^4.3.6
+**Runtime:** `@modelcontextprotocol/sdk` ^1.29.0, `@huggingface/transformers` ^4.2.0, `zod` ^4.3.6
 
 **Dev:** `esbuild` ^0.28.0, `typescript` ^7.0.2, `@types/node` ^26.1.1
 

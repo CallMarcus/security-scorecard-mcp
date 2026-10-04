@@ -39,9 +39,8 @@
     "test:validation": "npm run test"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.29.0",
     "@huggingface/transformers": "^4.2.0",
-    "dotenv": "^17.4.1",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "zod": "^4.3.6"
   },
   "engines": {
