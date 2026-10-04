@@ -54,7 +54,7 @@ class SecurityScorecardServer {
   buildServer(): McpServer {
     const server = new McpServer({
       name: "SSC MCP Server",
-      version: "1.2.0"
+      version: "2.0.0"
     });
     this.setupTools(server);
     return server;
