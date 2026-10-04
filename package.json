@@ -40,7 +40,7 @@
   },
   "dependencies": {
     "@huggingface/transformers": "^4.2.0",
-    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@modelcontextprotocol/server": "^2.3.0",
     "zod": "^4.3.6"
   },
   "engines": {
