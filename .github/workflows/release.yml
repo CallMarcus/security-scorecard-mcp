@@ -16,12 +16,24 @@
 # via PR to main, then:
 #   git checkout main && git pull
 #   git tag vX.Y.Z && git push origin vX.Y.Z
+#
+# RE-RUNNING: every publish step is idempotent (skips what already exists), so
+# a partial failure can be finished with a manual dispatch for the same tag:
+#   gh workflow run release.yml -f tag=vX.Y.Z
+# The v2.0.0 release needed this: npm publish succeeded but the registry step
+# ran one second later, before npm served the new version, and 404'd.
 
 name: Release
 
 on:
   push:
     tags: ["v*.*.*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing release tag to (re)publish, e.g. v2.0.0"
+        required: true
+        type: string
 
 jobs:
   release:
@@ -29,9 +41,16 @@ jobs:
     permissions:
       id-token: write   # OIDC for both npm trusted publishing and the MCP registry
       contents: write   # create the GitHub Release
+    env:
+      # The tag being released: from the push for tag pushes, from the input
+      # for manual re-runs.
+      TAG_NAME: ${{ inputs.tag || github.ref_name }}
+      PACKAGE: "@callmarcus/securityscorecard-mcp"
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag || github.ref_name }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v7
@@ -51,7 +70,7 @@ jobs:
       # commit can never ship.
       - name: Verify tag matches package versions
         run: |
-          TAG="${GITHUB_REF_NAME#v}"
+          TAG="${TAG_NAME#v}"
           PKG="$(node -p "require('./package.json').version")"
           SRV="$(node -p "require('./server.json').version")"
           echo "tag=$TAG  package.json=$PKG  server.json=$SRV"
@@ -66,8 +85,31 @@ jobs:
 
       # No NODE_AUTH_TOKEN: OIDC trusted publishing authenticates via id-token.
       # npm auto-attaches build provenance for public repo + public package.
+      # Skipped when the version is already on npm so a re-run can get past it.
       - name: Publish to npm
-        run: npm publish --access public
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          if npm view "$PACKAGE@$VERSION" version >/dev/null 2>&1; then
+            echo "::notice::$PACKAGE@$VERSION is already on npm, skipping publish"
+          else
+            npm publish --access public
+          fi
+
+      # The MCP registry validates that the npm version exists before it accepts
+      # the entry. A fresh publish can take a little while to be served, so poll
+      # rather than racing it.
+      - name: Wait for npm to serve the version
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          for attempt in $(seq 1 30); do
+            if npm view "$PACKAGE@$VERSION" version >/dev/null 2>&1; then
+              echo "$PACKAGE@$VERSION visible on npm (attempt $attempt)"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::$PACKAGE@$VERSION not served by npm after 5 minutes"
+          exit 1
 
       - name: Install mcp-publisher
         run: |
@@ -81,4 +123,9 @@ jobs:
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes --latest
+        run: |
+          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
+            echo "::notice::GitHub Release $TAG_NAME already exists, skipping"
+          else
+            gh release create "$TAG_NAME" --title "$TAG_NAME" --generate-notes --latest
+          fi
