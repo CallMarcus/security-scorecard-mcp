@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { McpServer } from "@modelcontextprotocol/server";
+import { serveStdio } from "@modelcontextprotocol/server/stdio";
 import { getFindingsByCategory } from "./get_findings_by_category.js";
 import { getAssetInventory } from "./asset_management.js";
 import { renderIssueTypeAnalysis, renderEmailSecurityAnalysis, renderDataCompletenessReport, renderImprovementPlan, renderAssetInventory } from "./analysis_modes.js";
@@ -16,7 +16,6 @@ interface SecurityScorecardConfig {
 }
 
 class SecurityScorecardServer {
-  private server: McpServer;
   private client: any;
   private config: SecurityScorecardConfig;
   private apiReferenceClient: ApiReferenceClient;
@@ -30,11 +29,6 @@ class SecurityScorecardServer {
   };
 
   constructor() {
-    this.server = new McpServer({
-      name: "SSC MCP Server",
-      version: "1.2.0"
-    });
-
     this.config = {
       apiToken: process.env.SECURITY_SCORECARD_API_TOKEN || process.env.SECURITY_SCORECARD_TOKEN || "",
       defaultDomain: process.env.COMPANY_DOMAIN || "example.com"
@@ -49,16 +43,29 @@ class SecurityScorecardServer {
     
     // Initialize API reference client for endpoint discovery
     this.apiReferenceClient = new ApiReferenceClient();
-    
-    this.setupTools();
   }
 
-  private setupTools() {
+  /**
+   * Factory for serveStdio: one fresh McpServer per connection. The opening
+   * exchange pins the connection to a 2025-era or 2026-07-28 instance, so the
+   * instance must not be shared. The API client, config and reference index
+   * live on this class and are shared across instances.
+   */
+  buildServer(): McpServer {
+    const server = new McpServer({
+      name: "SSC MCP Server",
+      version: "1.2.0"
+    });
+    this.setupTools(server);
+    return server;
+  }
+
+  private setupTools(server: McpServer) {
     // Register security_dashboard tool - Enhanced with MCP 2025-06-18 schema
-    this.server.registerTool("security_dashboard", {
+    server.registerTool("security_dashboard", {
       title: "Security Dashboard Overview",
       description: "📊 SECURITY STATUS: Get comprehensive security score, grade, and key metrics with intelligent response modes. Supports minimal responses for quick queries and detailed analysis for comprehensive security overviews.",
-      inputSchema: {
+      inputSchema: z.object({
         domain: z.string()
           .min(1, "Domain is required")
           .describe("Company domain to analyze (e.g., example.com)")
@@ -66,7 +73,7 @@ class SecurityScorecardServer {
         response_mode: z.enum(["minimal", "standard", "detailed"])
           .describe("Response detail level: minimal (10-20 tokens), standard (200-300 tokens), detailed (800+ tokens)")
           .default("minimal")
-      }
+      }),
     }, async (args) => {
       const { domain, response_mode = "minimal" } = args;
       
@@ -132,10 +139,10 @@ class SecurityScorecardServer {
     });
 
     // Register analyze_security_risks tool - Enhanced with MCP 2025-06-18 schema  
-    this.server.registerTool("analyze_security_risks", {
+    server.registerTool("analyze_security_risks", {
       title: "Security Risk Analysis & Prioritization", 
       description: "🚨 SECURITY RISKS: Comprehensive security risk analysis with intelligent prioritization. Analyzes critical vulnerabilities, risk patterns, and provides actionable remediation guidance with flexible response modes.",
-      inputSchema: {
+      inputSchema: z.object({
         domain: z.string()
           .min(1, "Domain is required")
           .describe("Company domain to analyze (e.g., example.com)")
@@ -146,7 +153,7 @@ class SecurityScorecardServer {
         response_mode: z.enum(["minimal", "standard", "detailed"])
           .describe("Response detail level: minimal (50-100 tokens), standard (300-500 tokens), detailed (comprehensive)")
           .default("minimal")
-      }
+      }),
     }, async (args) => {
       const { domain, focus = "all", response_mode = "minimal" } = args;
       
@@ -199,20 +206,20 @@ class SecurityScorecardServer {
     });
 
     // Register remaining tools with similar pattern...
-    this.registerRemainingTools();
+    this.registerRemainingTools(server);
   }
 
-  private registerRemainingTools() {
+  private registerRemainingTools(server: McpServer) {
     // Register create_improvement_plan tool
-    this.server.registerTool("create_improvement_plan", {
+    server.registerTool("create_improvement_plan", {
       title: "Security Improvement Plan",
       description: "🎯 IMPROVEMENT PLAN: Generate security improvement recommendations. INTELLIGENT RESPONSES: Use 'minimal' for simple questions like 'what should I fix first?' (50-100 tokens). Use 'standard' for improvement summary (300-500 tokens). Use 'detailed' for full roadmap.",
-      inputSchema: {
+      inputSchema: z.object({
         domain: z.string().describe("Company domain to analyze").default(this.config.defaultDomain),
         target_grade: z.enum(["C", "B", "A"]).describe("Target security grade").default("A"),
         timeline: z.enum(["30-days", "90-days", "6-months"]).describe("Timeline for improvement").default("90-days"),
         response_mode: z.enum(["minimal", "standard", "detailed"]).describe("Response detail level").default("minimal")
-      }
+      }),
     }, async (args) => {
       const { domain, target_grade = "A", timeline = "90-days", response_mode = "minimal" } = args;
 
@@ -236,14 +243,14 @@ class SecurityScorecardServer {
     });
 
     // Register discover_assets tool
-    this.server.registerTool("discover_assets", {
+    server.registerTool("discover_assets", {
       title: "Asset Discovery",
       description: "🔍 ASSET INVENTORY: Discover domains and IPs with security context and data completeness validation. INTELLIGENT RESPONSES: Use 'minimal' for simple questions like 'how many assets?' (20-50 tokens). Use 'standard' for asset overview (200-400 tokens). Use 'detailed' for comprehensive inventory.",
-      inputSchema: {
+      inputSchema: z.object({
         domain: z.string().describe("Parent domain to discover assets for").default(this.config.defaultDomain),
         include_risk_details: z.boolean().describe("Include security risk information").default(true),
         response_mode: z.enum(["minimal", "standard", "detailed"]).describe("Response detail level").default("minimal")
-      }
+      }),
     }, async (args) => {
       const { domain, include_risk_details = true, response_mode = "minimal" } = args;
 
@@ -263,13 +270,13 @@ class SecurityScorecardServer {
     });
 
     // Register analyze_email_security tool  
-    this.server.registerTool("analyze_email_security", {
+    server.registerTool("analyze_email_security", {
       title: "Email Security Analysis",
       description: "📧 EMAIL SECURITY: Analyze SPF, DMARC, DKIM issues with domain-by-domain breakdown and cross-validation. INTELLIGENT RESPONSES: Use 'minimal' for simple counts like 'how many SPF missing?' (10-30 tokens). Use 'standard' for email security overview (200-400 tokens). Use 'detailed' for comprehensive email analysis.",
-      inputSchema: {
+      inputSchema: z.object({
         domain: z.string().describe("Company domain to analyze").default(this.config.defaultDomain),
         response_mode: z.enum(["minimal", "standard", "detailed"]).describe("Response detail level").default("minimal")
-      }
+      }),
     }, async (args) => {
       const { domain, response_mode = "minimal" } = args;
       
@@ -290,10 +297,10 @@ class SecurityScorecardServer {
     });
 
     // Register API discovery tool for endpoint search
-    this.server.registerTool("api_discovery", {
+    server.registerTool("api_discovery", {
       title: "SecurityScorecard API Discovery",
       description: "Search and discover SecurityScorecard API endpoints. Returns both human-readable summary and structured JSON for programmatic use.",
-      inputSchema: {
+      inputSchema: z.object({
         query: z.string()
           .min(1, "Search query is required")
           .describe("Search query for API endpoints (e.g., 'security score', 'vulnerabilities', 'company data')"),
@@ -311,7 +318,7 @@ class SecurityScorecardServer {
         include_schema: z.boolean()
           .describe("Include detailed request/response schema for top result")
           .default(false)
-      }
+      }),
     }, async (args) => {
       const { query, tag, method, limit = 8, include_schema = false } = args;
 
@@ -425,20 +432,20 @@ class SecurityScorecardServer {
     });
 
     // Register remaining tools for completeness
-    this.registerAnalysisTools();
-    this.registerUtilityTools();
+    this.registerAnalysisTools(server);
+    this.registerUtilityTools(server);
   }
 
-  private registerAnalysisTools() {
+  private registerAnalysisTools(server: McpServer) {
     // Register analyze_issue_types tool
-    this.server.registerTool("analyze_issue_types", {
+    server.registerTool("analyze_issue_types", {
       title: "Issue Type Analysis",
       description: "🔍 ISSUE BREAKDOWN: Get detailed breakdown of security issues by specific types (SPF, DMARC, patching, etc.). INTELLIGENT RESPONSES: Use 'minimal' for specific counts (20-50 tokens). Use 'standard' for issue type summary (200-300 tokens). Use 'detailed' for comprehensive breakdown.",
-      inputSchema: {
+      inputSchema: z.object({
         domain: z.string().describe("Company domain to analyze").default(this.config.defaultDomain),
         focus_factor: z.enum(["dns_health", "application_security", "network_security", "endpoint_security", "all"]).describe("Focus on specific security factor").default("all"),
         response_mode: z.enum(["minimal", "standard", "detailed"]).describe("Response detail level").default("minimal")
-      }
+      }),
     }, async (args) => {
       const { domain, focus_factor = "all", response_mode = "minimal" } = args;
       
@@ -459,16 +466,16 @@ class SecurityScorecardServer {
     });
   }
 
-  private registerUtilityTools() {
+  private registerUtilityTools(server: McpServer) {
     // Register validate_data_completeness tool
-    this.server.registerTool("validate_data_completeness", {
+    server.registerTool("validate_data_completeness", {
       title: "Data Completeness Validation",
       description: "✅ DATA VALIDATION: Cross-validate tool results for accuracy and completeness. INTELLIGENT RESPONSES: Use 'minimal' for validation status (25 tokens). Use 'standard' for validation summary (200-400 tokens). Use 'detailed' for full data audit.",
-      inputSchema: {
+      inputSchema: z.object({
         domain: z.string().describe("Company domain to validate").default(this.config.defaultDomain),
         expected_asset_count: z.number().describe("Expected number of assets for validation").optional(),
         response_mode: z.enum(["minimal", "standard", "detailed"]).describe("Response detail level").default("minimal")
-      }
+      }),
     }, async (args) => {
       const { domain, expected_asset_count, response_mode = "minimal" } = args;
       
@@ -488,16 +495,16 @@ class SecurityScorecardServer {
     });
 
     // Register query_security_data tool
-    this.server.registerTool("query_security_data", {
+    server.registerTool("query_security_data", {
       title: "Security Data Query",
       description: "Direct API access with smart endpoint validation. Uses API discovery to validate endpoints, suggest alternatives, and provide parameter hints.",
-      inputSchema: {
+      inputSchema: z.object({
         endpoint: z.string().describe("API endpoint to query (e.g., /companies/{domain}/factors)"),
         domain: z.string().describe("Domain to use in endpoint").default(this.config.defaultDomain),
         method: z.enum(["GET", "POST", "PUT", "DELETE"]).describe("HTTP method").default("GET"),
         validate_only: z.boolean().describe("Only validate endpoint without calling API").default(false),
         fetch_all: z.boolean().describe("Follow pagination and return every page of a GET list endpoint (capped at 20 pages; a truncation notice is added if the cap is hit)").default(false)
-      }
+      }),
     }, async (args) => {
       const { endpoint, domain, method = "GET", validate_only = false, fetch_all = false } = args;
 
@@ -600,13 +607,12 @@ class SecurityScorecardServer {
     });
   }
 
-  async start() {
-    const transport = new StdioServerTransport();
-    await this.server.connect(transport);
+  start() {
+    serveStdio(() => this.buildServer());
     console.error("SSC MCP Server running");
   }
 }
 
 // Start the server
-const server = new SecurityScorecardServer();
-server.start().catch(console.error);
+const app = new SecurityScorecardServer();
+app.start();

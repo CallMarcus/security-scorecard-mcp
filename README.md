@@ -3,7 +3,7 @@
 [![npm version](https://img.shields.io/npm/v/@callmarcus/securityscorecard-mcp.svg)](https://www.npmjs.com/package/@callmarcus/securityscorecard-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-A community-built, comprehensive Model Context Protocol (MCP) server that integrates with the [SecurityScorecard API](https://securityscorecard.readme.io/). It runs over stdio, so it works with any MCP-compatible client — Claude Desktop, Claude Code, Cursor, VS Code, and others.
+A community-built, comprehensive Model Context Protocol (MCP) server that integrates with the [SecurityScorecard API](https://securityscorecard.readme.io/). It runs over stdio, so it works with any MCP-compatible client — Claude Desktop, Claude Code, Cursor, VS Code, and others. It serves MCP protocol revision 2026-07-28 and stays compatible with 2025-era clients.
 
 > Published on npm as [`@callmarcus/securityscorecard-mcp`](https://www.npmjs.com/package/@callmarcus/securityscorecard-mcp) and listed in the [MCP Registry](https://registry.modelcontextprotocol.io) as `io.github.CallMarcus/securityscorecard-mcp`.
 

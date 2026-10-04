@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a Model Context Protocol (MCP) server that integrates with the SecurityScorecard REST API for **operational security work** - managing findings, analyzing issues, and working with security data.
 
-The server (`src/index.ts`) provides **9 specialized tools** for operational workflows with 90% token reduction, using the MCP SDK v1.29.0+ with the modern `McpServer` API.
+The server (`src/index.ts`) provides **9 specialized tools** for operational workflows with 90% token reduction, using the MCP TypeScript SDK v2 (`@modelcontextprotocol/server`), serving protocol revision 2026-07-28 alongside the 2025-era `initialize` handshake.
 
 ## Current Setup
 
@@ -112,7 +112,7 @@ This system helps find the correct syntax for complex SecurityScorecard API call
 **Use API discovery when** the 9 specialized tools don't cover your needs, or you're unsure of endpoint syntax/parameters.
 
 **4. MCP Server Implementation Pattern**
-The server uses `McpServer` + `registerTool()` with Zod input schemas and `StdioServerTransport`. See `src/index.ts` for the canonical pattern.
+The server uses `McpServer` + `registerTool()` with `z.object()` input schemas, built by a factory and served via `serveStdio(() => buildServer())`. One `McpServer` instance is pinned per connection (the opening exchange picks the 2025 or 2026-07-28 era); the API client and reference index are shared across instances. See `src/index.ts` for the canonical pattern.
 
 ### Type Definitions
 
@@ -126,7 +126,7 @@ Tools implement 3 tiers: **minimal** (15-50 tokens, no headers), **standard** (2
 
 ## Dependencies
 
-**Runtime:** `@modelcontextprotocol/sdk` ^1.29.0, `@huggingface/transformers` ^4.2.0, `zod` ^4.3.6
+**Runtime:** `@modelcontextprotocol/server` ^2.3.0, `@huggingface/transformers` ^4.2.0, `zod` ^4.3.6
 
 **Dev:** `esbuild` ^0.28.0, `typescript` ^7.0.2, `@types/node` ^26.1.1
 
