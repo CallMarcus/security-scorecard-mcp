@@ -2,7 +2,7 @@
 
 - **Method:** `GET`
 - **Path:** `/apps/jira/installation-error`
-- **Tag:** `jira`
+- **Tag:** `itsm`
 - **operationId:** `get_apps-jira-installation-error`
 
 ## Description

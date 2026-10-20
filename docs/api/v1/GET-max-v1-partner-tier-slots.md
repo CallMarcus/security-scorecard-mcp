@@ -46,7 +46,7 @@ Tier slots information for the partner
           },
           "list_price": {
             "type": "string",
-            "description": "Per-tier list price in USD as an exact decimal string; omitted when unset"
+            "description": "Per-tier list price in USD per vendor per year, as an exact decimal string; omitted when unset"
           },
           "discount_pct": {
             "type": "string",

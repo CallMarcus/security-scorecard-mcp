@@ -2,7 +2,7 @@
 
 - **Method:** `GET`
 - **Path:** `/apps/jira/redirect-from-ssc`
-- **Tag:** `jira`
+- **Tag:** `itsm`
 - **operationId:** `get_apps-jira-redirect-from-ssc`
 
 ## Description

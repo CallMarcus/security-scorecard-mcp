@@ -110,6 +110,30 @@ Gets the vendor details
     "score": {
       "type": "number",
       "description": "Vendor score"
+    },
+    "trust_center_eligible": {
+      "type": "boolean",
+      "description": "Partner vendor list only. True when the vendor has questionnaire evidence in its Evidence Locker AND at least one contact on its own domain. Absent for every vendor while MAX_VENDOR_TRUST_CENTER is off."
+    },
+    "trust_center_reason": {
+      "type": "string",
+      "description": "Partner vendor list only. Why the vendor is not eligible. Empty when it is. Tells the analyst whether to wait for evidence or to go and find a corporate contact."
+    },
+    "trust_center_evidence_count": {
+      "type": "integer",
+      "description": "Partner vendor list only. Questionnaire evidence items the vendor owns, as of the last daily snapshot. Zero while the check is unavailable \u2014 read trustCenterEvidenceCheck before believing it."
+    },
+    "trust_center_evidence_check": {
+      "type": "string",
+      "enum": [
+        "resolved",
+        "unavailable"
+      ],
+      "description": "Partner vendor list only. Whether the evidence question could be answered. \"unavailable\" means the snapshot is missing or stale, which is NOT the same as a vendor having nothing; no vendor is eligible while it is unavailable."
+    },
+    "trust_center_questionnaire_count": {
+      "type": "integer",
+      "description": "Partner vendor list only. Questionnaires the partner customers have sent this vendor. Context only \u2014 it decides nothing. A high count beside a zero evidence count is a vendor that answered and attached nothing."
     }
   },
   "required": [

@@ -1,12 +1,12 @@
-# Get "alleged_breach_incident" historical issues in
+# Get "service_neo4j" historical issues in a scoreca
 
 - **Method:** `GET`
-- **Path:** `/companies/{scorecard_identifier}/history/events/{effective_date}/issues/alleged_breach_incident/`
+- **Path:** `/companies/{scorecard_identifier}/history/events/{effective_date}/issues/service_neo4j/`
 - **Tag:** `historical findings`
-- **operationId:** `get_companies-scorecard-identifier-history-events-effective-date-issues-alleged-breach-incident`
+- **operationId:** `get_companies-scorecard-identifier-history-events-effective-date-issues-service-neo4j`
 
 ## Description
-Get "alleged_breach_incident" historical issues in a scorecard
+Get "service_neo4j" historical issues in a scorecard
 
 ## Path Parameters
 - `scorecard_identifier` (**required**) — find entries where 'scorecard_identifier' equals a string
@@ -22,7 +22,7 @@ Get "alleged_breach_incident" historical issues in a scorecard
 
 ## Responses
 ### 200
-A page in a list of HistoricalAllegedBreachIncidents
+A page in a list of HistoricalServiceNeo4JS
 ```json
 {
   "type": "object",
@@ -36,11 +36,11 @@ A page in a list of HistoricalAllegedBreachIncidents
             "type": "string",
             "format": "uuid",
             "pattern": "^[a-z0-9-]{16,}$",
-            "description": "Unique UUID for this measurement."
+            "description": ""
           },
           "parent_domain": {
             "type": "string",
-            "description": "Parent domain aka vendor."
+            "description": ""
           },
           "feedback": {
             "type": "array",
@@ -92,26 +92,63 @@ A page in a list of HistoricalAllegedBreachIncidents
             "type": "string",
             "format": "date-time",
             "pattern": "^\\d{4}-\\d{2}-\\d{2}[T ]\\d{2}:\\d{2}:\\d{2}\\.{0,1}[0-9]*Z$",
-            "description": "Epoch of observation in nanoseconds."
+            "description": ""
           },
           "last_seen_time": {
             "type": "string",
             "format": "date-time",
             "pattern": "^\\d{4}-\\d{2}-\\d{2}[T ]\\d{2}:\\d{2}:\\d{2}\\.{0,1}[0-9]*Z$",
-            "description": "Epoch of observation in nanoseconds."
+            "description": ""
           },
-          "description": {
+          "product_name": {
             "type": "string",
             "description": ""
           },
-          "breach_sources": {
-            "type": "array",
-            "items": {
-              "type": "string"
+          "product_version": {
+            "type": "string",
+            "description": ""
+          },
+          "banner": {
+            "type": "string",
+            "description": ""
+          },
+          "connection_attributes": {
+            "type": "object",
+            "properties": {
+              "protocol": {
+                "type": "string"
+              },
+              "src_ip": {
+                "type": "string"
+              },
+              "src_port": {
+                "type": "integer"
+              },
+              "src_host": {
+                "type": "string"
+              },
+              "dst_ip": {
+                "type": "string"
+              },
+              "dst_port": {
+                "type": "integer"
+              },
+              "dst_host": {
+                "type": "string"
+              }
             },
+            "additionalProperties": false,
             "description": ""
           },
           "reason": {
+            "type": "string",
+            "description": ""
+          },
+          "evidence1": {
+            "type": "string",
+            "description": ""
+          },
+          "evidence2": {
             "type": "string",
             "description": ""
           },
@@ -127,7 +164,7 @@ A page in a list of HistoricalAllegedBreachIncidents
           }
         },
         "additionalProperties": false,
-        "description": "\"alleged_breach_incident\" historical issues in a scorecard"
+        "description": "\"service_neo4j\" historical issues in a scorecard"
       }
     }
   },
@@ -135,14 +172,14 @@ A page in a list of HistoricalAllegedBreachIncidents
   "required": [
     "entries"
   ],
-  "description": "A page in a list of HistoricalAllegedBreachIncidents"
+  "description": "A page in a list of HistoricalServiceNeo4JS"
 }
 ```
 
 ## Example cURL Request
 ```bash
 curl -X GET \
-  'https://api.securityscorecard.io//companies/<scorecard_identifier>/history/events/<effective_date>/issues/alleged_breach_incident/' \
+  'https://api.securityscorecard.io//companies/<scorecard_identifier>/history/events/<effective_date>/issues/service_neo4j/' \
   -H 'Authorization: Token <YOUR_API_TOKEN>'
 ```
 

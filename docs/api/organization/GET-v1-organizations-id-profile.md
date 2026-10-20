@@ -867,6 +867,10 @@ company profile
               },
               "visible": {
                 "type": "boolean"
+              },
+              "gated": {
+                "type": "boolean",
+                "description": "listed publicly, but downloading needs a grant or an access request"
               }
             },
             "additionalProperties": false,

@@ -2,7 +2,7 @@
 
 - **Method:** `GET`
 - **Path:** `/actions/validate-jira-secrets`
-- **Tag:** `jira`
+- **Tag:** `itsm`
 - **operationId:** `get_actions-validate-jira-secrets`
 
 ## Description

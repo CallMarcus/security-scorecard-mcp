@@ -60,8 +60,7 @@ domain schema
           },
           "tags": {
             "type": "array",
-            "description": "array of tag ids",
-            "items": {}
+            "description": "array of tag ids"
           },
           "organization_id": {
             "type": "string",

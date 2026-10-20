@@ -168,7 +168,7 @@ A page in a list of Notifications
           },
           "category": {
             "type": "string",
-            "description": "notification category: standard, prioritized, queued, or customer_contacts"
+            "description": "notification category: standard, prioritized, queued, assessments, vendor_intake, or customer_contacts"
           }
         },
         "additionalProperties": false,
