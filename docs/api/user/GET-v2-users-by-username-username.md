@@ -123,6 +123,19 @@ a person that uses any system at SecurityScorecard
             "enabled"
           ]
         },
+        "intake_submission_notification_email": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "indicates whether to receive emails about new vendor intake submissions"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "enabled"
+          ]
+        },
         "portfolios": {
           "type": "object",
           "properties": {},

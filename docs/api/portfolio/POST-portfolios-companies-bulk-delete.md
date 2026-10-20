@@ -30,6 +30,10 @@ Remove selected companies from selected portfolios
     },
     "isForClearValues": {
       "type": "boolean"
+    },
+    "keepPartialMonitoring": {
+      "type": "boolean",
+      "description": "move companies with no remaining portfolio to partial monitoring instead of removing them from All Companies; ignored when this behavior is not available for the caller's organization"
     }
   },
   "additionalProperties": false,

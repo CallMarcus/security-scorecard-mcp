@@ -1,12 +1,12 @@
-# Get "threat_actor_hosting_infrastructure" historic
+# Get "exposed_mobile_printing_service" historical i
 
 - **Method:** `GET`
-- **Path:** `/companies/{scorecard_identifier}/history/events/{effective_date}/issues/threat_actor_hosting_infrastructure/`
+- **Path:** `/companies/{scorecard_identifier}/history/events/{effective_date}/issues/exposed_mobile_printing_service/`
 - **Tag:** `historical findings`
-- **operationId:** `get_companies-scorecard-identifier-history-events-effective-date-issues-threat-actor-hosting-infrastructure`
+- **operationId:** `get_companies-scorecard-identifier-history-events-effective-date-issues-exposed-mobile-printing-service`
 
 ## Description
-Get "threat_actor_hosting_infrastructure" historical issues in a scorecard
+Get "exposed_mobile_printing_service" historical issues in a scorecard
 
 ## Path Parameters
 - `scorecard_identifier` (**required**) — find entries where 'scorecard_identifier' equals a string
@@ -22,7 +22,7 @@ Get "threat_actor_hosting_infrastructure" historical issues in a scorecard
 
 ## Responses
 ### 200
-A page in a list of HistoricalThreatActorHostingInfrastructures
+A page in a list of HistoricalExposedMobilePrintingServices
 ```json
 {
   "type": "object",
@@ -100,27 +100,55 @@ A page in a list of HistoricalThreatActorHostingInfrastructures
             "pattern": "^\\d{4}-\\d{2}-\\d{2}[T ]\\d{2}:\\d{2}:\\d{2}\\.{0,1}[0-9]*Z$",
             "description": ""
           },
-          "destination_ip": {
+          "product_name": {
             "type": "string",
             "description": ""
           },
-          "destination_port": {
-            "type": "number",
-            "description": ""
-          },
-          "protocol": {
+          "product_version": {
             "type": "string",
             "description": ""
           },
-          "apt_group": {
+          "banner": {
             "type": "string",
             "description": ""
           },
-          "malicious": {
-            "type": "integer",
+          "connection_attributes": {
+            "type": "object",
+            "properties": {
+              "protocol": {
+                "type": "string"
+              },
+              "src_ip": {
+                "type": "string"
+              },
+              "src_port": {
+                "type": "integer"
+              },
+              "src_host": {
+                "type": "string"
+              },
+              "dst_ip": {
+                "type": "string"
+              },
+              "dst_port": {
+                "type": "integer"
+              },
+              "dst_host": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
             "description": ""
           },
           "reason": {
+            "type": "string",
+            "description": ""
+          },
+          "evidence1": {
+            "type": "string",
+            "description": ""
+          },
+          "evidence2": {
             "type": "string",
             "description": ""
           },
@@ -136,7 +164,7 @@ A page in a list of HistoricalThreatActorHostingInfrastructures
           }
         },
         "additionalProperties": false,
-        "description": "\"threat_actor_hosting_infrastructure\" historical issues in a scorecard"
+        "description": "\"exposed_mobile_printing_service\" historical issues in a scorecard"
       }
     }
   },
@@ -144,14 +172,14 @@ A page in a list of HistoricalThreatActorHostingInfrastructures
   "required": [
     "entries"
   ],
-  "description": "A page in a list of HistoricalThreatActorHostingInfrastructures"
+  "description": "A page in a list of HistoricalExposedMobilePrintingServices"
 }
 ```
 
 ## Example cURL Request
 ```bash
 curl -X GET \
-  'https://api.securityscorecard.io//companies/<scorecard_identifier>/history/events/<effective_date>/issues/threat_actor_hosting_infrastructure/' \
+  'https://api.securityscorecard.io//companies/<scorecard_identifier>/history/events/<effective_date>/issues/exposed_mobile_printing_service/' \
   -H 'Authorization: Token <YOUR_API_TOKEN>'
 ```
 

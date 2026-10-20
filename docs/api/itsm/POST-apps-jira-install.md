@@ -2,7 +2,7 @@
 
 - **Method:** `POST`
 - **Path:** `/apps/jira/install`
-- **Tag:** `jira`
+- **Tag:** `itsm`
 - **operationId:** `post_apps-jira-install`
 
 ## Description

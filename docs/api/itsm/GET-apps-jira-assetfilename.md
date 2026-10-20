@@ -2,7 +2,7 @@
 
 - **Method:** `GET`
 - **Path:** `/apps/jira/{assetFilename}`
-- **Tag:** `jira`
+- **Tag:** `itsm`
 - **operationId:** `get_apps-jira-assetfilename`
 
 ## Description

@@ -25,6 +25,7 @@ retrieve suggested vendors for the caller's domain
 - `grade` (optional, array) — filter by grade letter
 - `recalibrated_score` (optional, array) — filter by recalibrated score
 - `recalibrated_score_grade` (optional, array) — filter by recalibrated score grade letter
+- `recalibration_impact` (optional, array) — filter by how the recalibrated score compares to the security score: higher, lower, same, or none (no recalibrated score)
 - `last_month_score_change` (optional, array) — filter by score points difference in the last 30 days
 - `ransomware_score_categorical_value` (optional, array) — filter by ransomware score severity level
 - `bsi_score_categorical_value` (optional, array) — filter by Breach Susceptibility Indicator score severity level
@@ -210,6 +211,11 @@ A page in a list of VendorPortfolioAutomationSuggestions
           "vsor_monitored": {
             "type": "boolean",
             "description": "Is monitored if it is present in at least one portfolio"
+          },
+          "monitoring_level": {
+            "type": "string",
+            "x-example": "full",
+            "description": "Depth of monitoring the company has within this organization: 'full' (in an org portfolio), 'partial' (org watchlist only), or 'none'. Org-scoped and ranked, so a company in both a portfolio and the watchlist reads 'full'."
           },
           "vsor_status": {
             "type": "string",

@@ -2,7 +2,7 @@
 
 - **Method:** `GET`
 - **Path:** `/apps/jira/install`
-- **Tag:** `jira`
+- **Tag:** `itsm`
 - **operationId:** `get_apps-jira-install`
 
 ## Description
